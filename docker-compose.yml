@@ -1,0 +1,239 @@
+services:
+  ollama:
+    image: hwdsl2/ollama-server
+    container_name: ollama
+    restart: always
+    # ports:
+    #   - "11434:11434/tcp"  # Uncomment for direct access to Ollama
+    volumes:
+      - ollama-data:/var/lib/ollama
+      - ollama-shared:/var/lib/ollama-shared
+      # - ./ollama.env:/ollama.env:ro  # optional: custom config
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:11434/"]
+      interval: 15s
+      timeout: 3s
+      start_period: 60s
+      retries: 3
+
+  ai-stack-init:
+    image: alpine:3.24
+    container_name: ai-stack-init
+    restart: "no"
+    environment:
+      LITELLM_POSTGRES_PASSWORD: ${LITELLM_POSTGRES_PASSWORD:-}
+      AI_STACK_VARIANT: full
+      AI_STACK_ACCEL: cpu
+      AI_STACK_DISABLE_USAGE_COUNTS: "${AI_STACK_DISABLE_USAGE_COUNTS:-}"
+    volumes:
+      - litellm-db:/var/lib/postgresql:ro
+      - ai-stack-shared:/var/lib/ai-stack-shared
+      - ./VERSION:/etc/ai-stack/VERSION:ro
+      - ./scripts/ai-stack-init.sh:/usr/local/bin/ai-stack-init.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/ai-stack-init.sh"]
+
+  db:
+    image: pgvector/pgvector:pg18-trixie
+    container_name: litellm-db
+    restart: always
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD_FILE: /var/lib/ai-stack-shared/litellm_postgres_password
+      POSTGRES_DB: litellm
+    volumes:
+      - litellm-db:/var/lib/postgresql
+      - ai-stack-shared:/var/lib/ai-stack-shared:ro
+    depends_on:
+      ai-stack-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  litellm:
+    image: hwdsl2/litellm-server
+    container_name: litellm
+    restart: always
+    ports:
+      - "4000:4000/tcp"  # For a host-based reverse proxy, change to "127.0.0.1:4000:4000/tcp"
+    environment:
+      - LITELLM_OLLAMA_BASE_URL=http://ollama:11434
+      - LITELLM_MCP_URL=http://mcp:3000/mcp
+      - LITELLM_POSTGRES_PASSWORD_FILE=/var/lib/ai-stack-shared/litellm_postgres_password
+    volumes:
+      - litellm-data:/etc/litellm
+      - ai-stack-shared:/var/lib/ai-stack-shared:ro
+      - ollama-shared:/var/lib/ollama-shared:ro
+      - mcp-shared:/var/lib/mcp-shared:ro
+      - litellm-shared:/var/lib/litellm-shared
+      # - ./litellm.env:/litellm.env:ro  # optional: custom config
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:4000/health/liveliness"]
+      interval: 15s
+      timeout: 5s
+      start_period: 300s
+      retries: 5
+    depends_on:
+      ollama:
+        condition: service_healthy
+      mcp:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+
+  embeddings:
+    image: hwdsl2/embeddings-server
+    container_name: embeddings
+    restart: always
+    ports:
+      - "127.0.0.1:8000:8000/tcp"
+    volumes:
+      - embeddings-data:/var/lib/embeddings
+      # - ./embed.env:/embed.env:ro  # optional: custom config
+
+  whisper:
+    image: hwdsl2/whisper-server
+    container_name: whisper
+    restart: always
+    ports:
+      - "127.0.0.1:9000:9000/tcp"
+    volumes:
+      - whisper-data:/var/lib/whisper
+      # - ./whisper.env:/whisper.env:ro  # optional: custom config
+
+  mcp:
+    image: hwdsl2/mcp-gateway
+    container_name: mcp
+    restart: always
+    # ports:
+    #   - "3000:3000/tcp"  # Uncomment for direct MCP client access (e.g. Claude Desktop, Cursor)
+    volumes:
+      - mcp-data:/var/lib/mcp
+      - mcp-shared:/var/lib/mcp-shared
+      # - ./mcp.env:/mcp.env:ro  # optional: custom config
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 3s
+      start_period: 60s
+      retries: 3
+
+  anythingllm:
+    image: mintplexlabs/anythingllm:1.15.0
+    container_name: anythingllm
+    restart: always
+    ports:
+      - "3001:3001/tcp"  # For a host-based reverse proxy, change to "127.0.0.1:3001:3001/tcp"
+    environment:
+      - STORAGE_DIR=/app/server/storage
+      - LLM_PROVIDER=generic-openai
+      - GENERIC_OPEN_AI_BASE_PATH=http://litellm:4000/v1
+      - GENERIC_OPEN_AI_MODEL_PREF=ollama/llama3.2:3b
+      - GENERIC_OPEN_AI_MODEL_TOKEN_LIMIT=131072
+      - ANYTHINGLLM_DEFAULT_CHAT_MODE=chat
+      - EMBEDDING_ENGINE=native
+      # To embed with the stack's Embeddings service instead of the in-process
+      # model, comment out the line above and uncomment the block below.
+      # NOTE: on an existing deployment, previously embedded documents must be
+      # re-embedded after switching (old vectors won't match the new embedder).
+      # - EMBEDDING_ENGINE=generic-openai
+      # - EMBEDDING_BASE_PATH=http://embeddings:8000/v1
+      # - EMBEDDING_MODEL_PREF=BAAI/bge-small-en-v1.5
+      # - EMBEDDING_MODEL_MAX_CHUNK_LENGTH=1000   # max chars per chunk
+      # - GENERIC_OPEN_AI_EMBEDDING_API_KEY=...   # use `docker exec embeddings embed_manage --getkey`
+      #
+      # Optional: store vectors in the stack's pgvector-enabled Postgres instead
+      # of AnythingLLM's bundled LanceDB (also requires re-embedding to switch).
+      # AnythingLLM auto-creates the extension and table on first use.
+      # - VECTOR_DB=pgvector
+      # - PGVECTOR_CONNECTION_STRING=...        # optional override; auto-configured when unset
+      # - PGVECTOR_TABLE_NAME=anythingllm_vectors   # optional (this is the default)
+      #
+      # When using either of the above, also add `embeddings` and/or `db` as
+      # dependencies — see the commented note next to `depends_on:` below.
+      - DISABLE_TELEMETRY=true
+    volumes:
+      - anythingllm-data:/app/server/storage
+      - ai-stack-shared:/var/lib/ai-stack-shared:ro
+      - litellm-shared:/var/lib/litellm-shared:ro
+      - ./chat-ui-bootstrap.sh:/usr/local/bin/chat-ui-bootstrap.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/chat-ui-bootstrap.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "/bin/bash /usr/local/bin/docker-healthcheck.sh || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 360s
+      retries: 6
+    # cap_add:
+    #   - SYS_ADMIN  # Uncomment if you need AnythingLLM's built-in web scraping (uses Chromium)
+    depends_on:
+      litellm:
+        condition: service_started
+      # When opting into the Embeddings service or pgvector above, also add:
+      # embeddings:
+      #   condition: service_started
+      # db:
+      #   condition: service_healthy
+
+  # docling:  # Uncomment to enable document parsing (PDF, DOCX, etc.); also uncomment docling-data volume below
+  #   image: hwdsl2/docling-server
+  #   container_name: docling
+  #   restart: always
+  #   ports:
+  #     - "127.0.0.1:5001:5001/tcp"
+  #   volumes:
+  #     - docling-data:/var/lib/docling
+  #     # - ./docling.env:/docling.env:ro  # optional: custom config
+
+  # kokoro:  # Uncomment to enable text-to-speech (TTS); also uncomment kokoro-data volume below
+  #   image: hwdsl2/kokoro-server
+  #   container_name: kokoro
+  #   restart: always
+  #   ports:
+  #     - "127.0.0.1:8880:8880/tcp"
+  #   volumes:
+  #     - kokoro-data:/var/lib/kokoro
+  #     # - ./kokoro.env:/kokoro.env:ro  # optional: custom config
+
+  # whisper-live:  # Uncomment to enable real-time speech-to-text (WebSocket); also uncomment whisper-live-data volume below
+  #   image: hwdsl2/whisper-live-server
+  #   container_name: whisper-live
+  #   restart: always
+  #   ports:
+  #     - "127.0.0.1:9090:9090/tcp"  # WebSocket
+  #     - "127.0.0.1:8001:8000/tcp"  # REST API (host port 8001 avoids conflict with embeddings)
+  #   volumes:
+  #     - whisper-live-data:/var/lib/whisper-live
+  #     # - ./whisper-live.env:/whisper-live.env:ro  # optional: custom config
+
+volumes:
+  ollama-data:
+    name: ollama-data
+  ollama-shared:
+    name: ollama-shared
+  litellm-data:
+    name: litellm-data
+  embeddings-data:
+    name: embeddings-data
+  whisper-data:
+    name: whisper-data
+  mcp-data:
+    name: mcp-data
+  mcp-shared:
+    name: mcp-shared
+  litellm-shared:
+    name: litellm-shared
+  anythingllm-data:
+    name: anythingllm-data
+  ai-stack-shared:
+    name: ai-stack-shared
+  litellm-db:
+    name: litellm-db
+  # docling-data:
+  #   name: docling-data
+  # kokoro-data:
+  #   name: kokoro-data
+  # whisper-live-data:
+  #   name: whisper-live-data
