@@ -201,8 +201,11 @@ else
   note_warn "Keine AMD-GPU über lspci erkannt (evtl. lspci fehlt)."; GPU_OK=0
 fi
 
-if lsmod 2>/dev/null | grep -q '^amdgpu'; then ok "Kernel-Modul amdgpu geladen."
-else note_warn "Kernel-Modul amdgpu nicht geladen — GPU-Beschleunigung geht dann nicht."; GPU_OK=0; fi
+if lsmod 2>/dev/null | grep -q '^amdgpu' || [ -d /sys/module/amdgpu ]; then
+  ok "amdgpu-Treiber aktiv (als Modul oder fest im Kernel eingebaut)."
+else
+  note_warn "amdgpu-Treiber nicht gefunden — GPU-Beschleunigung geht dann evtl. nicht."; GPU_OK=0
+fi
 
 if [ -e /dev/kfd ]; then ok "/dev/kfd vorhanden (ROCm-Compute-Interface)."
 else note_warn "/dev/kfd fehlt — ROCm-Treiber/kfd nicht aktiv. Ollama läuft dann auf CPU."; GPU_OK=0; fi
@@ -305,7 +308,9 @@ fi
 # ════════════════════════════════════════════════════════════════════════════
 step "5/7 · Konfiguration schreiben (.env)"
 
-rand() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-32}"; }
+# Zufalls-String. Wichtig: '|| true' fängt den SIGPIPE von 'tr' ab (head schließt
+# die Pipe früh), sonst würde 'set -o pipefail' + 'set -e' das Skript abbrechen.
+rand() { LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c "${1:-32}" || true; }
 
 if [ -f .env ]; then
   info "Bestehende .env gefunden — behalte vorhandene Secrets."
