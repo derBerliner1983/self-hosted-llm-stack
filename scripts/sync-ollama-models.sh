@@ -2,11 +2,10 @@
 #
 # Trägt alle in Ollama geladenen Modelle automatisch bei LiteLLM ein.
 #
-# Angepasst an den ROCm-Stack (Upstream-Images): vanilla-Ollama und
-# vanilla-LiteLLM haben keine *_manage-Tools. Wir lesen daher:
-#   - die Modelliste über die Ollama-API (/api/tags)
-#   - den LiteLLM-Master-Key aus der .env
-# und registrieren nur Modelle, die bei LiteLLM noch fehlen (idempotent).
+# Curl-frei: die Modelliste kommt aus 'ollama list' (im Container), die
+# LiteLLM-Aufrufe laufen über python3 (auf dem Host vorhanden). So werden
+# weder im schlanken ollama-Image noch auf dem Host zusätzliche Tools
+# gebraucht. Idempotent: bereits eingetragene Modelle werden übersprungen.
 #
 # This file is part of Self-Hosted AI Stack. MIT License.
 
@@ -25,62 +24,77 @@ fi
 LITELLM_KEY="${LITELLM_MASTER_KEY:-sk-1234}"
 PORT_LITELLM="${PORT_LITELLM:-4000}"
 LITELLM_URL="http://localhost:${PORT_LITELLM}"
-
 # api_base, unter dem LiteLLM den Ollama-Container erreicht (im Docker-Netz).
 OLLAMA_API_BASE="http://ollama:11434"
 
-info()  { printf '\033[0;34m•\033[0m %s\n' "$*"; }
-ok()    { printf '\033[0;32m✓\033[0m %s\n' "$*"; }
-warn()  { printf '\033[0;33m!\033[0m %s\n' "$*"; }
+command -v python3 >/dev/null 2>&1 || { echo "python3 wird benötigt (bitte installieren)."; exit 1; }
 
-# Ollama-Modelle über die API (im Container ausgeführt, daher localhost:11434).
-info "Frage geladene Ollama-Modelle ab…"
-ALL_MODELS="$(docker exec ollama sh -c \
-  'curl -s http://localhost:11434/api/tags' \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); [print(m['name']) for m in d.get('models',[])]" 2>/dev/null || true)"
+echo "• Frage geladene Ollama-Modelle ab…"
+# 'ollama list'-Tabelle -> nur echte Modellzeilen (Spalte 1 enthält 'name:tag')
+ALL_MODELS="$(docker exec ollama ollama list 2>/dev/null | awk 'NR>1 && $1 ~ /:/ {print $1}')"
 
 if [ -z "${ALL_MODELS// }" ]; then
-  warn "Keine Ollama-Modelle gefunden. Erst ein Modell laden: docker exec ollama ollama pull <modell>"
+  echo "! Keine Ollama-Modelle gefunden. Erst eins laden, z. B.:"
+  echo "    docker exec ollama ollama pull ${DEFAULT_MODEL:-gemma3:12b}"
   exit 0
 fi
 
-# Bereits bei LiteLLM registrierte Modelle (nur ollama/-Präfix).
-EXISTING="$(curl -s "${LITELLM_URL}/v1/models" -H "Authorization: Bearer ${LITELLM_KEY}" \
-  | python3 -c "import sys,json
-try:
-    d=json.load(sys.stdin)
-    for m in d.get('data',[]):
-        i=m.get('id','')
-        if i.startswith('ollama/'): print(i.replace('ollama/',''))
-except Exception:
-    pass" 2>/dev/null || true)"
-
 echo "Gefundene Ollama-Modelle:"
 echo "$ALL_MODELS" | sed 's/^/  - /'
-echo "Bereits bei LiteLLM (ollama/):"
-if [ -n "${EXISTING// }" ]; then echo "$EXISTING" | sed 's/^/  - /'; else echo "  (keine)"; fi
 echo "---"
 
-for MODEL in $ALL_MODELS; do
-  if echo "$EXISTING" | grep -qx "$MODEL"; then
-    info "Übersprungen (schon vorhanden): ollama/${MODEL}"
-    continue
-  fi
+export LITELLM_URL LITELLM_KEY OLLAMA_API_BASE ALL_MODELS
+python3 <<'PY'
+import os, json, urllib.request, urllib.error
 
-  info "Trage neu ein: ollama/${MODEL}"
-  curl -s -X POST "${LITELLM_URL}/model/new" \
-    -H "Authorization: Bearer ${LITELLM_KEY}" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"model_name\": \"ollama/${MODEL}\",
-      \"litellm_params\": {
-        \"model\": \"ollama/${MODEL}\",
-        \"api_base\": \"${OLLAMA_API_BASE}\"
-      }
-    }" >/dev/null && ok "ollama/${MODEL} eingetragen" || warn "Fehler bei ollama/${MODEL}"
-done
+base = os.environ["LITELLM_URL"].rstrip("/")
+key  = os.environ["LITELLM_KEY"]
+obase = os.environ["OLLAMA_API_BASE"]
+models = [m.strip() for m in os.environ["ALL_MODELS"].splitlines() if m.strip()]
 
-echo "---"
-ok "Fertig. Aktuelle Modelle bei LiteLLM:"
-curl -s "${LITELLM_URL}/v1/models" -H "Authorization: Bearer ${LITELLM_KEY}" \
-  | python3 -m json.tool 2>/dev/null || true
+def api(path, method="GET", payload=None):
+    req = urllib.request.Request(
+        base + path, method=method,
+        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+    )
+    if payload is not None:
+        req.data = json.dumps(payload).encode()
+    with urllib.request.urlopen(req, timeout=15) as r:
+        raw = r.read()
+        return json.loads(raw) if raw else {}
+
+# Bereits registrierte ollama/-Modelle einsammeln
+existing = set()
+try:
+    data = api("/v1/models")
+    for m in data.get("data", []):
+        i = m.get("id", "")
+        if i.startswith("ollama/"):
+            existing.add(i[len("ollama/"):])
+except Exception as e:  # noqa: BLE001
+    print("! Konnte LiteLLM-Modelle nicht lesen (läuft LiteLLM schon?):", e)
+
+added = 0
+for name in models:
+    if name in existing:
+        print("• Übersprungen (schon vorhanden): ollama/%s" % name)
+        continue
+    try:
+        api("/model/new", "POST", {
+            "model_name": "ollama/%s" % name,
+            "litellm_params": {"model": "ollama/%s" % name, "api_base": obase},
+        })
+        print("\033[0;32m✓\033[0m Eingetragen: ollama/%s" % name)
+        added += 1
+    except Exception as e:  # noqa: BLE001
+        print("! Fehler bei ollama/%s: %s" % (name, e))
+
+print("---")
+print("Fertig. Neu eingetragen: %d" % added)
+try:
+    data = api("/v1/models")
+    ids = [m.get("id") for m in data.get("data", []) if m.get("id", "").startswith("ollama/")]
+    print("Aktuell bei LiteLLM:", ", ".join(sorted(ids)) or "(keine)")
+except Exception:
+    pass
+PY

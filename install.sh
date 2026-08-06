@@ -496,9 +496,21 @@ fi
 # ════════════════════════════════════════════════════════════════════════════
 step "7/7 · Modelle bei LiteLLM eintragen"
 
+# HTTP-Check ohne curl-Abhängigkeit (Host hat evtl. kein curl, aber python3).
+http_ok() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -sf "$1" >/dev/null 2>&1
+  else
+    python3 - "$1" <<'PY' >/dev/null 2>&1
+import sys, urllib.request
+urllib.request.urlopen(sys.argv[1], timeout=3)
+PY
+  fi
+}
+
 info "Warte auf LiteLLM…"
 for i in $(seq 1 40); do
-  if curl -sf "http://localhost:${PORT_LITELLM}/health/liveliness" >/dev/null 2>&1; then ok "LiteLLM ist bereit."; break; fi
+  if http_ok "http://localhost:${PORT_LITELLM}/health/liveliness"; then ok "LiteLLM ist bereit."; break; fi
   sleep 3
 done
 bash "$ROOT_DIR/scripts/sync-ollama-models.sh" || note_warn "Modell-Sync unvollständig — später erneut ausführen: ./scripts/sync-ollama-models.sh"
