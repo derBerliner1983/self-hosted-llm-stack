@@ -133,6 +133,12 @@ services:
     restart: always
     ports:
       - "127.0.0.1:${PORT_EMBEDDINGS:-8000}:80/tcp"
+    environment:
+      # Explizit setzen: falls der Docker-Client eine leere HF_ENDPOINT-Variable
+      # in den Container injiziert, baut hf-hub daraus eine URL ohne Schema
+      # ("relative URL without a base") und der Modell-Download crasht in
+      # einer Neustart-Schleife. Ein expliziter, gültiger Wert überschreibt das.
+      - HF_ENDPOINT=https://huggingface.co
     command: ["--model-id", "${EMBEDDINGS_MODEL:-BAAI/bge-small-en-v1.5}"]
     volumes:
       - embeddings-data:/data
