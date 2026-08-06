@@ -62,13 +62,13 @@ The installer:
 - writes a `.env` with auto-generated **secrets** (Postgres password, LiteLLM master key)
 - starts the stack, **pulls the default model** and **registers all models with LiteLLM**
 
-**Default model:** `gemma3:12b` (change it with a single line in `.env`, e.g. `DEFAULT_MODEL=qwen2.5:14b`), or pick one at invocation time:
+**Default model:** `gemma4:12b` (change it with a single line in `.env`, e.g. `DEFAULT_MODEL=qwen2.5:14b`), or pick one at invocation time:
 
 ```bash
 DEFAULT_MODEL=llama3.1:8b sudo ./install.sh
 ```
 
-> **Note on `gemma4`:** Ollama's library currently has **no** `gemma4:12b`. The default is therefore `gemma3:12b` (the current 12B Gemma). Once `gemma4` ships, just update `DEFAULT_MODEL` in `.env` and run `docker exec ollama ollama pull gemma4:12b`.
+> **Automatic fallback:** If `gemma4:12b` isn't (yet) in Ollama's library, the installer automatically pulls the **fallback model** `gemma3:12b` (configurable via `FALLBACK_MODEL` in `.env`) so it never starts without a model. Once `gemma4:12b` is available, pull it with `docker exec ollama ollama pull gemma4:12b`.
 
 After install:
 
