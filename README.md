@@ -233,7 +233,9 @@ Der `ollama`-Dienst nutzt das offizielle `ollama/ollama:rocm`-Image und bekommt 
 
 Beim **Ryzen AI Max+ 395** (iGPU `gfx1151`) setzt der Stack `HSA_OVERRIDE_GFX_VERSION=11.5.1`, falls ROCm die iGPU nicht direkt erkennt. Diesen Wert kannst du in der `.env` anpassen. Dank des großen Unified-Memory kann die iGPU sehr große Modelle laden.
 
-> **Tipp:** Der [Installer](#schnellstart-amd-rocm--empfohlen) (`./install.sh`) prüft all das automatisch und meldet, was fehlt. Ein reiner Check ohne Änderungen: `./install.sh --check-only`.
+> **Tipp:** Der [Installer](#schnellstart-amd-rocm--empfohlen) (`./install.sh`) prüft all das automatisch und meldet, was fehlt. Fehlt der Kernel-Treiber, **bietet er die Installation von `amdgpu-dkms` an** (nur der Kernel-Treiber — die ROCm-Bibliotheken bringt das Container-Image mit). Erzwingen mit `sudo ./install.sh --install-drivers`, überspringen mit `--skip-drivers`. Reiner Check ohne Änderungen: `./install.sh --check-only`.
+
+> **Hinweis:** Nach einer frischen Treiber-Installation kann ein **Neustart** nötig sein, damit `/dev/kfd` erscheint. Danach den Installer einfach erneut ausführen. Passt die vorgeschlagene ROCm-Version nicht zu deiner Distribution, lässt sie sich per `ROCM_VERSION=6.x.y sudo ./install.sh --install-drivers` überschreiben.
 
 ## Leichtgewichtige Stacks
 

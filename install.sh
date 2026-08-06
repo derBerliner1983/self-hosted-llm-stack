@@ -7,10 +7,12 @@
 # Standardmodell und trägt alle Ollama-Modelle bei LiteLLM ein.
 #
 # Aufruf:   sudo ./install.sh
-#           ./install.sh --check-only     # nur prüfen, nichts ändern
+#           ./install.sh --check-only        # nur prüfen, nichts ändern
 #           DEFAULT_MODEL=qwen2.5:14b ./install.sh
-#           sudo ./install.sh --uninstall # Container/Netze entfernen, Daten behalten
-#           sudo ./install.sh --purge     # ALLES entfernen (auch Modelle/Chats/DB!)
+#           sudo ./install.sh --install-drivers  # AMD-Kernel-Treiber (amdgpu-dkms) installieren
+#           sudo ./install.sh --skip-drivers     # Treiber-Installation nie anbieten
+#           sudo ./install.sh --uninstall    # Container/Netze entfernen, Daten behalten
+#           sudo ./install.sh --purge        # ALLES entfernen (auch Modelle/Chats/DB!)
 #           ./install.sh --help
 #
 # --uninstall/--purge räumen sowohl den neuen ROCm-Stack als auch den alten
@@ -37,14 +39,17 @@ cd "$ROOT_DIR"
 CHECK_ONLY=0
 MODE="install"   # install | uninstall | purge
 ASSUME_YES=0
+INSTALL_AMD_DRIVERS="${INSTALL_AMD_DRIVERS:-auto}"   # auto | yes | no
 for arg in "$@"; do
   case "$arg" in
-    --check-only) CHECK_ONLY=1 ;;
-    --uninstall)  MODE="uninstall" ;;
-    --purge)      MODE="purge" ;;
-    -y|--yes)     ASSUME_YES=1 ;;
+    --check-only)      CHECK_ONLY=1 ;;
+    --install-drivers) INSTALL_AMD_DRIVERS="yes" ;;
+    --skip-drivers)    INSTALL_AMD_DRIVERS="no" ;;
+    --uninstall)       MODE="uninstall" ;;
+    --purge)           MODE="purge" ;;
+    -y|--yes)          ASSUME_YES=1 ;;
     -h|--help)
-      sed -n '3,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '3,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0 ;;
     *) printf 'Unbekannte Option: %s (--help für Hilfe)\n' "$arg" >&2; exit 2 ;;
   esac
@@ -79,6 +84,74 @@ resolve_dc() {
   if docker compose version >/dev/null 2>&1; then DC="docker compose"
   elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
   else DC=""; fi
+}
+
+# ── AMD-Kernel-Treiber (amdgpu-dkms) installieren ───────────────────────────
+# Es wird bewusst NUR der Kernel-Treiber installiert (liefert /dev/kfd + /dev/dri).
+# Die ROCm-Userspace-Bibliotheken bringt das ollama/ollama:rocm-Image selbst mit.
+# Rückgabe: 0 = installiert (evtl. Reboot nötig), 1 = nicht möglich/abgebrochen.
+install_amd_drivers() {
+  local codename amdgpu_deb url rocm_ver amdgpu_pkg_ver
+
+  if [ "$PKG" != "apt" ]; then
+    note_warn "Automatische Treiber-Installation ist nur für apt (Ubuntu/Debian) umgesetzt."
+    info "Für Fedora/Arch bitte den amdgpu/ROCm-Treiber der Distribution installieren:"
+    info "  https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html"
+    return 1
+  fi
+  command -v curl >/dev/null 2>&1 || $SUDO apt-get install -y -qq curl || true
+
+  codename=""
+  if [ -r /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    codename="${UBUNTU_CODENAME:-${VERSION_CODENAME:-}}"
+  fi
+  info "System: ${PRETTY_NAME:-Debian/Ubuntu} (Codename: ${codename:-unbekannt})"
+  if [ -z "$codename" ]; then
+    note_warn "Konnte den Ubuntu-Codename nicht ermitteln — Treiber bitte manuell installieren."
+    return 1
+  fi
+
+  # Versionen überschreibbar per Env, falls AMD die Pfade ändert.
+  rocm_ver="${ROCM_VERSION:-6.4.1}"
+  amdgpu_pkg_ver="${AMDGPU_INSTALL_VERSION:-6.4.60401-1}"
+
+  info "Installiere Kernel-Header (für den DKMS-Build nötig)…"
+  $SUDO apt-get update -qq || true
+  $SUDO apt-get install -y -qq "linux-headers-$(uname -r)" "linux-modules-extra-$(uname -r)" 2>/dev/null \
+    || note_warn "Passende Kernel-Header/-Module nicht gefunden — DKMS-Build könnte scheitern."
+
+  amdgpu_deb="amdgpu-install_${amdgpu_pkg_ver}_all.deb"
+  url="https://repo.radeon.com/amdgpu-install/${rocm_ver}/ubuntu/${codename}/${amdgpu_deb}"
+  info "Lade AMD-Installer: ${url}"
+  if ! curl -fsSL -o "/tmp/${amdgpu_deb}" "$url"; then
+    note_warn "Download fehlgeschlagen — Codename '${codename}' oder ROCm-Version '${rocm_ver}' wird evtl. nicht angeboten."
+    info "Passende Version findest du hier; danach z. B. ROCM_VERSION=6.x.y setzen:"
+    info "  https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html"
+    return 1
+  fi
+  $SUDO apt-get install -y -qq "/tmp/${amdgpu_deb}" \
+    || { note_warn "amdgpu-install-Paket ließ sich nicht installieren."; return 1; }
+  $SUDO apt-get update -qq || true
+
+  info "Installiere amdgpu-Kernel-Treiber (DKMS) — das dauert ein paar Minuten…"
+  if ! $SUDO apt-get install -y amdgpu-dkms; then
+    note_warn "Installation von amdgpu-dkms fehlgeschlagen. Log oben prüfen."
+    return 1
+  fi
+  ok "amdgpu-Treiber installiert."
+
+  # Gruppen sicherstellen und Modul laden
+  $SUDO modprobe amdgpu 2>/dev/null || true
+  if [ -e /dev/kfd ]; then
+    ok "/dev/kfd ist jetzt vorhanden — GPU ist bereit."
+    return 0
+  fi
+  note_warn "Der Treiber wurde installiert, /dev/kfd erscheint aber erst nach einem Neustart."
+  info "Bitte neu starten und den Installer erneut ausführen:"
+  info "  sudo reboot     # danach:  cd $ROOT_DIR && sudo ./install.sh"
+  return 0
 }
 
 # ── Deinstallation ──────────────────────────────────────────────────────────
@@ -229,8 +302,48 @@ if [ "$CHECK_ONLY" -eq 0 ] && [ -n "$SUDO$( [ "$(id -u)" -eq 0 ] && echo root )"
   done
 fi
 
-[ "$GPU_OK" -eq 1 ] && ok "ROCm-Voraussetzungen erfüllt." \
-  || note_warn "ROCm nicht vollständig. Installiere die AMD-Treiber (amdgpu-dkms/ROCm) — der Stack startet trotzdem, nutzt dann aber die CPU."
+if [ "$GPU_OK" -eq 1 ]; then
+  ok "ROCm-Voraussetzungen erfüllt."
+fi
+
+# Treiber fehlt? Automatische Installation anbieten/durchführen.
+# Harter Indikator ist /dev/kfd. --install-drivers erzwingt den Versuch.
+if [ "$CHECK_ONLY" -eq 0 ] && [ "$INSTALL_AMD_DRIVERS" != "no" ]; then
+  need_drivers=0
+  [ ! -e /dev/kfd ] && need_drivers=1
+  do_drv=0
+  if [ "$INSTALL_AMD_DRIVERS" = "yes" ]; then
+    do_drv=1
+  elif [ "$need_drivers" -eq 1 ]; then
+    if [ "$ASSUME_YES" -eq 1 ]; then
+      do_drv=1
+    else
+      printf '%sAMD-Kernel-Treiber (amdgpu-dkms) jetzt automatisch installieren? [j/N] %s' "$c_bold" "$c_reset"
+      read -r drv_reply || drv_reply=""
+      case "$drv_reply" in j|J|y|Y|ja|Ja|JA) do_drv=1 ;; esac
+    fi
+  fi
+
+  if [ "$do_drv" -eq 1 ]; then
+    step "AMD-Treiber installieren"
+    if install_amd_drivers; then
+      # Nach erfolgreicher Installation GIDs/Gruppen und /dev/kfd neu bewerten
+      VIDEO_GID="$(getent group video 2>/dev/null | cut -d: -f3 || true)"; VIDEO_GID="${VIDEO_GID:-44}"
+      RENDER_GID="$(getent group render 2>/dev/null | cut -d: -f3 || true)"; RENDER_GID="${RENDER_GID:-993}"
+      for grp in video render; do
+        if getent group "$grp" >/dev/null 2>&1 && ! id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx "$grp"; then
+          $SUDO usermod -aG "$grp" "$TARGET_USER" 2>/dev/null || true
+        fi
+      done
+      [ -e /dev/kfd ] && GPU_OK=1
+    fi
+  fi
+fi
+
+if [ "$GPU_OK" -ne 1 ]; then
+  note_warn "ROCm nicht vollständig — der Stack startet trotzdem, nutzt dann aber die CPU."
+  info "Treiber später nachrüsten: sudo ./install.sh --install-drivers"
+fi
 
 # ════════════════════════════════════════════════════════════════════════════
 step "3/7 · Docker prüfen"
