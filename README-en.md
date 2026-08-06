@@ -101,6 +101,17 @@ docker compose -f docker-compose.rocm.yml logs -f open-webui # logs for one serv
 docker compose -f docker-compose.rocm.yml down               # stop (data stays in volumes)
 ```
 
+### Uninstall
+
+The install script can also clean up — both the new ROCm stack and the **old** stack (AnythingLLM/`hwdsl2` images):
+
+```bash
+sudo ./install.sh --uninstall   # remove containers & networks, keep data (volumes)
+sudo ./install.sh --purge       # remove EVERYTHING: models, chats, database and .env too
+```
+
+`--purge` is irreversible and asks for confirmation first (type `loeschen`; add `-y` to skip the prompt). Firewall rules are left untouched.
+
 > The sections below describe the **original CPU/NVIDIA stack** (the `hwdsl2/*` images and AnythingLLM). For AMD, use the ROCm quick start above.
 
 ## Included services

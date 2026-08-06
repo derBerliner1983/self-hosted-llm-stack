@@ -9,6 +9,12 @@
 # Aufruf:   sudo ./install.sh
 #           ./install.sh --check-only     # nur prüfen, nichts ändern
 #           DEFAULT_MODEL=qwen2.5:14b ./install.sh
+#           sudo ./install.sh --uninstall # Container/Netze entfernen, Daten behalten
+#           sudo ./install.sh --purge     # ALLES entfernen (auch Modelle/Chats/DB!)
+#           ./install.sh --help
+#
+# --uninstall/--purge räumen sowohl den neuen ROCm-Stack als auch den alten
+# Stack (docker-compose.yml, AnythingLLM/hwdsl2-Images) auf.
 #
 # This file is part of Self-Hosted AI Stack. MIT License.
 
@@ -29,7 +35,20 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 CHECK_ONLY=0
-[ "${1:-}" = "--check-only" ] && CHECK_ONLY=1
+MODE="install"   # install | uninstall | purge
+ASSUME_YES=0
+for arg in "$@"; do
+  case "$arg" in
+    --check-only) CHECK_ONLY=1 ;;
+    --uninstall)  MODE="uninstall" ;;
+    --purge)      MODE="purge" ;;
+    -y|--yes)     ASSUME_YES=1 ;;
+    -h|--help)
+      sed -n '3,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
+    *) printf 'Unbekannte Option: %s (--help für Hilfe)\n' "$arg" >&2; exit 2 ;;
+  esac
+done
 
 # ── Ausgabe-Helfer ──────────────────────────────────────────────────────────
 c_reset=$'\033[0m'; c_blue=$'\033[0;34m'; c_green=$'\033[0;32m'
@@ -54,6 +73,88 @@ fi
 
 # Realer Benutzer (auch unter sudo), für Gruppenzuordnung
 TARGET_USER="${SUDO_USER:-$(id -un)}"
+
+# ── Docker-Compose-Befehl ermitteln ─────────────────────────────────────────
+resolve_dc() {
+  if docker compose version >/dev/null 2>&1; then DC="docker compose"
+  elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
+  else DC=""; fi
+}
+
+# ── Deinstallation ──────────────────────────────────────────────────────────
+# $1 = "purge" entfernt zusätzlich alle Daten-Volumes (unwiderruflich).
+do_uninstall() {
+  local purge="$1"
+
+  printf '%s' "$c_bold"
+  cat <<'BANNER'
+╔══════════════════════════════════════════════════════╗
+║   Self-Hosted AI Stack · Deinstallation              ║
+╚══════════════════════════════════════════════════════╝
+BANNER
+  printf '%s' "$c_reset"
+
+  command -v docker >/dev/null 2>&1 || die "Docker nicht gefunden — nichts zu tun."
+  resolve_dc
+  [ -n "$DC" ] || die "Docker Compose nicht gefunden."
+
+  # Sicherheitsabfrage beim Purge
+  if [ "$purge" = "purge" ] && [ "$ASSUME_YES" -ne 1 ]; then
+    warn "PURGE entfernt ALLE Daten: geladene Modelle, Chats (Open WebUI), Datenbank und .env."
+    printf '%sTippe zum Bestätigen »loeschen«: %s' "$c_bold" "$c_reset"
+    read -r reply || reply=""
+    [ "$reply" = "loeschen" ] || die "Abgebrochen — nichts wurde entfernt."
+  fi
+
+  local down_args=""
+  [ "$purge" = "purge" ] && down_args="-v"
+
+  # Beide Stacks herunterfahren (soweit die Compose-Dateien vorhanden sind).
+  for f in docker-compose.rocm.yml docker-compose.yml; do
+    if [ -f "$ROOT_DIR/$f" ]; then
+      info "Fahre Stack herunter: $f"
+      # shellcheck disable=SC2086
+      (cd "$ROOT_DIR" && $DC -f "$f" down $down_args --remove-orphans 2>/dev/null) || true
+    fi
+  done
+
+  # Übrig gebliebene Container (auch aus manuellem 'docker run') gezielt entfernen.
+  local containers="ollama open-webui anythingllm litellm litellm-db db mcp \
+embeddings whisper whisper-live kokoro docling ai-stack-init ai-stack-dashboard \
+ai-stack-caddy"
+  info "Entferne evtl. verbliebene Container…"
+  for c in $containers; do
+    docker rm -f "$c" >/dev/null 2>&1 && ok "Container entfernt: $c" || true
+  done
+
+  if [ "$purge" = "purge" ]; then
+    # Bekannte Volumes beider Stacks (alte + neue Namen) löschen.
+    local volumes="ollama-data ollama-shared litellm-data litellm-db litellm-shared \
+ai-stack-shared open-webui-data anythingllm-data embeddings-data whisper-data \
+whisper-live-data kokoro-data mcp-data mcp-shared docling-data caddy-data caddy-config"
+    info "Lösche Daten-Volumes…"
+    for v in $volumes; do
+      docker volume rm "$v" >/dev/null 2>&1 && ok "Volume gelöscht: $v" || true
+    done
+
+    if [ -f "$ROOT_DIR/.env" ]; then
+      rm -f "$ROOT_DIR/.env" && ok ".env entfernt."
+    fi
+    warn "Firewall-Regeln (ufw) wurden NICHT verändert. Bei Bedarf manuell entfernen:"
+    printf '    %s ufw status numbered\n' "${SUDO:-sudo}"
+  else
+    ok "Container/Netzwerke entfernt. Daten-Volumes und .env bleiben erhalten."
+    info "Alles inkl. Daten entfernen:  ${SUDO:-sudo} ./install.sh --purge"
+  fi
+
+  step "Deinstallation abgeschlossen."
+  exit 0
+}
+
+case "$MODE" in
+  uninstall) do_uninstall "keep" ;;
+  purge)     do_uninstall "purge" ;;
+esac
 
 printf '%s' "$c_bold"
 cat <<'BANNER'
