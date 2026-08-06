@@ -51,7 +51,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-litellm}
       POSTGRES_DB: litellm
     volumes:
-      - litellm-db:/var/lib/postgresql/data
+      # postgres:18 legt PGDATA unter /var/lib/postgresql/18/docker ab und
+      # deklariert /var/lib/postgresql als Volume — daher das ganze Verzeichnis
+      # mounten (nicht /data), sonst startet der Container nicht sauber.
+      - litellm-db:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U litellm"]
       interval: 15s
