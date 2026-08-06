@@ -156,6 +156,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: ["python", "/app/app.py"]
 
+# Netzwerk: MTU an die Host-MTU anpassbar. Hinter VPN/Cloud-Overlays hat der
+# Host oft < 1500 (z. B. 1450/1420); ohne Anpassung laufen TLS-Handshakes aus
+# Containern in Timeouts ("i/o timeout"). install.sh erkennt die Host-MTU und
+# setzt DOCKER_MTU in der .env automatisch.
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "${DOCKER_MTU:-1500}"
+
 volumes:
   ollama-data:
     name: ollama-data

@@ -435,6 +435,18 @@ POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(rand 32)}"
 LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-sk-$(rand 40)}"
 WEBUI_SECRET_KEY="${WEBUI_SECRET_KEY:-$(rand 40)}"
 
+# Host-MTU der Standardroute ermitteln und die Container-MTU daran anpassen.
+# Verhindert TLS-Timeouts ("i/o timeout") aus Containern hinter VPN/Cloud-Overlays.
+DEFAULT_DEV="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')"
+HOST_MTU=""
+[ -n "$DEFAULT_DEV" ] && HOST_MTU="$(cat "/sys/class/net/${DEFAULT_DEV}/mtu" 2>/dev/null || true)"
+DOCKER_MTU="${DOCKER_MTU:-${HOST_MTU:-1500}}"
+if [ "${DOCKER_MTU:-1500}" -lt 1500 ] 2>/dev/null; then
+  info "Host-MTU ${DOCKER_MTU} (auf ${DEFAULT_DEV}) — setze Container-MTU passend (verhindert TLS-Timeouts)."
+else
+  info "Host-MTU: ${DOCKER_MTU:-1500} (Standard)."
+fi
+
 cat > .env <<EOF
 # Automatisch erzeugt von install.sh — enthält Secrets, nicht committen!
 COMPOSE_FILE=${COMPOSE_FILE}
@@ -449,6 +461,9 @@ HSA_OVERRIDE_GFX_VERSION=${HSA_OVERRIDE_GFX_VERSION}
 VIDEO_GID=${VIDEO_GID}
 RENDER_GID=${RENDER_GID}
 OLLAMA_KEEP_ALIVE=30m
+
+# Docker-Netzwerk-MTU (an Host-MTU angepasst; verhindert TLS-Timeouts im Container)
+DOCKER_MTU=${DOCKER_MTU}
 
 # Ports
 PORT_WEBUI=${PORT_WEBUI}
