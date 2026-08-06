@@ -3,123 +3,154 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Stack · Dashboard</title>
+<title>AI Stack · Status</title>
 <style>
   :root {
-    --bg: #f5f5f7;
-    --bg-grad-1: #eef1f6;
-    --bg-grad-2: #f7f7fa;
-    --card: rgba(255, 255, 255, 0.72);
-    --card-border: rgba(0, 0, 0, 0.06);
-    --text: #1d1d1f;
-    --text-dim: #6e6e73;
-    --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-    --online: #34c759;
-    --offline: #ff3b30;
-    --starting: #ff9f0a;
-    --accent: #0071e3;
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --border: #e2e5ea;
+    --border-strong: #d3d8df;
+    --text: #1f2328;
+    --text-muted: #616a75;
+    --icon-bg: #f0f2f5;
+    --accent: #1f6feb;
+    --online: #1a7f37;
+    --warn: #9a6700;
+    --offline: #cf222e;
+    --shadow: 0 1px 2px rgba(16, 22, 26, 0.05);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #000000;
-      --bg-grad-1: #1c1c1e;
-      --bg-grad-2: #0a0a0c;
-      --card: rgba(28, 28, 30, 0.72);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --text: #f5f5f7;
-      --text-dim: #98989d;
-      --shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-      --accent: #2997ff;
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #262c36;
+      --border-strong: #333b47;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --icon-bg: #1c222b;
+      --accent: #4493f8;
+      --online: #3fb950;
+      --warn: #d29922;
+      --offline: #f85149;
+      --shadow: none;
     }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f5f7; --surface: #ffffff; --border: #e2e5ea; --border-strong: #d3d8df;
+    --text: #1f2328; --text-muted: #616a75; --icon-bg: #f0f2f5; --accent: #1f6feb;
+    --online: #1a7f37; --warn: #9a6700; --offline: #cf222e; --shadow: 0 1px 2px rgba(16,22,26,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --surface: #161b22; --border: #262c36; --border-strong: #333b47;
+    --text: #e6edf3; --text-muted: #8b949e; --icon-bg: #1c222b; --accent: #4493f8;
+    --online: #3fb950; --warn: #d29922; --offline: #f85149; --shadow: none;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-                 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
     color: var(--text);
-    min-height: 100vh;
-    background:
-      radial-gradient(1200px 600px at 20% -10%, var(--bg-grad-1), transparent 60%),
-      radial-gradient(1000px 700px at 100% 0%, var(--bg-grad-2), transparent 55%),
-      var(--bg);
     -webkit-font-smoothing: antialiased;
+    font-size: 14px;
+    line-height: 1.5;
   }
-  .wrap { max-width: 980px; margin: 0 auto; padding: 56px 24px 80px; }
-  header { text-align: center; margin-bottom: 40px; }
-  h1 {
-    font-size: clamp(30px, 5vw, 44px);
-    font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px;
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding-bottom: 18px; margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
   }
-  .subtitle { color: var(--text-dim); font-size: 17px; margin: 0; }
-  .meta {
-    display: inline-flex; align-items: center; gap: 8px;
-    margin-top: 18px; padding: 7px 14px; border-radius: 980px;
-    background: var(--card); border: 1px solid var(--card-border);
-    font-size: 13px; color: var(--text-dim); backdrop-filter: blur(20px);
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand .logo {
+    width: 34px; height: 34px; flex: none; border-radius: 8px;
+    background: var(--icon-bg); border: 1px solid var(--border);
+    display: grid; place-items: center; color: var(--text-muted);
   }
-  .meta .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
+  .brand h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  .brand p { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+  .summary {
+    display: inline-flex; align-items: center; gap: 8px; flex: none;
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); font-size: 12.5px; color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .summary .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+
   .grid {
-    display: grid; gap: 18px;
+    display: grid; gap: 12px;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   }
   .card {
-    position: relative; display: block; text-decoration: none; color: inherit;
-    background: var(--card); border: 1px solid var(--card-border);
-    border-radius: 22px; padding: 22px 22px 20px;
-    box-shadow: var(--shadow); backdrop-filter: blur(20px) saturate(160%);
-    transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s;
+    display: block; text-decoration: none; color: inherit;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; box-shadow: var(--shadow);
+    transition: border-color .15s ease;
   }
-  a.card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,.14); }
-  .card.disabled { cursor: default; opacity: .85; }
-  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  a.card:hover { border-color: var(--border-strong); }
+  a.card:hover .open { color: var(--accent); }
+  .card.disabled { cursor: default; }
+
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .idlabel { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .icon {
-    width: 46px; height: 46px; flex: none; border-radius: 13px;
-    display: grid; place-items: center; font-size: 24px;
-    background: rgba(127,127,127,.12);
+    width: 36px; height: 36px; flex: none; border-radius: 8px;
+    background: var(--icon-bg); border: 1px solid var(--border);
+    display: grid; place-items: center; color: var(--text-muted);
   }
-  .name { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
-  .desc { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  .icon svg { width: 19px; height: 19px; }
+  .name { font-size: 15px; font-weight: 600; letter-spacing: -0.005em; }
+  .desc { font-size: 12.5px; color: var(--text-muted); margin-top: 1px; }
+
   .status {
-    display: inline-flex; align-items: center; gap: 7px; flex: none;
-    font-size: 13px; font-weight: 500; color: var(--text-dim);
+    display: inline-flex; align-items: center; gap: 6px; flex: none;
+    font-size: 12px; font-weight: 500; color: var(--text-muted); white-space: nowrap;
   }
-  .led { width: 11px; height: 11px; border-radius: 50%; background: var(--offline);
-         box-shadow: 0 0 0 0 rgba(52,199,89,.5); }
-  .led.online { background: var(--online); animation: pulse 2s infinite; }
-  .led.starting { background: var(--starting); }
+  .led { width: 8px; height: 8px; border-radius: 50%; background: var(--offline); flex: none; }
+  .led.online { background: var(--online); }
+  .led.warn { background: var(--warn); }
   .led.offline { background: var(--offline); }
-  @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(52,199,89,.45); }
-    70% { box-shadow: 0 0 0 9px rgba(52,199,89,0); }
-    100% { box-shadow: 0 0 0 0 rgba(52,199,89,0); }
+
+  .foot {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+    font-size: 12.5px; color: var(--text-muted);
   }
-  .foot { display: flex; align-items: center; justify-content: space-between;
-          margin-top: 18px; font-size: 13px; color: var(--text-dim); }
-  .port { font-variant-numeric: tabular-nums;
-          background: rgba(127,127,127,.12); padding: 3px 9px; border-radius: 7px; }
-  .open { color: var(--accent); font-weight: 600; }
-  .refresh { text-align: center; margin-top: 34px; color: var(--text-dim); font-size: 13px; }
+  .port {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--text-muted);
+  }
+  .open { color: var(--text-muted); font-weight: 500; transition: color .15s ease; }
+
+  footer { margin-top: 28px; text-align: center; font-size: 12px; color: var(--text-muted); }
   .banner {
-    display: none; margin: 0 0 22px; padding: 14px 18px; border-radius: 14px;
-    background: rgba(255,59,48,.12); color: var(--offline);
-    border: 1px solid rgba(255,59,48,.25); font-size: 14px;
+    display: none; margin-bottom: 18px; padding: 10px 14px; border-radius: 8px;
+    background: color-mix(in srgb, var(--offline) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--offline) 35%, transparent);
+    color: var(--offline); font-size: 13px;
   }
 </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <h1>Self-Hosted AI Stack</h1>
-      <p class="subtitle">Dein privater KI-Server — alles auf einen Blick</p>
-      <div class="meta"><span class="dot" id="metaDot"></span><span id="meta">Verbinde…</span></div>
+      <div class="brand">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="19" height="19"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>
+        </span>
+        <div>
+          <h1>Self-Hosted AI Stack</h1>
+          <p>Dienststatus</p>
+        </div>
+      </div>
+      <div class="summary"><span class="dot" id="metaDot"></span><span id="meta">Verbinde …</span></div>
     </header>
 
     <div class="banner" id="banner"></div>
     <div class="grid" id="grid"></div>
 
-    <p class="refresh">Aktualisiert sich automatisch alle 5&nbsp;Sekunden</p>
+    <footer>Aktualisiert automatisch alle 5&nbsp;Sekunden</footer>
   </div>
 
 <script>
@@ -128,21 +159,31 @@
   const metaDot = document.getElementById('metaDot');
   const banner = document.getElementById('banner');
 
+  // Dezente, einfarbige Icons je Dienst (stroke = currentColor).
+  const ICONS = {
+    "open-webui": '<path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/>',
+    "litellm":    '<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+    "ollama":     '<rect x="6" y="6" width="12" height="12" rx="1.5"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>',
+    "whisper":    '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+    "embeddings": '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.2-4.2"/>',
+    "litellm-db": '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+    "_default":   '<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/>'
+  };
+
   function esc(s) {
     return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   }
-
-  function ledClass(s) {
-    if (s.online) return 'online';
-    if (s.health === 'starting' || s.state === 'restarting' || s.state === 'created') return 'starting';
-    return 'offline';
+  function iconFor(container) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" '
+      + 'stroke-linecap="round" stroke-linejoin="round">' + (ICONS[container] || ICONS._default) + '</svg>';
   }
-  function ledText(s) {
-    if (s.online) return 'Online';
-    if (s.health === 'unhealthy') return 'Fehler';
-    if (s.health === 'starting' || s.state === 'restarting') return 'Startet…';
-    if (s.state === 'absent') return 'Nicht da';
-    return 'Offline';
+  function statusOf(s) {
+    if (s.online) return { cls: 'online', txt: 'Online' };
+    if (s.health === 'unhealthy') return { cls: 'offline', txt: 'Fehler' };
+    if (s.state === 'restarting') return { cls: 'warn', txt: 'Neustart …' };
+    if (s.health === 'starting' || s.state === 'created') return { cls: 'warn', txt: 'Startet …' };
+    if (s.state === 'absent') return { cls: 'offline', txt: 'Nicht vorhanden' };
+    return { cls: 'offline', txt: 'Offline' };
   }
 
   function card(s) {
@@ -150,23 +191,22 @@
     const clickable = s.online && s.port && s.path;
     const url = clickable ? `${window.location.protocol}//${host}:${s.port}${s.path}` : null;
     const tag = clickable ? 'a' : 'div';
-    const href = clickable ? ` href="${esc(url)}" target="_blank" rel="noopener"` : '';
-    const cls = clickable ? 'card' : 'card disabled';
-    const foot = s.port
-      ? `<span class="port">:${s.port}</span>${clickable ? '<span class="open">Öffnen →</span>' : '<span></span>'}`
-      : `<span class="port">intern</span><span></span>`;
-    return `<${tag} class="${cls}"${href}>
-      <div class="row">
+    const attrs = clickable ? ` href="${esc(url)}" target="_blank" rel="noopener"` : '';
+    const st = statusOf(s);
+    const portLabel = s.port ? `:${s.port}` : 'intern';
+    const openLabel = clickable ? '<span class="open">Öffnen →</span>' : '<span></span>';
+    return `<${tag} class="card${clickable ? '' : ' disabled'}"${attrs}>
+      <div class="top">
         <div class="idlabel">
-          <div class="icon">${s.icon || '📦'}</div>
+          <span class="icon" aria-hidden="true">${iconFor(s.container)}</span>
           <div>
             <div class="name">${esc(s.label)}</div>
             <div class="desc">${esc(s.desc)}</div>
           </div>
         </div>
-        <div class="status"><span class="led ${ledClass(s)}"></span>${ledText(s)}</div>
+        <span class="status"><span class="led ${st.cls}"></span>${st.txt}</span>
       </div>
-      <div class="foot">${foot}</div>
+      <div class="foot"><span class="port">${portLabel}</span>${openLabel}</div>
     </${tag}>`;
   }
 
@@ -177,20 +217,15 @@
       grid.innerHTML = data.services.map(card).join('');
       const up = data.services.filter(s => s.online).length;
       const total = data.services.length;
-      meta.textContent = `${up} von ${total} Diensten online · ${new Date().toLocaleTimeString('de-DE')}`;
-      metaDot.style.background = up === total ? 'var(--online)' : (up === 0 ? 'var(--offline)' : 'var(--starting)');
-      if (!data.docker_ok) {
-        banner.style.display = 'block';
-        banner.textContent = 'Docker-Socket nicht erreichbar — Status kann nicht gelesen werden.';
-      } else {
-        banner.style.display = 'none';
-      }
+      meta.textContent = `${up} / ${total} online · ${new Date().toLocaleTimeString('de-DE')}`;
+      metaDot.style.background = up === total ? 'var(--online)' : (up === 0 ? 'var(--offline)' : 'var(--warn)');
+      banner.style.display = data.docker_ok ? 'none' : 'block';
+      if (!data.docker_ok) banner.textContent = 'Docker-Socket nicht erreichbar — Status kann nicht gelesen werden.';
     } catch (e) {
-      meta.textContent = 'Dashboard nicht erreichbar…';
+      meta.textContent = 'nicht erreichbar';
       metaDot.style.background = 'var(--offline)';
     }
   }
-
   tick();
   setInterval(tick, 5000);
 </script>
