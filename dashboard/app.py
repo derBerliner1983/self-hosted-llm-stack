@@ -123,7 +123,7 @@ def _state_for(container):
         health = "healthy"
     elif "(unhealthy)" in status:
         health = "unhealthy"
-    elif "(health: starting)" in status or "starting" in status:
+    elif "(health: starting)" in status:
         health = "starting"
     return {"state": state, "health": health, "status": status}
 
