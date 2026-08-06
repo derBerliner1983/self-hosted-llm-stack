@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Stack · Dashboard</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --bg-grad-1: #eef1f6;
+    --bg-grad-2: #f7f7fa;
+    --card: rgba(255, 255, 255, 0.72);
+    --card-border: rgba(0, 0, 0, 0.06);
+    --text: #1d1d1f;
+    --text-dim: #6e6e73;
+    --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    --online: #34c759;
+    --offline: #ff3b30;
+    --starting: #ff9f0a;
+    --accent: #0071e3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --bg-grad-1: #1c1c1e;
+      --bg-grad-2: #0a0a0c;
+      --card: rgba(28, 28, 30, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #f5f5f7;
+      --text-dim: #98989d;
+      --shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+      --accent: #2997ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+                 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at 20% -10%, var(--bg-grad-1), transparent 60%),
+      radial-gradient(1000px 700px at 100% 0%, var(--bg-grad-2), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 56px 24px 80px; }
+  header { text-align: center; margin-bottom: 40px; }
+  h1 {
+    font-size: clamp(30px, 5vw, 44px);
+    font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px;
+  }
+  .subtitle { color: var(--text-dim); font-size: 17px; margin: 0; }
+  .meta {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-top: 18px; padding: 7px 14px; border-radius: 980px;
+    background: var(--card); border: 1px solid var(--card-border);
+    font-size: 13px; color: var(--text-dim); backdrop-filter: blur(20px);
+  }
+  .meta .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
+  .grid {
+    display: grid; gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+  .card {
+    position: relative; display: block; text-decoration: none; color: inherit;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 22px; padding: 22px 22px 20px;
+    box-shadow: var(--shadow); backdrop-filter: blur(20px) saturate(160%);
+    transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s;
+  }
+  a.card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,.14); }
+  .card.disabled { cursor: default; opacity: .85; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .idlabel { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .icon {
+    width: 46px; height: 46px; flex: none; border-radius: 13px;
+    display: grid; place-items: center; font-size: 24px;
+    background: rgba(127,127,127,.12);
+  }
+  .name { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+  .desc { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  .status {
+    display: inline-flex; align-items: center; gap: 7px; flex: none;
+    font-size: 13px; font-weight: 500; color: var(--text-dim);
+  }
+  .led { width: 11px; height: 11px; border-radius: 50%; background: var(--offline);
+         box-shadow: 0 0 0 0 rgba(52,199,89,.5); }
+  .led.online { background: var(--online); animation: pulse 2s infinite; }
+  .led.starting { background: var(--starting); }
+  .led.offline { background: var(--offline); }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(52,199,89,.45); }
+    70% { box-shadow: 0 0 0 9px rgba(52,199,89,0); }
+    100% { box-shadow: 0 0 0 0 rgba(52,199,89,0); }
+  }
+  .foot { display: flex; align-items: center; justify-content: space-between;
+          margin-top: 18px; font-size: 13px; color: var(--text-dim); }
+  .port { font-variant-numeric: tabular-nums;
+          background: rgba(127,127,127,.12); padding: 3px 9px; border-radius: 7px; }
+  .open { color: var(--accent); font-weight: 600; }
+  .refresh { text-align: center; margin-top: 34px; color: var(--text-dim); font-size: 13px; }
+  .banner {
+    display: none; margin: 0 0 22px; padding: 14px 18px; border-radius: 14px;
+    background: rgba(255,59,48,.12); color: var(--offline);
+    border: 1px solid rgba(255,59,48,.25); font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Self-Hosted AI Stack</h1>
+      <p class="subtitle">Dein privater KI-Server — alles auf einen Blick</p>
+      <div class="meta"><span class="dot" id="metaDot"></span><span id="meta">Verbinde…</span></div>
+    </header>
+
+    <div class="banner" id="banner"></div>
+    <div class="grid" id="grid"></div>
+
+    <p class="refresh">Aktualisiert sich automatisch alle 5&nbsp;Sekunden</p>
+  </div>
+
+<script>
+  const grid = document.getElementById('grid');
+  const meta = document.getElementById('meta');
+  const metaDot = document.getElementById('metaDot');
+  const banner = document.getElementById('banner');
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  function ledClass(s) {
+    if (s.online) return 'online';
+    if (s.health === 'starting' || s.state === 'restarting' || s.state === 'created') return 'starting';
+    return 'offline';
+  }
+  function ledText(s) {
+    if (s.online) return 'Online';
+    if (s.health === 'unhealthy') return 'Fehler';
+    if (s.health === 'starting' || s.state === 'restarting') return 'Startet…';
+    if (s.state === 'absent') return 'Nicht da';
+    return 'Offline';
+  }
+
+  function card(s) {
+    const host = window.location.hostname || 'localhost';
+    const clickable = s.online && s.port && s.path;
+    const url = clickable ? `${window.location.protocol}//${host}:${s.port}${s.path}` : null;
+    const tag = clickable ? 'a' : 'div';
+    const href = clickable ? ` href="${esc(url)}" target="_blank" rel="noopener"` : '';
+    const cls = clickable ? 'card' : 'card disabled';
+    const foot = s.port
+      ? `<span class="port">:${s.port}</span>${clickable ? '<span class="open">Öffnen →</span>' : '<span></span>'}`
+      : `<span class="port">intern</span><span></span>`;
+    return `<${tag} class="${cls}"${href}>
+      <div class="row">
+        <div class="idlabel">
+          <div class="icon">${s.icon || '📦'}</div>
+          <div>
+            <div class="name">${esc(s.label)}</div>
+            <div class="desc">${esc(s.desc)}</div>
+          </div>
+        </div>
+        <div class="status"><span class="led ${ledClass(s)}"></span>${ledText(s)}</div>
+      </div>
+      <div class="foot">${foot}</div>
+    </${tag}>`;
+  }
+
+  async function tick() {
+    try {
+      const r = await fetch('/api/status', { cache: 'no-store' });
+      const data = await r.json();
+      grid.innerHTML = data.services.map(card).join('');
+      const up = data.services.filter(s => s.online).length;
+      const total = data.services.length;
+      meta.textContent = `${up} von ${total} Diensten online · ${new Date().toLocaleTimeString('de-DE')}`;
+      metaDot.style.background = up === total ? 'var(--online)' : (up === 0 ? 'var(--offline)' : 'var(--starting)');
+      if (!data.docker_ok) {
+        banner.style.display = 'block';
+        banner.textContent = 'Docker-Socket nicht erreichbar — Status kann nicht gelesen werden.';
+      } else {
+        banner.style.display = 'none';
+      }
+    } catch (e) {
+      meta.textContent = 'Dashboard nicht erreichbar…';
+      metaDot.style.background = 'var(--offline)';
+    }
+  }
+
+  tick();
+  setInterval(tick, 5000);
+</script>
+</body>
+</html>

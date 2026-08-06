@@ -1,0 +1,8 @@
+# Lokale Umgebung / Secrets (von install.sh erzeugt) — niemals committen
+.env
+.env.tmp
+*.env
+!*.env.example
+
+# Backups
+backups/
