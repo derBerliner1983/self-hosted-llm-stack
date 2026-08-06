@@ -7,6 +7,11 @@
 # api_base zeigt auf den Ollama-Container im gemeinsamen Docker-Netz.
 
 model_list:
+  - model_name: gemma4:12b
+    litellm_params:
+      model: ollama/gemma4:12b
+      api_base: http://ollama:11434
+
   - model_name: gemma3:12b
     litellm_params:
       model: ollama/gemma3:12b

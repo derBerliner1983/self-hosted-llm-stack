@@ -24,7 +24,8 @@ set -euo pipefail
 
 # ── Konfiguration (per Env oder .env überschreibbar) ────────────────────────
 COMPOSE_FILE="docker-compose.rocm.yml"
-DEFAULT_MODEL="${DEFAULT_MODEL:-gemma3:12b}"   # gemma4 gibt's noch nicht -> gemma3:12b
+DEFAULT_MODEL="${DEFAULT_MODEL:-gemma4:12b}"     # gewünschtes Standardmodell
+FALLBACK_MODEL="${FALLBACK_MODEL:-gemma3:12b}"   # falls DEFAULT_MODEL (noch) nicht existiert
 HSA_OVERRIDE_GFX_VERSION="${HSA_OVERRIDE_GFX_VERSION:-11.5.1}"  # gfx1151 (Strix Halo)
 FIREWALL_MODE="${FIREWALL_MODE:-lan}"          # lan | open | none
 MIN_RAM_GB="${MIN_RAM_GB:-16}"
@@ -438,8 +439,10 @@ cat > .env <<EOF
 # Automatisch erzeugt von install.sh — enthält Secrets, nicht committen!
 COMPOSE_FILE=${COMPOSE_FILE}
 
-# Standardmodell (mit einer Zeile änderbar; 'gemma4' existiert noch nicht -> gemma3:12b)
+# Standardmodell (mit einer Zeile änderbar). FALLBACK_MODEL wird gezogen,
+# falls DEFAULT_MODEL (noch) nicht in der Ollama-Bibliothek liegt.
 DEFAULT_MODEL=${DEFAULT_MODEL}
+FALLBACK_MODEL=${FALLBACK_MODEL}
 
 # AMD-GPU / ROCm (Strix Halo = gfx1151)
 HSA_OVERRIDE_GFX_VERSION=${HSA_OVERRIDE_GFX_VERSION}
@@ -482,6 +485,15 @@ done
 info "Lade Standardmodell: ${DEFAULT_MODEL} (das dauert je nach Größe)…"
 if docker exec ollama ollama pull "$DEFAULT_MODEL"; then
   ok "Modell ${DEFAULT_MODEL} geladen."
+elif [ -n "$FALLBACK_MODEL" ] && [ "$FALLBACK_MODEL" != "$DEFAULT_MODEL" ]; then
+  note_warn "'${DEFAULT_MODEL}' ließ sich nicht laden (evtl. noch nicht in der Ollama-Bibliothek)."
+  info "Nutze Fallback-Modell: ${FALLBACK_MODEL}…"
+  if docker exec ollama ollama pull "$FALLBACK_MODEL"; then
+    ok "Fallback-Modell ${FALLBACK_MODEL} geladen."
+    info "Sobald '${DEFAULT_MODEL}' verfügbar ist: DEFAULT_MODEL in .env anpassen und 'docker exec ollama ollama pull ${DEFAULT_MODEL}'."
+  else
+    note_warn "Auch das Fallback-Modell ließ sich nicht laden. Später manuell: docker exec ollama ollama pull <modell>"
+  fi
 else
   note_warn "Konnte ${DEFAULT_MODEL} nicht laden. Prüfe den Modellnamen (z. B. gemma3:12b, llama3.1:8b)."
 fi
