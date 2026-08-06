@@ -395,6 +395,15 @@ else
   fi
   if command -v ufw >/dev/null 2>&1; then
     $SUDO ufw allow OpenSSH >/dev/null 2>&1 || $SUDO ufw allow 22/tcp >/dev/null 2>&1 || true
+    # WICHTIG für Docker: ufw setzt die FORWARD-Policy sonst auf DROP und kappt
+    # damit den Container-Egress (Container kommen nicht mehr ins Internet ->
+    # 'ollama pull' läuft in "i/o timeout"). Auf ACCEPT stellen; der Ingress-
+    # Schutz über die ufw-Regeln bleibt davon unberührt.
+    if [ -f /etc/default/ufw ]; then
+      $SUDO sed -i 's/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw \
+        && ok "ufw FORWARD-Policy auf ACCEPT gesetzt (Docker-Container behalten Internetzugang)." \
+        || note_warn "Konnte DEFAULT_FORWARD_POLICY nicht anpassen."
+    fi
     if [ "$FIREWALL_MODE" = "lan" ]; then
       for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD"; do
         $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto tcp >/dev/null 2>&1 || true
