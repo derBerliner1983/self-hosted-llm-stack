@@ -1,4 +1,4 @@
-[English](README.md) | [Deutsch](README-de.md)
+[Deutsch](README.md) | [English](README-en.md)
 
 # Self-Hosted AI Stack
 
@@ -6,88 +6,88 @@
 
 <p align="center">
   <img src="docs/images/self-hosted-ai-stack-overview.png"
-       alt="Self-Hosted AI Stack: deploy a complete self-hosted AI stack with one command"
+       alt="Self-Hosted AI Stack: Stelle einen kompletten selbst gehosteten KI-Stack mit einem einzigen Befehl bereit"
        width="100%">
 </p>
 
-Includes Ollama, LiteLLM, AnythingLLM, Whisper, MCP Gateway, Embeddings, Docling, and Kokoro — fully configured and ready to run with Docker Compose.
+Enthält Ollama, LiteLLM, AnythingLLM, Whisper, MCP Gateway, Embeddings, Docling und Kokoro — vollständig konfiguriert und startklar mit Docker Compose.
 
-- Zero-config: all services auto-configure on first start
-- Secure by default: AnythingLLM password protection is enabled, and bundled API services auto-generate keys
-- HTTPS-ready: optional Caddy overlay provides automatic TLS and binds direct HTTP ports to localhost
-- Private: runs locally by default with optional external provider support via LiteLLM
-- Flexible: customize models, ports, providers, and API keys with simple env files
-- [Lightweight stacks](#lightweight-stacks) for lower memory requirements (as low as ~4.5 GB)
-- GPU acceleration via NVIDIA CUDA
-- Multi-arch: `linux/amd64`, `linux/arm64`
+- Ohne Konfiguration: Alle Dienste konfigurieren sich beim ersten Start automatisch
+- Standardmäßig sicher: Der Passwortschutz von AnythingLLM ist aktiviert, und die mitgelieferten API-Dienste erzeugen automatisch Schlüssel
+- HTTPS-bereit: Ein optionales Caddy-Overlay stellt automatisches TLS bereit und bindet direkte HTTP-Ports an localhost
+- Privat: Läuft standardmäßig lokal, mit optionaler Unterstützung externer Anbieter über LiteLLM
+- Flexibel: Passe Modelle, Ports, Anbieter und API-Schlüssel über einfache env-Dateien an
+- [Leichtgewichtige Stacks](#leichtgewichtige-stacks) für geringere Speicheranforderungen (ab ~4,5 GB)
+- GPU-Beschleunigung über NVIDIA CUDA
+- Multi-Arch: `linux/amd64`, `linux/arm64`
 
 ## Community
 
-- 📬 [Subscribe for project updates](https://selfhostedstack.beehiiv.com/subscribe?utm_campaign=ai) (1–2 emails/month) — get free AI and VPN deployment guides (PDF)
-- 💬 Join the [r/selfhostedstack](https://www.reddit.com/r/selfhostedstack/) community for discussions and showcases
-- ⭐ Star the repository if you find it useful — it helps others discover it
+- 📬 [Für Projekt-Updates anmelden](https://selfhostedstack.beehiiv.com/subscribe?utm_campaign=ai) (1–2 E-Mails/Monat) — erhalte kostenlose Anleitungen zur Bereitstellung von KI und VPN (PDF)
+- 💬 Tritt der [r/selfhostedstack](https://www.reddit.com/r/selfhostedstack/) Community für Diskussionen und Showcases bei
+- ⭐ Gib dem Repository einen Stern, wenn du es nützlich findest — das hilft anderen, es zu entdecken
 
-Self-Hosted AI Stack is maintained by the author of [Setup IPsec VPN](https://github.com/hwdsl2/setup-ipsec-vpn) (28k+ stars).
+Self-Hosted AI Stack wird vom Autor von [Setup IPsec VPN](https://github.com/hwdsl2/setup-ipsec-vpn) (28k+ Sterne) gepflegt.
 
-## Included services
+## Enthaltene Dienste
 
-| Service | Role | Default port |
+| Dienst | Rolle | Standard-Port |
 |---|---|---|
-| **[Ollama (LLM)](https://github.com/hwdsl2/docker-ollama)** | Runs local LLM models (llama3, qwen, mistral, etc.) | `11434` |
-| **[AnythingLLM](https://github.com/mintplex-labs/anything-llm)** | Web-based chat UI — password-protected by default | `3001` |
-| **[LiteLLM](https://github.com/hwdsl2/docker-litellm)** | AI gateway with Admin UI — routes requests to Ollama and 100+ providers | `4000` |
-| **[Embeddings](https://github.com/hwdsl2/docker-embeddings)** | Converts text to vectors for semantic search and RAG | `8000` |
-| **[Whisper (STT)](https://github.com/hwdsl2/docker-whisper)** | Transcribes spoken audio to text | `9000` |
-| **[WhisperLive (real-time STT)](https://github.com/hwdsl2/docker-whisper-live)** | Real-time speech-to-text transcription over WebSocket | `9090` |
-| **[Kokoro (TTS)](https://github.com/hwdsl2/docker-kokoro)** | Converts text to natural-sounding speech | `8880` |
-| **[MCP Gateway](https://github.com/hwdsl2/docker-mcp-gateway)** | Provides MCP tools (filesystem, fetch, GitHub, search, databases) to AI clients | `3000` |
-| **[Docling](https://github.com/hwdsl2/docker-docling)** | Converts documents (PDF, DOCX, etc.) to structured text/Markdown | `5001` |
+| **[Ollama (LLM)](https://github.com/hwdsl2/docker-ollama)** | Führt lokale LLM-Modelle aus (llama3, qwen, mistral usw.) | `11434` |
+| **[AnythingLLM](https://github.com/mintplex-labs/anything-llm)** | Web-basierte Chat-Oberfläche — standardmäßig passwortgeschützt | `3001` |
+| **[LiteLLM](https://github.com/hwdsl2/docker-litellm)** | KI-Gateway mit Admin-UI — leitet Anfragen an Ollama und 100+ Anbieter weiter | `4000` |
+| **[Embeddings](https://github.com/hwdsl2/docker-embeddings)** | Wandelt Text in Vektoren um für semantische Suche und RAG | `8000` |
+| **[Whisper (STT)](https://github.com/hwdsl2/docker-whisper)** | Transkribiert gesprochenes Audio in Text | `9000` |
+| **[WhisperLive (Echtzeit-STT)](https://github.com/hwdsl2/docker-whisper-live)** | Echtzeit-Transkription von Sprache zu Text über WebSocket | `9090` |
+| **[Kokoro (TTS)](https://github.com/hwdsl2/docker-kokoro)** | Wandelt Text in natürlich klingende Sprache um | `8880` |
+| **[MCP Gateway](https://github.com/hwdsl2/docker-mcp-gateway)** | Stellt MCP-Werkzeuge (Dateisystem, Fetch, GitHub, Suche, Datenbanken) für KI-Clients bereit | `3000` |
+| **[Docling](https://github.com/hwdsl2/docker-docling)** | Wandelt Dokumente (PDF, DOCX usw.) in strukturierten Text/Markdown um | `5001` |
 
-## Quick start
+## Schnellstart
 
-**Requirements:**
+**Voraussetzungen:**
 
-- A Linux server (local or cloud) with Docker installed
-- At least 8 GB of RAM (with small models). For larger LLM models (8B+), 16 GB or more is recommended.
-- You can comment out services you don't need to reduce memory usage.
+- Ein Linux-Server (lokal oder in der Cloud) mit installiertem Docker
+- Mindestens 8 GB RAM (mit kleinen Modellen). Für größere LLM-Modelle (8B+) werden 16 GB oder mehr empfohlen.
+- Du kannst nicht benötigte Dienste auskommentieren, um den Speicherverbrauch zu reduzieren.
 
-**Start the full stack:**
+**Den vollständigen Stack starten:**
 
 ```bash
-# Clone the repository to get the compose files
+# Klone das Repository, um die Compose-Dateien zu erhalten
 git clone https://github.com/hwdsl2/self-hosted-ai-stack
 cd self-hosted-ai-stack
 docker compose up -d
 ```
 
-> **Existing installs:** If you cloned this project before it was renamed from `docker-ai-stack`, your existing checkout and deployment continue to work. GitHub redirects the old repository URL, and you do not need to rename your local directory, containers, volumes, or networks.
+> **Bestehende Installationen:** Wenn du dieses Projekt geklont hast, bevor es von `docker-ai-stack` umbenannt wurde, funktionieren dein vorhandener Checkout und deine Bereitstellung weiterhin. GitHub leitet die alte Repository-URL um, und du musst dein lokales Verzeichnis, deine Container, Volumes oder Netzwerke nicht umbenennen.
 
-> **PostgreSQL credentials:** Fresh installs and existing default installs are handled automatically. If you previously set a custom database password, see [PostgreSQL credentials](#postgresql-credentials) before starting.
+> **PostgreSQL-Zugangsdaten:** Neue Installationen und bestehende Standardinstallationen werden automatisch behandelt. Wenn du zuvor ein eigenes Datenbankpasswort festgelegt hast, siehe [PostgreSQL-Zugangsdaten](#postgresql-zugangsdaten), bevor du startest.
 
-**Pull a model** (required before making LLM requests):
+**Ein Modell herunterladen** (erforderlich, bevor LLM-Anfragen gestellt werden):
 
 ```bash
 docker exec ollama ollama_manage --pull llama3.2:3b
 ```
 
-Run the health check to verify all services are working:
+Führe den Health-Check aus, um zu überprüfen, ob alle Dienste funktionieren:
 
 ```bash
 ./stack-check.sh
 ```
 
-> **Tip:** On first start, services may take a few minutes to initialize. If any checks fail, wait and run `./stack-check.sh` again. Use `docker compose logs` to check progress.
+> **Tipp:** Beim ersten Start kann die Initialisierung der Dienste einige Minuten dauern. Wenn Prüfungen fehlschlagen, warte und führe `./stack-check.sh` erneut aus. Nutze `docker compose logs`, um den Fortschritt zu prüfen.
 
-For detailed troubleshooting, see the [Troubleshooting](docs/troubleshooting.md) guide.
+Für detaillierte Fehlerbehebung siehe die Anleitung zur [Fehlerbehebung](docs/troubleshooting.md).
 
-**Get the LiteLLM master key** (used to log into the Admin UI and for LLM requests):
+**Den LiteLLM-Masterschlüssel abrufen** (wird zum Anmelden in der Admin-UI und für LLM-Anfragen verwendet):
 
 ```bash
 docker exec litellm litellm_manage --showkey
 ```
 
 <details>
-<summary>Show core API keys (Ollama, LiteLLM, MCP Gateway)</summary>
+<summary>Kern-API-Schlüssel anzeigen (Ollama, LiteLLM, MCP Gateway)</summary>
 
 ```bash
 docker exec ollama ollama_manage --showkey
@@ -97,128 +97,128 @@ docker exec mcp mcp_manage --showkey
 
 </details>
 
-**Access AnythingLLM (Chat UI):**
+**Auf AnythingLLM (Chat-UI) zugreifen:**
 
-AnythingLLM is pre-configured to connect to your local LLM via LiteLLM. On first start, it may take a few minutes to become available (check progress with `docker logs anythingllm`).
+AnythingLLM ist vorkonfiguriert, um sich über LiteLLM mit deinem lokalen LLM zu verbinden. Beim ersten Start kann es einige Minuten dauern, bis es verfügbar ist (prüfe den Fortschritt mit `docker logs anythingllm`).
 
-**Password-protected by default.** A random admin password is auto-generated on first start, printed once to `docker logs anythingllm`, and saved to `/app/server/storage/.initial_admin_password` inside the `anythingllm-data` volume. The seeded password persists across container upgrades. Change it any time from **Settings → Security**; after you do, `.initial_admin_password` may no longer match the current login password.
+**Standardmäßig passwortgeschützt.** Beim ersten Start wird ein zufälliges Admin-Passwort automatisch erzeugt, einmalig in `docker logs anythingllm` ausgegeben und in `/app/server/storage/.initial_admin_password` innerhalb des `anythingllm-data`-Volumes gespeichert. Das voreingestellte Passwort bleibt über Container-Upgrades hinweg erhalten. Ändere es jederzeit unter **Settings → Security**; danach stimmt `.initial_admin_password` möglicherweise nicht mehr mit dem aktuellen Anmeldepasswort überein.
 
-Retrieve the auto-generated password:
+Das automatisch erzeugte Passwort abrufen:
 
 ```bash
-# At any time from the data volume:
+# Jederzeit aus dem Daten-Volume:
 docker exec anythingllm cat /app/server/storage/.initial_admin_password
 
-# Or from the live logs (only shown on first start):
+# Oder aus den Live-Logs (nur beim ersten Start angezeigt):
 docker compose logs anythingllm | grep -A4 "FIRST RUN"
 ```
 
-Open `http://<server-ip>:3001` in your browser and log in with the password above.
+Öffne `http://<server-ip>:3001` in deinem Browser und melde dich mit dem obigen Passwort an.
 
-> **Tip:** When exposing AnythingLLM beyond `localhost` or a trusted LAN, use the included Caddy HTTPS overlay so the password is encrypted in transit and direct HTTP ports are bound to localhost. See [Internet-facing deployments](#internet-facing-deployments) below.
+> **Tipp:** Wenn du AnythingLLM über `localhost` oder ein vertrauenswürdiges LAN hinaus verfügbar machst, nutze das mitgelieferte Caddy-HTTPS-Overlay, damit das Passwort während der Übertragung verschlüsselt wird und direkte HTTP-Ports an localhost gebunden sind. Siehe [Ins Internet gerichtete Bereitstellungen](#ins-internet-gerichtete-bereitstellungen) weiter unten.
 
-**Access the LiteLLM Admin UI:**
+**Auf die LiteLLM-Admin-UI zugreifen:**
 
-Open `http://<server-ip>:4000/ui` in your browser. Log in with username `admin` and your LiteLLM master key as the password. The UI provides virtual key management, spend tracking, and model configuration.
+Öffne `http://<server-ip>:4000/ui` in deinem Browser. Melde dich mit dem Benutzernamen `admin` und deinem LiteLLM-Masterschlüssel als Passwort an. Die UI bietet Verwaltung virtueller Schlüssel, Ausgabenverfolgung und Modellkonfiguration.
 
-> **Tip:** In the Admin UI, click **Playground** in the left menu. Select a local model (e.g., `ollama-chat/llama3.2:3b`) from the dropdown and start chatting — a quick way to verify your local LLM is working end-to-end.
+> **Tipp:** Klicke in der Admin-UI im linken Menü auf **Playground**. Wähle ein lokales Modell (z. B. `ollama-chat/llama3.2:3b`) aus dem Dropdown-Menü und beginne zu chatten — eine schnelle Möglichkeit, um zu überprüfen, ob dein lokales LLM durchgängig funktioniert.
 
-**Stop the stack:**
+**Den Stack stoppen:**
 
 ```bash
-# Stop and remove all containers (data is preserved in Docker volumes)
+# Alle Container stoppen und entfernen (Daten bleiben in Docker-Volumes erhalten)
 docker compose down
 ```
 
-## GPU acceleration (NVIDIA CUDA)
+## GPU-Beschleunigung (NVIDIA CUDA)
 
-For NVIDIA GPU acceleration, use the CUDA compose file:
+Für NVIDIA-GPU-Beschleunigung nutze die CUDA-Compose-Datei:
 
 ```bash
 docker compose -f docker-compose.cuda.yml up -d
 ```
 
-> **Tip:** To avoid adding `-f docker-compose.cuda.yml` to every subsequent `docker compose` command (`down`, `pull`, `logs`, etc.), set it once for your shell session:
+> **Tipp:** Um zu vermeiden, dass du `-f docker-compose.cuda.yml` zu jedem weiteren `docker compose`-Befehl (`down`, `pull`, `logs` usw.) hinzufügen musst, lege es einmal für deine Shell-Sitzung fest:
 >
 > ```bash
 > export COMPOSE_FILE=docker-compose.cuda.yml
 > ```
 >
-> Then run plain `docker compose` commands as usual. To make it persistent, add `COMPOSE_FILE=docker-compose.cuda.yml` to a `.env` file in this directory. Run `unset COMPOSE_FILE` to switch back to the CPU configuration.
+> Führe dann wie gewohnt einfache `docker compose`-Befehle aus. Um es dauerhaft zu machen, füge `COMPOSE_FILE=docker-compose.cuda.yml` zu einer `.env`-Datei in diesem Verzeichnis hinzu. Führe `unset COMPOSE_FILE` aus, um zur CPU-Konfiguration zurückzuwechseln.
 
-**Requirements:** NVIDIA GPU, [NVIDIA driver](https://www.nvidia.com/en-us/drivers/) 575.57.08+ (Linux) or 576.57+ (Windows), and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed on the host. CUDA images are `linux/amd64` only.
+**Voraussetzungen:** NVIDIA-GPU, [NVIDIA-Treiber](https://www.nvidia.com/en-us/drivers/) 575.57.08+ (Linux) oder 576.57+ (Windows) und das auf dem Host installierte [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). CUDA-Images sind nur für `linux/amd64` verfügbar.
 
-> **Podman users:** The Compose `deploy:` GPU block is ignored by Podman. Use CDI instead — see [Using Podman](#using-podman).
+> **Podman-Nutzer:** Der Compose-`deploy:`-GPU-Block wird von Podman ignoriert. Nutze stattdessen CDI — siehe [Podman verwenden](#podman-verwenden).
 
-## Lightweight stacks
+## Leichtgewichtige Stacks
 
-Don't need the full stack? Use a pre-configured subset from the `stacks/` folder:
+Du brauchst nicht den vollständigen Stack? Nutze eine vorkonfigurierte Teilmenge aus dem `stacks/`-Ordner:
 
-> **Note:** The lightweight stacks share default container names, ports, and Docker volume names. Run one stack variant at a time with the default compose files; stop the current variant before switching to another. To combine capabilities, use the full stack or customize Compose project names, container names, ports, and volumes.
+> **Hinweis:** Die leichtgewichtigen Stacks teilen sich standardmäßig Container-Namen, Ports und Docker-Volume-Namen. Führe mit den Standard-Compose-Dateien immer nur eine Stack-Variante gleichzeitig aus; stoppe die aktuelle Variante, bevor du zu einer anderen wechselst. Um Funktionen zu kombinieren, nutze den vollständigen Stack oder passe Compose-Projektnamen, Container-Namen, Ports und Volumes an.
 
-| Stack | Services | Memory | Use case |
+| Stack | Dienste | Speicher | Anwendungsfall |
 |---|---|---|---|
-| **[chat-ui](stacks/chat-ui/)** | Ollama + LiteLLM + AnythingLLM | ~5 GB | Web-based ChatGPT-like chat interface |
-| **[voice-pipeline](stacks/voice-pipeline/)** | Whisper + Ollama + LiteLLM + Kokoro | ~6 GB | Speech-to-text → LLM → text-to-speech |
-| **[voice-chat](stacks/voice-chat/)** | Whisper + Ollama + LiteLLM + Kokoro + AnythingLLM | ~6.5 GB | Chat UI with voice input/output |
-| **[rag-pipeline](stacks/rag-pipeline/)** | Ollama + LiteLLM + Embeddings | ~5 GB | Semantic search + LLM Q&A |
-| **[rag-pipeline-full](stacks/rag-pipeline-full/)** | Ollama + LiteLLM + Embeddings + Docling | ~6 GB | Document parsing + semantic search + LLM Q&A |
-| **[code-assistant](stacks/code-assistant/)** | Ollama + LiteLLM + MCP Gateway + Embeddings | ~5 GB | AI coding with tools + semantic code search |
-| **[ai-tools](stacks/ai-tools/)** | Ollama + LiteLLM + MCP Gateway | ~5 GB | AI coding assistant with tool access |
-| **[chat-only](stacks/chat-only/)** | Ollama + LiteLLM | ~4.5 GB | Minimal local ChatGPT replacement |
+| **[chat-ui](stacks/chat-ui/)** | Ollama + LiteLLM + AnythingLLM | ~5 GB | Web-basierte ChatGPT-ähnliche Chat-Oberfläche |
+| **[voice-pipeline](stacks/voice-pipeline/)** | Whisper + Ollama + LiteLLM + Kokoro | ~6 GB | Sprache-zu-Text → LLM → Text-zu-Sprache |
+| **[voice-chat](stacks/voice-chat/)** | Whisper + Ollama + LiteLLM + Kokoro + AnythingLLM | ~6,5 GB | Chat-UI mit Sprachein-/-ausgabe |
+| **[rag-pipeline](stacks/rag-pipeline/)** | Ollama + LiteLLM + Embeddings | ~5 GB | Semantische Suche + LLM-Frage & Antwort |
+| **[rag-pipeline-full](stacks/rag-pipeline-full/)** | Ollama + LiteLLM + Embeddings + Docling | ~6 GB | Dokumentenanalyse + semantische Suche + LLM-Frage & Antwort |
+| **[code-assistant](stacks/code-assistant/)** | Ollama + LiteLLM + MCP Gateway + Embeddings | ~5 GB | KI-Programmierung mit Werkzeugen + semantische Codesuche |
+| **[ai-tools](stacks/ai-tools/)** | Ollama + LiteLLM + MCP Gateway | ~5 GB | KI-Programmierassistent mit Werkzeugzugriff |
+| **[chat-only](stacks/chat-only/)** | Ollama + LiteLLM | ~4,5 GB | Minimaler lokaler ChatGPT-Ersatz |
 
 ```bash
 git clone https://github.com/hwdsl2/self-hosted-ai-stack
-cd self-hosted-ai-stack/stacks/chat-ui  # or voice-pipeline, voice-chat, rag-pipeline, rag-pipeline-full, code-assistant, ai-tools, chat-only
+cd self-hosted-ai-stack/stacks/chat-ui  # oder voice-pipeline, voice-chat, rag-pipeline, rag-pipeline-full, code-assistant, ai-tools, chat-only
 docker compose up -d
 ```
 
-## Architecture
+## Architektur
 
 ```mermaid
 graph LR
-    A["🎤 Audio input"] -->|transcribe| W["Whisper<br/>(speech-to-text)"]
-    D["📄 Documents"] -->|parse| DC["Docling<br/>(document → text)"]
-    DC -->|embed| E["Embeddings<br/>(text → vectors)"]
-    E -->|store| VDB["pgvector<br/>(in shared Postgres)"]
-    W -->|query| E
-    VDB -->|context| L["LiteLLM<br/>(AI gateway)"]
-    W -->|text| L
-    L -->|routes to| O["Ollama<br/>(local LLM)"]
-    L -->|response| T["Kokoro TTS<br/>(text-to-speech)"]
-    T --> B["🔊 Audio output"]
-    C["🤖 AI client<br/>(Cline, Claude, etc.)"] -->|MCP tools| M["MCP Gateway<br/>(MCP endpoint)"]
-    C -->|chat| L
-    L -->|MCP protocol| M
-    U["👤 User"] -->|chat| AN["AnythingLLM<br/>(chat UI)"]
-    AN -->|LLM requests| L
-    AN -->|MCP tools| M
-    U -->|use| C
-    U -->|speak| A
-    U -->|upload| D
+    A["🎤 Audio-Eingabe"] -->|transkribieren| W["Whisper<br/>(Sprache-zu-Text)"]
+    D["📄 Dokumente"] -->|parsen| DC["Docling<br/>(Dokument → Text)"]
+    DC -->|einbetten| E["Embeddings<br/>(Text → Vektoren)"]
+    E -->|speichern| VDB["pgvector<br/>(im gemeinsamen Postgres)"]
+    W -->|Abfrage| E
+    VDB -->|Kontext| L["LiteLLM<br/>(KI-Gateway)"]
+    W -->|Text| L
+    L -->|leitet weiter an| O["Ollama<br/>(lokales LLM)"]
+    L -->|Antwort| T["Kokoro TTS<br/>(Text-zu-Sprache)"]
+    T --> B["🔊 Audio-Ausgabe"]
+    C["🤖 KI-Client<br/>(Cline, Claude usw.)"] -->|MCP-Werkzeuge| M["MCP Gateway<br/>(MCP-Endpunkt)"]
+    C -->|Chat| L
+    L -->|MCP-Protokoll| M
+    U["👤 Benutzer"] -->|Chat| AN["AnythingLLM<br/>(Chat-UI)"]
+    AN -->|LLM-Anfragen| L
+    AN -->|MCP-Werkzeuge| M
+    U -->|nutzen| C
+    U -->|sprechen| A
+    U -->|hochladen| D
 ```
 
-**Notes:**
+**Hinweise:**
 
-- Ollama's port (`11434`) and MCP Gateway's port (`3000`) are internal to the Docker network and not exposed to the host by default. Access your LLM through LiteLLM on port `4000`.
-- Kokoro (TTS), Docling (document parsing), and WhisperLive (real-time STT) are disabled by default to reduce memory usage. Uncomment these services in `docker-compose.yml` to enable them.
+- Der Port von Ollama (`11434`) und der Port des MCP Gateway (`3000`) sind interne Ports des Docker-Netzwerks und werden standardmäßig nicht an den Host weitergegeben. Greife über LiteLLM auf Port `4000` auf dein LLM zu.
+- Kokoro (TTS), Docling (Dokumentenanalyse) und WhisperLive (Echtzeit-STT) sind standardmäßig deaktiviert, um den Speicherverbrauch zu reduzieren. Kommentiere diese Dienste in `docker-compose.yml` aus, um sie zu aktivieren.
 
-## Running without Docker Compose
+## Ausführung ohne Docker Compose
 
-If you prefer using `docker run` commands directly, first create a shared network so services can communicate:
+Wenn du lieber direkt `docker run`-Befehle verwendest, erstelle zunächst ein gemeinsames Netzwerk, damit die Dienste miteinander kommunizieren können:
 
 ```bash
 docker network create ai-stack
 ```
 
-Then generate a PostgreSQL password and start each service on the shared network:
+Erzeuge dann ein PostgreSQL-Passwort und starte jeden Dienst im gemeinsamen Netzwerk:
 
-> **Note:** With manual `docker run`, wait for each dependency to become ready before starting services that use it (for example, wait for PostgreSQL and any other dependencies, such as Ollama or MCP, before LiteLLM; if using AnythingLLM, wait for LiteLLM before starting it). The examples below generate one PostgreSQL password variable and reuse it for Postgres and LiteLLM.
+> **Hinweis:** Warte bei manuellem `docker run`, bis jede Abhängigkeit bereit ist, bevor du Dienste startest, die sie nutzen (warte zum Beispiel auf PostgreSQL und weitere Abhängigkeiten wie Ollama oder MCP, bevor du LiteLLM startest; wenn du AnythingLLM nutzt, warte auf LiteLLM, bevor du es startest). Die folgenden Beispiele erzeugen eine PostgreSQL-Passwortvariable und verwenden sie für Postgres und LiteLLM wieder.
 
 ```bash
 LITELLM_POSTGRES_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
 
-# PostgreSQL with pgvector (required by LiteLLM; pgvector enables vector storage for RAG)
+# PostgreSQL mit pgvector (von LiteLLM benötigt; pgvector ermöglicht Vektorspeicherung für RAG)
 docker run -d --name litellm-db --restart always \
     --network ai-stack \
     -e POSTGRES_USER=litellm \
@@ -241,7 +241,7 @@ docker run -d --name mcp --restart always \
     -v mcp-shared:/var/lib/mcp-shared \
     hwdsl2/mcp-gateway
 
-# LiteLLM (AI gateway)
+# LiteLLM (KI-Gateway)
 docker run -d --name litellm --restart always \
     --network ai-stack \
     -p 4000:4000 \
@@ -268,14 +268,14 @@ docker run -d --name whisper --restart always \
     -v whisper-data:/var/lib/whisper \
     hwdsl2/whisper-server
 
-# WhisperLive (real-time STT)
+# WhisperLive (Echtzeit-STT)
 docker run -d --name whisper-live --restart always \
     --network ai-stack \
     -p 127.0.0.1:9090:9090 \
     -v whisper-live-data:/var/lib/whisper-live \
     hwdsl2/whisper-live-server
 
-# AnythingLLM (chat UI)
+# AnythingLLM (Chat-UI)
 docker run -d --name anythingllm --restart always \
     --network ai-stack \
     -p 3001:3001 \
@@ -301,7 +301,7 @@ docker run -d --name kokoro --restart always \
     -v kokoro-data:/var/lib/kokoro \
     hwdsl2/kokoro-server
 
-# Docling (document parsing)
+# Docling (Dokumentenanalyse)
 docker run -d --name docling --restart always \
     --network ai-stack \
     -p 127.0.0.1:5001:5001 \
@@ -309,19 +309,19 @@ docker run -d --name docling --restart always \
     hwdsl2/docling-server
 ```
 
-**Note:** The shared network allows services to reach each other by container name (e.g., LiteLLM connects to Ollama via `http://ollama:11434`). You can start only the services you need — they don't all have to run together.
+**Hinweis:** Das gemeinsame Netzwerk erlaubt es den Diensten, sich gegenseitig über den Container-Namen zu erreichen (z. B. verbindet sich LiteLLM über `http://ollama:11434` mit Ollama). Du kannst nur die Dienste starten, die du benötigst — sie müssen nicht alle zusammen laufen.
 
-**Pull a model** (required before making LLM requests):
+**Ein Modell herunterladen** (erforderlich, bevor LLM-Anfragen gestellt werden):
 
 ```bash
 docker exec ollama ollama_manage --pull llama3.2:3b
 ```
 
-## Using Podman
+## Podman verwenden
 
-The stack runs under [Podman](https://podman.io/) on a best-effort basis. The CPU compose files work as-is; GPU acceleration and SELinux-enabled hosts need a couple of extra steps described below. Podman **4.1+** is recommended.
+Der Stack läuft nach bestem Bemühen unter [Podman](https://podman.io/). Die CPU-Compose-Dateien funktionieren unverändert; GPU-Beschleunigung und Hosts mit aktiviertem SELinux benötigen einige zusätzliche Schritte, die unten beschrieben werden. Podman **4.1+** wird empfohlen.
 
-**1. Install the Docker CLI shim.** So that the `docker` commands in this README and the `stack-check.sh` health check work unchanged, install the `podman-docker` package (provides a `docker` → `podman` wrapper):
+**1. Installiere den Docker-CLI-Shim.** Damit die `docker`-Befehle in dieser README und der `stack-check.sh`-Health-Check unverändert funktionieren, installiere das Paket `podman-docker` (stellt einen `docker` → `podman`-Wrapper bereit):
 
 ```bash
 # Fedora / RHEL / CentOS Stream
@@ -331,9 +331,9 @@ sudo dnf install -y podman-docker
 sudo apt-get install -y podman-docker
 ```
 
-> **Note:** A shell `alias docker=podman` is **not** sufficient — aliases are not seen by scripts such as `stack-check.sh`. Use the `podman-docker` package (or a `docker` → `podman` symlink in your `PATH`) instead. Alternatively, `stack-check.sh` auto-detects Podman; you can also force it with `CONTAINER_ENGINE=podman ./stack-check.sh`.
+> **Hinweis:** Ein Shell-`alias docker=podman` ist **nicht** ausreichend — Aliase werden von Skripten wie `stack-check.sh` nicht erkannt. Nutze stattdessen das Paket `podman-docker` (oder einen `docker` → `podman`-Symlink in deinem `PATH`). Alternativ erkennt `stack-check.sh` Podman automatisch; du kannst es auch mit `CONTAINER_ENGINE=podman ./stack-check.sh` erzwingen.
 
-**2. Install a Compose provider.** `podman compose` delegates to an external provider. Install either `podman-compose` or `docker-compose`:
+**2. Installiere einen Compose-Provider.** `podman compose` delegiert an einen externen Provider. Installiere entweder `podman-compose` oder `docker-compose`:
 
 ```bash
 # Fedora / RHEL / CentOS Stream
@@ -343,7 +343,7 @@ sudo dnf install -y podman-compose
 sudo apt-get install -y podman-compose
 ```
 
-**3. Start the stack.** With the shim installed, every command in this README works unchanged. Without it, substitute `podman` for `docker`:
+**3. Starte den Stack.** Mit installiertem Shim funktioniert jeder Befehl in dieser README unverändert. Ohne ihn ersetze `docker` durch `podman`:
 
 ```bash
 git clone https://github.com/hwdsl2/self-hosted-ai-stack
@@ -351,57 +351,57 @@ cd self-hosted-ai-stack
 podman compose up -d
 ```
 
-Run the health check (auto-detects the engine):
+Führe den Health-Check aus (erkennt die Engine automatisch):
 
 ```bash
 ./stack-check.sh
 ```
 
-**GPU acceleration (CDI).** Podman does not read the Compose `deploy.resources` GPU block. Instead, use the [Container Device Interface (CDI)](https://github.com/cncf-tags/container-device-interface). After installing the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), generate a CDI spec:
+**GPU-Beschleunigung (CDI).** Podman liest den Compose-`deploy.resources`-GPU-Block nicht. Nutze stattdessen das [Container Device Interface (CDI)](https://github.com/cncf-tags/container-device-interface). Erzeuge nach der Installation des [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) eine CDI-Spezifikation:
 
 ```bash
 sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
 ```
 
-Then expose the GPU to the relevant services. For `podman compose`, replace the `deploy:` block in `docker-compose.cuda.yml` with a `devices:` entry for the `ollama` (and `whisper`) services:
+Stelle dann die GPU den relevanten Diensten zur Verfügung. Ersetze für `podman compose` den `deploy:`-Block in `docker-compose.cuda.yml` durch einen `devices:`-Eintrag für die Dienste `ollama` (und `whisper`):
 
 ```yaml
     devices:
       - nvidia.com/gpu=all
 ```
 
-For a plain `podman run` command, add `--device nvidia.com/gpu=all`.
+Für einen einfachen `podman run`-Befehl füge `--device nvidia.com/gpu=all` hinzu.
 
-**SELinux.** On SELinux-enabled hosts (Fedora, RHEL, CentOS Stream), bind-mounted files need a relabel suffix, or the container will be denied access. Add `:z` (shared) to the `chat-ui-bootstrap.sh` bind mount:
+**SELinux.** Auf Hosts mit aktiviertem SELinux (Fedora, RHEL, CentOS Stream) benötigen per Bind eingebundene Dateien einen Relabel-Suffix, sonst wird dem Container der Zugriff verweigert. Füge `:z` (gemeinsam) zum `chat-ui-bootstrap.sh`-Bind-Mount hinzu:
 
-- In `docker-compose.yml`: change `./chat-ui-bootstrap.sh:/usr/local/bin/chat-ui-bootstrap.sh:ro` to `./chat-ui-bootstrap.sh:/usr/local/bin/chat-ui-bootstrap.sh:ro,z`
-- In the `podman run` command above: change `"$(pwd)/chat-ui-bootstrap.sh:/usr/local/bin/chat-ui-bootstrap.sh:ro"` to `"$(pwd)/chat-ui-bootstrap.sh:/usr/local/bin/chat-ui-bootstrap.sh:ro,z"`
+- In `docker-compose.yml`: Ändere `./chat-ui-bootstrap.sh:/usr/local/bin/chat-ui-bootstrap.sh:ro` zu `./chat-ui-bootstrap.sh:/usr/local/bin/chat-ui-bootstrap.sh:ro,z`
+- Im obigen `podman run`-Befehl: Ändere `"$(pwd)/chat-ui-bootstrap.sh:/usr/local/bin/chat-ui-bootstrap.sh:ro"` zu `"$(pwd)/chat-ui-bootstrap.sh:/usr/local/bin/chat-ui-bootstrap.sh:ro,z"`
 
-Named volumes do not need relabeling.
+Benannte Volumes benötigen kein Relabeling.
 
-**Next steps:** Pull a model and access the services — follow the instructions in [Quick start](#quick-start) starting from "Pull a model." With the `podman-docker` shim installed, all commands work unchanged.
+**Nächste Schritte:** Lade ein Modell herunter und greife auf die Dienste zu — folge den Anweisungen im [Schnellstart](#schnellstart) ab „Ein Modell herunterladen". Mit installiertem `podman-docker`-Shim funktionieren alle Befehle unverändert.
 
-## Connect MCP Gateway to LiteLLM
+## MCP Gateway mit LiteLLM verbinden
 
-LiteLLM and MCP Gateway are **automatically wired** when using the compose files in this repository — no manual key setup is needed.
+LiteLLM und MCP Gateway werden bei Verwendung der Compose-Dateien in diesem Repository **automatisch verbunden** — es ist keine manuelle Schlüsseleinrichtung nötig.
 
-API keys are shared automatically between services via Docker shared volumes:
+API-Schlüssel werden automatisch über gemeinsame Docker-Volumes zwischen den Diensten geteilt:
 
-- Ollama generates an API key on first start and copies it to a shared volume
-- MCP Gateway does the same
-- LiteLLM reads both keys from the shared volumes on startup
+- Ollama erzeugt beim ersten Start einen API-Schlüssel und kopiert ihn in ein gemeinsames Volume
+- MCP Gateway macht dasselbe
+- LiteLLM liest beim Start beide Schlüssel aus den gemeinsamen Volumes
 
-The `LITELLM_MCP_URL=http://mcp:3000/mcp` and `LITELLM_OLLAMA_BASE_URL=http://ollama:11434` environment variables are pre-configured in the compose files, so all services are connected automatically with a single `docker compose up -d`.
+Die Umgebungsvariablen `LITELLM_MCP_URL=http://mcp:3000/mcp` und `LITELLM_OLLAMA_BASE_URL=http://ollama:11434` sind in den Compose-Dateien vorkonfiguriert, sodass alle Dienste mit einem einzigen `docker compose up -d` automatisch verbunden werden.
 
-Once connected, AI clients that call LiteLLM can use MCP tools (filesystem, fetch, GitHub, etc.) directly through the LiteLLM proxy.
+Einmal verbunden, können KI-Clients, die LiteLLM aufrufen, MCP-Werkzeuge (Dateisystem, Fetch, GitHub usw.) direkt über den LiteLLM-Proxy nutzen.
 
-## Voice pipeline example
+## Beispiel für eine Sprach-Pipeline
 
-Transcribe a spoken question, get a local LLM response via Ollama, and convert it to speech:
+Transkribiere eine gesprochene Frage, erhalte über Ollama eine lokale LLM-Antwort und wandle sie in Sprache um:
 
-**Note:** Kokoro (TTS) is disabled by default. To use this example, first uncomment the `kokoro` service in `docker-compose.yml`, then run `docker compose up -d`.
+**Hinweis:** Kokoro (TTS) ist standardmäßig deaktiviert. Um dieses Beispiel zu nutzen, kommentiere zunächst den `kokoro`-Dienst in `docker-compose.yml` aus und führe dann `docker compose up -d` aus.
 
-**Tip:** Need a sample audio file? Download this English speech sample (WAV, MIT License) from the [Azure Samples](https://github.com/Azure-Samples/cognitive-services-speech-sdk) repository:
+**Tipp:** Brauchst du eine Beispiel-Audiodatei? Lade dieses englische Sprachbeispiel (WAV, MIT-Lizenz) aus dem [Azure Samples](https://github.com/Azure-Samples/cognitive-services-speech-sdk)-Repository herunter:
 
 ```bash
 curl -L -o sample_speech.wav \
@@ -413,19 +413,19 @@ LITELLM_KEY=$(docker exec litellm litellm_manage --getkey)
 WHISPER_KEY=$(docker exec whisper whisper_manage --getkey)
 KOKORO_KEY=$(docker exec kokoro kokoro_manage --getkey)
 
-# Step 1: Transcribe audio to text (Whisper)
+# Schritt 1: Audio in Text transkribieren (Whisper)
 TEXT=$(curl -s http://localhost:9000/v1/audio/transcriptions \
     -H "Authorization: Bearer $WHISPER_KEY" \
     -F file=@sample_speech.wav -F model=whisper-1 | jq -r .text)
 
-# Step 2: Send text to Ollama via LiteLLM and get a response
+# Schritt 2: Text über LiteLLM an Ollama senden und eine Antwort erhalten
 RESPONSE=$(curl -s http://localhost:4000/v1/chat/completions \
     -H "Authorization: Bearer $LITELLM_KEY" \
     -H "Content-Type: application/json" \
     -d "{\"model\":\"ollama/llama3.2:3b\",\"messages\":[{\"role\":\"user\",\"content\":\"$TEXT\"}]}" \
     | jq -r '.choices[0].message.content')
 
-# Step 3: Convert the response to speech (Kokoro TTS)
+# Schritt 3: Die Antwort in Sprache umwandeln (Kokoro TTS)
 curl -s http://localhost:8880/v1/audio/speech \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $KOKORO_KEY" \
@@ -433,42 +433,42 @@ curl -s http://localhost:8880/v1/audio/speech \
     --output response.mp3
 ```
 
-## Vector database
+## Vektordatenbank
 
-The stack's PostgreSQL ships with the [pgvector](https://github.com/pgvector/pgvector) extension, so you can store and query embeddings in the same database that LiteLLM uses — no separate vector database required.
+Das PostgreSQL des Stacks wird mit der [pgvector](https://github.com/pgvector/pgvector)-Erweiterung ausgeliefert, sodass du Embeddings in derselben Datenbank speichern und abfragen kannst, die auch LiteLLM verwendet — es ist keine separate Vektordatenbank erforderlich.
 
-Enable the extension once (the database persists, so this only needs to be done a single time):
+Aktiviere die Erweiterung einmalig (die Datenbank bleibt bestehen, dies muss also nur ein einziges Mal getan werden):
 
 ```bash
 docker exec litellm-db psql -U litellm -d litellm -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 ```
 
-Verify it is enabled:
+Überprüfe, ob sie aktiviert ist:
 
 ```bash
 docker exec litellm-db psql -U litellm -d litellm -c "SELECT extname, extversion FROM pg_extension WHERE extname='vector';"
 ```
 
-You can then create a table with a `vector` column (use the dimension of your embedding model — e.g. `384` for the default `BAAI/bge-small-en-v1.5`) and run similarity search with the `<=>` operator. For larger-scale or hybrid search, you can run a dedicated vector database such as Qdrant or Chroma instead.
+Du kannst dann eine Tabelle mit einer `vector`-Spalte erstellen (nutze die Dimension deines Embedding-Modells — z. B. `384` für das Standardmodell `BAAI/bge-small-en-v1.5`) und mit dem `<=>`-Operator eine Ähnlichkeitssuche durchführen. Für größere oder hybride Suchen kannst du stattdessen eine dedizierte Vektordatenbank wie Qdrant oder Chroma betreiben.
 
-## RAG pipeline example
+## Beispiel für eine RAG-Pipeline
 
-Embed documents for semantic search, retrieve context, then answer questions with a local Ollama model:
+Bette Dokumente für die semantische Suche ein, rufe Kontext ab und beantworte dann Fragen mit einem lokalen Ollama-Modell:
 
 ```bash
 LITELLM_KEY=$(docker exec litellm litellm_manage --getkey)
 EMBED_KEY=$(docker exec embeddings embed_manage --getkey)
 
-# Step 1: Embed a document chunk and store the vector in your vector DB
+# Schritt 1: Einen Dokumentabschnitt einbetten und den Vektor in deiner Vektor-DB speichern
 curl -s http://localhost:8000/v1/embeddings \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $EMBED_KEY" \
     -d '{"input": "Docker simplifies deployment by packaging apps in containers.", "model": "text-embedding-ada-002"}' \
     | jq '.data[0].embedding'
-# → Store the returned vector alongside the source text in pgvector (included in the stack's Postgres), or another vector DB such as Qdrant or Chroma.
+# → Speichere den zurückgegebenen Vektor zusammen mit dem Quelltext in pgvector (im Postgres des Stacks enthalten) oder einer anderen Vektor-DB wie Qdrant oder Chroma.
 
-# Step 2: At query time, embed the question, retrieve the top matching chunks from
-#          the vector DB, then send the question and retrieved context to Ollama via LiteLLM.
+# Schritt 2: Bette zur Abfragezeit die Frage ein, rufe die am besten passenden Abschnitte aus
+#          der Vektor-DB ab und sende dann die Frage und den abgerufenen Kontext über LiteLLM an Ollama.
 curl -s http://localhost:4000/v1/chat/completions \
     -H "Authorization: Bearer $LITELLM_KEY" \
     -H "Content-Type: application/json" \
@@ -482,20 +482,20 @@ curl -s http://localhost:4000/v1/chat/completions \
     | jq -r '.choices[0].message.content'
 ```
 
-## MCP tools example
+## Beispiel für MCP-Werkzeuge
 
-Use MCP Gateway to give your AI assistant access to files, web, and GitHub:
+Nutze MCP Gateway, um deinem KI-Assistenten Zugriff auf Dateien, das Web und GitHub zu geben:
 
-MCP Gateway is internal to the Docker network by default. Before using `http://localhost:3000/mcp` from a host-side AI client or host-side `curl`, uncomment the `3000:3000/tcp` port mapping for the `mcp` service in `docker-compose.yml` and restart it.
+MCP Gateway ist standardmäßig intern im Docker-Netzwerk. Bevor du `http://localhost:3000/mcp` von einem host-seitigen KI-Client oder host-seitigem `curl` nutzt, kommentiere die Port-Zuordnung `3000:3000/tcp` für den `mcp`-Dienst in `docker-compose.yml` aus und starte ihn neu.
 
 ```bash
 MCP_KEY=$(docker exec mcp mcp_manage --getkey)
 
-# Use MCP endpoint with an AI client (e.g., Cline in VS Code)
-# Set the MCP server URL: http://localhost:3000/mcp
-# Set Authorization header: Bearer <api_key>
+# MCP-Endpunkt mit einem KI-Client nutzen (z. B. Cline in VS Code)
+# Setze die MCP-Server-URL: http://localhost:3000/mcp
+# Setze den Authorization-Header: Bearer <api_key>
 
-# Or test the MCP endpoint directly with an initialize request
+# Oder teste den MCP-Endpunkt direkt mit einer initialize-Anfrage
 curl -s http://localhost:3000/mcp \
     -X POST \
     -H "Authorization: Bearer $MCP_KEY" \
@@ -504,21 +504,21 @@ curl -s http://localhost:3000/mcp \
     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
 ```
 
-## Usage counts
+## Nutzungszählungen
 
-Self-Hosted AI Stack uses anonymous, aggregate GitHub release asset download counts to help understand usage and prioritize future improvements. It does not send a telemetry payload or use a private collector.
+Self-Hosted AI Stack nutzt anonyme, aggregierte Zählungen der Downloads von GitHub-Release-Assets, um die Nutzung zu verstehen und zukünftige Verbesserungen zu priorisieren. Es wird keine Telemetrie-Nutzlast gesendet und kein privater Collector verwendet.
 
-To disable usage counts when starting the stack:
+Um die Nutzungszählungen beim Start des Stacks zu deaktivieren:
 
 ```bash
 AI_STACK_DISABLE_USAGE_COUNTS=1 docker compose up -d
 ```
 
-## Customization
+## Anpassung
 
-Each service can be configured with an optional env file. Copy the example env file from the respective repository, edit it, and uncomment the volume mount in `docker-compose.yml`:
+Jeder Dienst kann über eine optionale env-Datei konfiguriert werden. Kopiere die Beispiel-env-Datei aus dem jeweiligen Repository, bearbeite sie und kommentiere den Volume-Mount in `docker-compose.yml` aus:
 
-| Service | Env file | Repository |
+| Dienst | Env-Datei | Repository |
 |---|---|---|
 | Ollama | `ollama.env` | [docker-ollama](https://github.com/hwdsl2/docker-ollama) |
 | LiteLLM | `litellm.env` | [docker-litellm](https://github.com/hwdsl2/docker-litellm) |
@@ -529,73 +529,73 @@ Each service can be configured with an optional env file. Copy the example env f
 | MCP Gateway | `mcp.env` | [docker-mcp-gateway](https://github.com/hwdsl2/docker-mcp-gateway) |
 | Docling | `docling.env` | [docker-docling](https://github.com/hwdsl2/docker-docling) |
 
-AnythingLLM is configured through its web UI at `http://<server-ip>:3001`. You can change the LLM provider, model, embedding engine, and other settings in **Settings**. See [AnythingLLM docs](https://docs.useanything.com/) for more details.
+AnythingLLM wird über seine Web-UI unter `http://<server-ip>:3001` konfiguriert. Du kannst den LLM-Anbieter, das Modell, die Embedding-Engine und andere Einstellungen unter **Settings** ändern. Weitere Details findest du in der [AnythingLLM-Dokumentation](https://docs.useanything.com/).
 
-**Use the stack's Embeddings service (optional).** By default AnythingLLM embeds documents in-process with its bundled MiniLM model and stores the vectors in its own LanceDB. To use the stack's [Embeddings](https://github.com/hwdsl2/docker-embeddings) service (BAAI/bge-small-en-v1.5) and/or the stack's pgvector-enabled Postgres instead, edit the `anythingllm` service in `docker-compose.yml`: comment out `EMBEDDING_ENGINE=native` and uncomment the opt-in block beneath it. Also uncomment the `depends_on` note so the embeddings/db services start first. When `VECTOR_DB=pgvector` is enabled and no `PGVECTOR_CONNECTION_STRING` is set, AnythingLLM uses the generated Postgres password from `ai-stack-shared` automatically. AnythingLLM auto-creates the `vector` extension and `anythingllm_vectors` table on first use. ⚠️ Switching the embedder or vector store on an existing deployment makes previously embedded documents incompatible — re-embed your workspaces after the change.
+**Den Embeddings-Dienst des Stacks nutzen (optional).** Standardmäßig bettet AnythingLLM Dokumente prozessintern mit seinem mitgelieferten MiniLM-Modell ein und speichert die Vektoren in seiner eigenen LanceDB. Um stattdessen den [Embeddings](https://github.com/hwdsl2/docker-embeddings)-Dienst des Stacks (BAAI/bge-small-en-v1.5) und/oder das pgvector-fähige Postgres des Stacks zu nutzen, bearbeite den `anythingllm`-Dienst in `docker-compose.yml`: Kommentiere `EMBEDDING_ENGINE=native` aus und den darunterliegenden Opt-in-Block ein. Kommentiere außerdem den `depends_on`-Hinweis aus, damit die Embeddings-/DB-Dienste zuerst starten. Wenn `VECTOR_DB=pgvector` aktiviert ist und kein `PGVECTOR_CONNECTION_STRING` gesetzt ist, nutzt AnythingLLM automatisch das erzeugte Postgres-Passwort aus `ai-stack-shared`. AnythingLLM erstellt bei der ersten Nutzung automatisch die `vector`-Erweiterung und die Tabelle `anythingllm_vectors`. ⚠️ Das Umstellen des Embedders oder Vektorspeichers bei einer bestehenden Bereitstellung macht zuvor eingebettete Dokumente inkompatibel — bette deine Workspaces nach der Änderung erneut ein.
 
-For detailed configuration options, API reference, and model management, see the documentation in each service's repository.
+Detaillierte Konfigurationsoptionen, API-Referenz und Modellverwaltung findest du in der Dokumentation im Repository jedes Dienstes.
 
-## Internet-facing deployments
+## Ins Internet gerichtete Bereitstellungen
 
-By default, all services listen over plain HTTP. For internet-facing deployments, use the included Caddy overlay to add automatic HTTPS. In proxy mode, Caddy is the only public listener on ports `80` and `443`; the direct AnythingLLM and LiteLLM ports are rebound to `127.0.0.1`.
+Standardmäßig lauschen alle Dienste über einfaches HTTP. Für ins Internet gerichtete Bereitstellungen nutze das mitgelieferte Caddy-Overlay, um automatisches HTTPS hinzuzufügen. Im Proxy-Modus ist Caddy der einzige öffentliche Listener auf den Ports `80` und `443`; die direkten AnythingLLM- und LiteLLM-Ports werden auf `127.0.0.1` neu gebunden.
 
-Prerequisites:
+Voraussetzungen:
 
-- Docker Compose `2.24.4+` (required for the proxy overlay's port override)
-- A DNS `A`/`AAAA` record for your domain pointing to this server
-- Inbound `80/tcp`, `443/tcp`, and ideally `443/udp` open in your firewall/security group
-- No other service already using ports `80` or `443` on the host
+- Docker Compose `2.24.4+` (erforderlich für die Port-Überschreibung des Proxy-Overlays)
+- Ein DNS-`A`/`AAAA`-Eintrag für deine Domain, der auf diesen Server zeigt
+- Eingehende `80/tcp`, `443/tcp` und idealerweise `443/udp` in deiner Firewall/Sicherheitsgruppe geöffnet
+- Kein anderer Dienst nutzt bereits die Ports `80` oder `443` auf dem Host
 
-**CPU stack:**
+**CPU-Stack:**
 
 ```bash
 DOMAIN=chat.example.com ACME_EMAIL=you@example.com \
   docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
 ```
 
-**CUDA stack:**
+**CUDA-Stack:**
 
 ```bash
 DOMAIN=chat.example.com ACME_EMAIL=you@example.com \
   docker compose -f docker-compose.cuda.yml -f docker-compose.proxy.yml up -d
 ```
 
-Open `https://chat.example.com` (replace with your `DOMAIN`) to access AnythingLLM. In proxy mode, `http://127.0.0.1:3001` and `http://127.0.0.1:4000/ui` remain available on the host, but the direct `3001` and `4000` ports are not reachable from outside the server.
+Öffne `https://chat.example.com` (ersetze durch deine `DOMAIN`), um auf AnythingLLM zuzugreifen. Im Proxy-Modus bleiben `http://127.0.0.1:3001` und `http://127.0.0.1:4000/ui` auf dem Host verfügbar, aber die direkten Ports `3001` und `4000` sind von außerhalb des Servers nicht erreichbar.
 
-The standard compose files publish LiteLLM on port `4000`. The proxy overlay changes that direct port to localhost-only, and the included Caddyfile routes only AnythingLLM by default. Uncommenting the optional LiteLLM hostname block exposes LiteLLM through Caddy, so keep the LiteLLM master key secret.
+Die Standard-Compose-Dateien veröffentlichen LiteLLM auf Port `4000`. Das Proxy-Overlay ändert diesen direkten Port auf localhost-only, und die mitgelieferte Caddyfile leitet standardmäßig nur AnythingLLM weiter. Das Auskommentieren des optionalen LiteLLM-Hostname-Blocks stellt LiteLLM über Caddy bereit, halte daher den LiteLLM-Masterschlüssel geheim.
 
-Troubleshooting:
+Fehlerbehebung:
 
 ```bash
 docker logs ai-stack-caddy
-# Use the same -f files you used to start the stack
+# Nutze dieselben -f-Dateien, mit denen du den Stack gestartet hast
 docker compose -f docker-compose.yml -f docker-compose.proxy.yml ps
 ```
 
-If Caddy reports an unknown `request_body` directive, pull the current `caddy:2` image and restart the overlay.
+Wenn Caddy eine unbekannte `request_body`-Direktive meldet, lade das aktuelle `caddy:2`-Image herunter und starte das Overlay neu.
 
-For older Docker Compose versions or Podman, use a host-based reverse proxy instead: bind direct HTTP ports to localhost in the compose file (for example, `"127.0.0.1:3001:3001/tcp"` and `"127.0.0.1:4000:4000/tcp"`) and proxy to those localhost ports. For stack-specific Caddy and nginx examples, see the [Chat UI manual reverse proxy section](stacks/chat-ui/#manual-reverse-proxy).
+Für ältere Docker-Compose-Versionen oder Podman nutze stattdessen einen host-basierten Reverse-Proxy: Binde die direkten HTTP-Ports in der Compose-Datei an localhost (zum Beispiel `"127.0.0.1:3001:3001/tcp"` und `"127.0.0.1:4000:4000/tcp"`) und leite an diese localhost-Ports weiter. Für stack-spezifische Caddy- und nginx-Beispiele siehe den [Abschnitt zum manuellen Reverse-Proxy für die Chat-UI](stacks/chat-ui/#manual-reverse-proxy).
 
-When exposing services to the internet, use the generated API keys where present. For existing no-key deployments, set API keys via the relevant env files before publishing those services.
+Wenn du Dienste ins Internet stellst, nutze wo vorhanden die erzeugten API-Schlüssel. Setze für bestehende Bereitstellungen ohne Schlüssel die API-Schlüssel über die entsprechenden env-Dateien, bevor du diese Dienste veröffentlichst.
 
-## Backup and restore
+## Sicherung und Wiederherstellung
 
-Your API keys, models, and configuration are stored in Docker volumes. Back up before upgrading or making changes:
+Deine API-Schlüssel, Modelle und Konfiguration werden in Docker-Volumes gespeichert. Sichere sie vor einem Upgrade oder vor Änderungen:
 
 ```bash
-# Export API keys (while containers are running)
+# API-Schlüssel exportieren (während die Container laufen)
 docker exec ollama ollama_manage --getkey
 docker exec litellm litellm_manage --getkey
 docker exec mcp mcp_manage --getkey
-# Optional services; ignored if the container is not enabled/running
+# Optionale Dienste; ignoriert, wenn der Container nicht aktiviert/laufend ist
 docker exec whisper whisper_manage --getkey 2>/dev/null || true
 docker exec whisper-live whisper_live_manage --getkey 2>/dev/null || true
 docker exec kokoro kokoro_manage --getkey 2>/dev/null || true
 docker exec embeddings embed_manage --getkey 2>/dev/null || true
 docker exec docling docling_manage --getkey 2>/dev/null || true
 
-# Back up all volumes (stop services first)
-# Stop and remove all containers (data is preserved in Docker volumes)
+# Alle Volumes sichern (stoppe zuerst die Dienste)
+# Alle Container stoppen und entfernen (Daten bleiben in Docker-Volumes erhalten)
 docker compose down
 mkdir -p backups
 for vol in ollama-data litellm-data litellm-db ai-stack-shared embeddings-data whisper-data whisper-live-data kokoro-data mcp-data docling-data anythingllm-data caddy-data caddy-config; do
@@ -605,19 +605,19 @@ for vol in ollama-data litellm-data litellm-db ai-stack-shared embeddings-data w
 done
 ```
 
-**Note:** Back up `ai-stack-shared` with `litellm-db`; fresh installs store the generated PostgreSQL password there. The `ollama-shared`, `mcp-shared`, and `litellm-shared` volumes are ephemeral key-sharing volumes and do not need to be backed up.
+**Hinweis:** Sichere `ai-stack-shared` zusammen mit `litellm-db`; neue Installationen speichern dort das erzeugte PostgreSQL-Passwort. Die Volumes `ollama-shared`, `mcp-shared` und `litellm-shared` sind kurzlebige Volumes zum Teilen von Schlüsseln und müssen nicht gesichert werden.
 
-For restore instructions, server migration, and the full pre-upgrade checklist, see the [Backup and Restore](docs/backup-restore.md) guide.
+Anweisungen zur Wiederherstellung, Server-Migration und die vollständige Checkliste vor dem Upgrade findest du in der Anleitung zu [Sicherung und Wiederherstellung](docs/backup-restore.md).
 
-## PostgreSQL credentials
+## PostgreSQL-Zugangsdaten
 
-Fresh Docker Compose installs generate a random PostgreSQL password automatically and store it in the `ai-stack-shared` volume. Existing default installs continue to use the legacy `litellm` database password for compatibility.
+Neue Docker-Compose-Installationen erzeugen automatisch ein zufälliges PostgreSQL-Passwort und speichern es im `ai-stack-shared`-Volume. Bestehende Standardinstallationen nutzen aus Kompatibilitätsgründen weiterhin das ältere `litellm`-Datenbankpasswort.
 
-If you previously customized the database password, set `LITELLM_POSTGRES_PASSWORD` in your shell environment to that current password before running `docker compose up -d`, or keep an explicit `LITELLM_DATABASE_URL` override in `litellm.env`.
+Wenn du das Datenbankpasswort zuvor angepasst hast, setze `LITELLM_POSTGRES_PASSWORD` in deiner Shell-Umgebung auf dieses aktuelle Passwort, bevor du `docker compose up -d` ausführst, oder behalte eine explizite `LITELLM_DATABASE_URL`-Überschreibung in `litellm.env`.
 
-## Update images
+## Images aktualisieren
 
-To update all services to the latest versions:
+Um alle Dienste auf die neuesten Versionen zu aktualisieren:
 
 ```bash
 git pull
@@ -626,19 +626,19 @@ docker compose up -d
 ./stack-check.sh
 ```
 
-After the stack restarts, run `./stack-check.sh` to confirm the services and generated credential wiring are healthy.
+Führe nach dem Neustart des Stacks `./stack-check.sh` aus, um zu bestätigen, dass die Dienste und die erzeugte Verdrahtung der Zugangsdaten fehlerfrei sind.
 
-`git pull` updates all project files (including any changes to compose files); `docker compose pull` updates the service images. If you've customized `docker-compose.yml`, `git pull` will merge changes automatically, or prompt you to resolve conflicts on the same lines.
+`git pull` aktualisiert alle Projektdateien (einschließlich etwaiger Änderungen an den Compose-Dateien); `docker compose pull` aktualisiert die Dienst-Images. Wenn du `docker-compose.yml` angepasst hast, führt `git pull` Änderungen automatisch zusammen oder fordert dich auf, Konflikte in denselben Zeilen aufzulösen.
 
-**One-time note for older installs:** If you set an AnythingLLM password before the `.env` persistence fix, the first container recreation after upgrading may clear that password and leave AnythingLLM unprotected. After updating, open AnythingLLM immediately and confirm password protection is still enabled. If it is not, set a new password in **Settings → Security**. Future container recreations will preserve it.
+**Einmaliger Hinweis für ältere Installationen:** Wenn du ein AnythingLLM-Passwort vor dem `.env`-Persistenz-Fix gesetzt hast, kann die erste Neuerstellung des Containers nach dem Upgrade dieses Passwort löschen und AnythingLLM ungeschützt lassen. Öffne AnythingLLM nach dem Update sofort und bestätige, dass der Passwortschutz noch aktiviert ist. Falls nicht, setze ein neues Passwort unter **Settings → Security**. Zukünftige Container-Neuerstellungen bewahren es.
 
-AnythingLLM is pinned to a stable release tag instead of `latest` because the upstream `latest` image tracks the master branch. When a newer AnythingLLM release is available, back up first, update the tag in the compose files, then run the commands above.
+AnythingLLM ist auf ein stabiles Release-Tag statt auf `latest` gepinnt, weil das Upstream-`latest`-Image dem Master-Branch folgt. Wenn ein neueres AnythingLLM-Release verfügbar ist, sichere zuerst, aktualisiere das Tag in den Compose-Dateien und führe dann die obigen Befehle aus.
 
-Your data is preserved in the Docker volumes. **Always [back up](#backup-and-restore) before upgrading.**
+Deine Daten bleiben in den Docker-Volumes erhalten. **[Sichere](#sicherung-und-wiederherstellung) immer, bevor du ein Upgrade durchführst.**
 
-## License
+## Lizenz
 
 Copyright (C) 2026 Lin Song   
-This work is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+Dieses Werk ist unter der [MIT-Lizenz](https://opensource.org/licenses/MIT) lizenziert.
 
-This project is an independent Docker configuration and is not affiliated with, endorsed by, or sponsored by Docker, Inc., Ollama, Berri AI (LiteLLM), Hugging Face, hexgrad (Kokoro), OpenAI, SYSTRAN, or MCPHub. Docker is a trademark or registered trademark of Docker, Inc.
+Dieses Projekt ist eine unabhängige Docker-Konfiguration und ist nicht mit Docker, Inc., Ollama, Berri AI (LiteLLM), Hugging Face, hexgrad (Kokoro), OpenAI, SYSTRAN oder MCPHub verbunden, wird von ihnen nicht unterstützt oder gesponsert. Docker ist eine Marke oder eingetragene Marke von Docker, Inc.
