@@ -9,6 +9,7 @@
        alt="Self-Hosted AI Stack: deploy a complete self-hosted AI stack with one command"
        width="100%">
 </p>
+<p align="center"><sub>Shows the general concept of the original CPU/NVIDIA variant. For the current AMD ROCm stack diagram, see the <a href="#architecture">Architecture section</a> below.</sub></p>
 
 Includes Ollama, LiteLLM, AnythingLLM, Whisper, MCP Gateway, Embeddings, Docling, and Kokoro — fully configured and ready to run with Docker Compose.
 
@@ -20,7 +21,7 @@ Includes Ollama, LiteLLM, AnythingLLM, Whisper, MCP Gateway, Embeddings, Docling
 - [Lightweight stacks](#lightweight-stacks) for lower memory requirements (as low as ~4.5 GB)
 - **GPU acceleration via AMD ROCm** — tuned for the **Ryzen AI Max+ 395** (Strix Halo, gfx1151)
 - One-command [installer](#quick-start-amd-rocm--recommended) that checks hardware, sets up the firewall, and pulls the default model
-- [Apple-style dashboard](#dashboard) — see what's online at a glance and jump straight to it
+- [Modern status dashboard](#dashboard) — see what's online at a glance and jump straight to it
 - Multi-arch: `linux/amd64`, `linux/arm64`
 
 ## Community
@@ -38,7 +39,7 @@ This variant is rebuilt entirely on **upstream images** and targets **AMD GPUs**
 - **[Ollama (ROCm)](https://hub.docker.com/r/ollama/ollama)** as the LLM engine with AMD GPU acceleration
 - **[Open WebUI](https://github.com/open-webui/open-webui)** as the chat interface (replaces AnythingLLM)
 - **[LiteLLM](https://github.com/BerriAI/litellm)** gateway, **PostgreSQL/pgvector**, **Whisper** (STT) and **Embeddings** (TEI)
-- an **[Apple-style dashboard](#dashboard)** showing the live status of every service
+- a **[modern status dashboard](#dashboard)** showing the live status of every service
 
 Everything is checked and set up by a single script:
 
@@ -74,13 +75,35 @@ After install:
 
 | Service | URL |
 |---|---|
-| **Dashboard** (Apple style) | `http://<server-ip>:8600` |
-| **Chat** (Open WebUI) | `http://<server-ip>:3001` |
-| **LiteLLM admin UI** | `http://<server-ip>:4000/ui` (login `admin` + master key from `.env`) |
+| **Dashboard** (status overview) | `http://<server-ip>:8600` |
+| **Chat** (Open WebUI) | `http://<server-ip>:3001` (admin = first account you register) |
+| **LiteLLM admin UI** | `http://<server-ip>:4000/ui` (login `admin` + master key, see below) |
+
+### Architecture
+
+```mermaid
+graph LR
+    U["👤 User"] -->|chat| W["Open WebUI<br/>(port 3001)"]
+    U -->|status| DASH["Dashboard<br/>(port 8600)"]
+    W -->|OpenAI API| L["LiteLLM<br/>(AI gateway, port 4000)"]
+    L -->|routes to| O["Ollama<br/>(ROCm, AMD iGPU)"]
+    L -->|metadata| DB[("PostgreSQL<br/>+ pgvector")]
+    A["🎤 Audio"] --> WH["Whisper<br/>(speech-to-text)"]
+    D["📄 Documents"] --> E["Embeddings<br/>(text-to-vectors)"]
+    DASH -.->|reads status| SOCK[("Docker socket<br/>(read-only)")]
+```
+
+**Show credentials**
+
+```bash
+./scripts/show-credentials.sh
+```
+
+Prints every URL, the LiteLLM master key, and the Postgres password straight from your `.env` — no `docker exec ... _manage` needed (that only exists in the old `hwdsl2` images, not the upstream images used here). Open WebUI has no seeded password: the **first account** you register at `http://<server-ip>:3001` automatically becomes admin.
 
 ### Dashboard
 
-The stack ships a small, self-contained **Apple-style dashboard** (`dashboard/`). It reads the Docker socket (read-only) and shows in real time **which services are online, which port they run on**, and links straight to them. It refreshes automatically and is available at `http://<server-ip>:8600`.
+The stack ships a small, self-contained **modern status dashboard** (`dashboard/`). It reads the Docker socket (read-only) and shows in real time **which services are online, which port they run on**, and links straight to them. It refreshes automatically and is available at `http://<server-ip>:8600`.
 
 ### Register models with LiteLLM
 
@@ -96,9 +119,10 @@ The script is **idempotent**: already-registered models are skipped, only new on
 ### Useful commands
 
 ```bash
-docker compose -f docker-compose.rocm.yml ps                 # status
-docker compose -f docker-compose.rocm.yml logs -f open-webui # logs for one service
-docker compose -f docker-compose.rocm.yml down               # stop (data stays in volumes)
+./scripts/show-credentials.sh                                 # URLs, master key, passwords
+docker compose -f docker-compose.rocm.yml ps                  # status
+docker compose -f docker-compose.rocm.yml logs -f open-webui  # logs for one service
+docker compose -f docker-compose.rocm.yml down                # stop (data stays in volumes)
 ```
 
 ### Uninstall
@@ -260,7 +284,7 @@ cd self-hosted-ai-stack/stacks/chat-ui  # or voice-pipeline, voice-chat, rag-pip
 docker compose up -d
 ```
 
-## Architecture
+## Architecture (CPU/NVIDIA stack)
 
 ```mermaid
 graph LR

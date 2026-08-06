@@ -9,6 +9,7 @@
        alt="Self-Hosted AI Stack: Stelle einen kompletten selbst gehosteten KI-Stack mit einem einzigen Befehl bereit"
        width="100%">
 </p>
+<p align="center"><sub>Zeigt das allgemeine Konzept der ursprünglichen CPU-/NVIDIA-Variante. Das aktuelle Architekturdiagramm für den AMD-ROCm-Stack findest du im <a href="#architektur">Architektur-Abschnitt</a> weiter unten.</sub></p>
 
 Enthält Ollama, LiteLLM, AnythingLLM, Whisper, MCP Gateway, Embeddings, Docling und Kokoro — vollständig konfiguriert und startklar mit Docker Compose.
 
@@ -20,7 +21,7 @@ Enthält Ollama, LiteLLM, AnythingLLM, Whisper, MCP Gateway, Embeddings, Docling
 - [Leichtgewichtige Stacks](#leichtgewichtige-stacks) für geringere Speicheranforderungen (ab ~4,5 GB)
 - **GPU-Beschleunigung über AMD ROCm** — optimiert für den **Ryzen AI Max+ 395** (Strix Halo, gfx1151)
 - Ein-Befehl-[Installer](#schnellstart-amd-rocm--empfohlen), der Hardware prüft, Firewall einrichtet und das Standardmodell lädt
-- [Dashboard im Apple-Design](#dashboard) — sieh auf einen Blick, was online ist, und springe direkt drauf
+- [Modernes Status-Dashboard](#dashboard) — sieh auf einen Blick, was online ist, und springe direkt drauf
 - Multi-Arch: `linux/amd64`, `linux/arm64`
 
 ## Community
@@ -38,7 +39,7 @@ Diese Variante ist komplett auf **Upstream-Images** umgebaut und für **AMD-GPUs
 - **[Ollama (ROCm)](https://hub.docker.com/r/ollama/ollama)** als LLM-Engine mit AMD-GPU-Beschleunigung
 - **[Open WebUI](https://github.com/open-webui/open-webui)** als Chat-Oberfläche (ersetzt AnythingLLM)
 - **[LiteLLM](https://github.com/BerriAI/litellm)** als AI-Gateway, **PostgreSQL/pgvector**, **Whisper** (STT) und **Embeddings** (TEI)
-- ein **[Dashboard im Apple-Design](#dashboard)**, das den Live-Status aller Dienste zeigt
+- ein **[modernes Status-Dashboard](#dashboard)**, das den Live-Status aller Dienste zeigt
 
 Alles wird über ein einziges Skript geprüft und eingerichtet:
 
@@ -74,13 +75,35 @@ Nach der Installation:
 
 | Dienst | URL |
 |---|---|
-| **Dashboard** (Apple-Design) | `http://<server-ip>:8600` |
-| **Chat** (Open WebUI) | `http://<server-ip>:3001` |
-| **LiteLLM-Admin-UI** | `http://<server-ip>:4000/ui` (Login `admin` + Master-Key aus `.env`) |
+| **Dashboard** (Status-Übersicht) | `http://<server-ip>:8600` |
+| **Chat** (Open WebUI) | `http://<server-ip>:3001` (Admin = erster registrierter Account) |
+| **LiteLLM-Admin-UI** | `http://<server-ip>:4000/ui` (Login `admin` + Master-Key, siehe unten) |
+
+### Architektur
+
+```mermaid
+graph LR
+    U["👤 Benutzer"] -->|Chat| W["Open WebUI<br/>(Port 3001)"]
+    U -->|Status| DASH["Dashboard<br/>(Port 8600)"]
+    W -->|OpenAI-API| L["LiteLLM<br/>(AI-Gateway, Port 4000)"]
+    L -->|routet zu| O["Ollama<br/>(ROCm, AMD-iGPU)"]
+    L -->|Metadaten| DB[("PostgreSQL<br/>+ pgvector")]
+    A["🎤 Audio"] --> WH["Whisper<br/>(Sprache → Text)"]
+    D["📄 Dokumente"] --> E["Embeddings<br/>(Text → Vektoren)"]
+    DASH -.->|liest Status| SOCK[("Docker-Socket<br/>(nur lesend)")]
+```
+
+**Zugangsdaten anzeigen**
+
+```bash
+./scripts/show-credentials.sh
+```
+
+Zeigt alle URLs, den LiteLLM-Master-Key und das Postgres-Passwort direkt aus deiner `.env` an — kein `docker exec ... _manage` nötig (das gibt es nur in den alten `hwdsl2`-Images, nicht in den hier verwendeten Upstream-Images). Open WebUI hat kein vorgegebenes Passwort: Der **erste Account**, den du unter `http://<server-ip>:3001` registrierst, wird automatisch Admin.
 
 ### Dashboard
 
-Der Stack bringt ein eigenes, schlankes **Dashboard im Apple-Design** mit (`dashboard/`). Es liest den Docker-Socket (nur lesend) und zeigt in Echtzeit, **welche Dienste online sind, auf welchem Port sie laufen** und verlinkt direkt darauf. Es aktualisiert sich automatisch und ist unter `http://<server-ip>:8600` erreichbar.
+Der Stack bringt ein eigenes, schlankes **modernes Status-Dashboard** mit (`dashboard/`). Es liest den Docker-Socket (nur lesend) und zeigt in Echtzeit, **welche Dienste online sind, auf welchem Port sie laufen** und verlinkt direkt darauf. Es aktualisiert sich automatisch und ist unter `http://<server-ip>:8600` erreichbar.
 
 ### Modelle bei LiteLLM eintragen
 
@@ -96,9 +119,10 @@ Das Skript ist **idempotent**: bereits eingetragene Modelle werden übersprungen
 ### Nützliche Befehle
 
 ```bash
-docker compose -f docker-compose.rocm.yml ps                 # Status
-docker compose -f docker-compose.rocm.yml logs -f open-webui # Logs eines Dienstes
-docker compose -f docker-compose.rocm.yml down               # Stoppen (Daten bleiben in Volumes)
+./scripts/show-credentials.sh                                 # URLs, Master-Key, Passwörter
+docker compose -f docker-compose.rocm.yml ps                  # Status
+docker compose -f docker-compose.rocm.yml logs -f open-webui  # Logs eines Dienstes
+docker compose -f docker-compose.rocm.yml down                # Stoppen (Daten bleiben in Volumes)
 ```
 
 ### Deinstallieren
@@ -260,7 +284,7 @@ cd self-hosted-ai-stack/stacks/chat-ui  # oder voice-pipeline, voice-chat, rag-p
 docker compose up -d
 ```
 
-## Architektur
+## Architektur (CPU-/NVIDIA-Stack)
 
 ```mermaid
 graph LR

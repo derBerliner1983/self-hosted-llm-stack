@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Self-Hosted AI Stack — Dashboard (Apple-Design)
+Self-Hosted AI Stack — Dashboard
 
 Ein winziger, abhängigkeitsfreier Statusserver (nur Python-Standardbibliothek).
 Er liest den Docker-Socket (read-only gemountet) und liefert den Live-Status

@@ -448,7 +448,7 @@ WEBUI_SECRET_KEY="${WEBUI_SECRET_KEY:-$(rand 40)}"
 
 # Host-MTU der Standardroute ermitteln und die Container-MTU daran anpassen.
 # Verhindert TLS-Timeouts ("i/o timeout") aus Containern hinter VPN/Cloud-Overlays.
-DEFAULT_DEV="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')"
+DEFAULT_DEV="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}' || true)"
 HOST_MTU=""
 [ -n "$DEFAULT_DEV" ] && HOST_MTU="$(cat "/sys/class/net/${DEFAULT_DEV}/mtu" 2>/dev/null || true)"
 DOCKER_MTU="${DOCKER_MTU:-${HOST_MTU:-1500}}"
@@ -554,18 +554,14 @@ done
 bash "$ROOT_DIR/scripts/sync-ollama-models.sh" || note_warn "Modell-Sync unvollständig — später erneut ausführen: ./scripts/sync-ollama-models.sh"
 
 # ════════════════════════════════════════════════════════════════════════════
-IP="$(ip -o -f inet addr show scope global 2>/dev/null | awk '{print $4}' | head -1 | cut -d/ -f1)"
+IP="$(ip -o -f inet addr show scope global 2>/dev/null | awk '{print $4}' | head -1 | cut -d/ -f1 || true)"
 IP="${IP:-<server-ip>}"
 
 step "Fertig! 🎉"
 cat <<EOF
 
-  ${c_bold}Zugriff:${c_reset}
-    Dashboard    →  http://${IP}:${PORT_DASHBOARD}
-    Chat (WebUI) →  http://${IP}:${PORT_WEBUI}
-    LiteLLM-UI   →  http://${IP}:${PORT_LITELLM}/ui   (Login: admin / Master-Key aus .env)
-
   ${c_bold}Nützliche Befehle:${c_reset}
+    Zugangsdaten   ./scripts/show-credentials.sh
     Status         ${DC} -f ${COMPOSE_FILE} ps
     Logs           ${DC} -f ${COMPOSE_FILE} logs -f <dienst>
     Modell laden   docker exec ollama ollama pull <modell>
@@ -573,5 +569,7 @@ cat <<EOF
     Stoppen        ${DC} -f ${COMPOSE_FILE} down
 
 EOF
+bash "$ROOT_DIR/scripts/show-credentials.sh" || true
+echo
 [ "$WARNINGS" -gt 0 ] && warn "$WARNINGS Warnung(en) während der Installation — bitte oben prüfen."
 ok "Viel Spaß mit deinem privaten KI-Stack!"
