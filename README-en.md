@@ -18,7 +18,9 @@ Includes Ollama, LiteLLM, AnythingLLM, Whisper, MCP Gateway, Embeddings, Docling
 - Private: runs locally by default with optional external provider support via LiteLLM
 - Flexible: customize models, ports, providers, and API keys with simple env files
 - [Lightweight stacks](#lightweight-stacks) for lower memory requirements (as low as ~4.5 GB)
-- GPU acceleration via NVIDIA CUDA
+- **GPU acceleration via AMD ROCm** — tuned for the **Ryzen AI Max+ 395** (Strix Halo, gfx1151)
+- One-command [installer](#quick-start-amd-rocm--recommended) that checks hardware, sets up the firewall, and pulls the default model
+- [Apple-style dashboard](#dashboard) — see what's online at a glance and jump straight to it
 - Multi-arch: `linux/amd64`, `linux/arm64`
 
 ## Community
@@ -28,6 +30,78 @@ Includes Ollama, LiteLLM, AnythingLLM, Whisper, MCP Gateway, Embeddings, Docling
 - ⭐ Star the repository if you find it useful — it helps others discover it
 
 Self-Hosted AI Stack is maintained by the author of [Setup IPsec VPN](https://github.com/hwdsl2/setup-ipsec-vpn) (28k+ stars).
+
+## Quick start (AMD ROCm) — recommended
+
+This variant is rebuilt entirely on **upstream images** and targets **AMD GPUs** (tuned for the **Ryzen AI Max+ 395** / Strix Halo). It uses:
+
+- **[Ollama (ROCm)](https://hub.docker.com/r/ollama/ollama)** as the LLM engine with AMD GPU acceleration
+- **[Open WebUI](https://github.com/open-webui/open-webui)** as the chat interface (replaces AnythingLLM)
+- **[LiteLLM](https://github.com/BerriAI/litellm)** gateway, **PostgreSQL/pgvector**, **Whisper** (STT) and **Embeddings** (TEI)
+- an **[Apple-style dashboard](#dashboard)** showing the live status of every service
+
+Everything is checked and set up by a single script:
+
+```bash
+git clone https://github.com/derBerliner1983/self-hosted-llm-stack
+cd self-hosted-llm-stack
+
+# Optional: check only, without changing anything
+./install.sh --check-only
+
+# Install (checks hardware/ROCm, sets up the firewall, pulls the model, starts everything)
+sudo ./install.sh
+```
+
+The installer:
+
+- checks **system, RAM and free disk space**
+- checks the **AMD GPU/ROCm** (`amdgpu` module, `/dev/kfd`, `/dev/dri`, `video`/`render` groups) and adds your user to the GPU groups
+- installs **Docker** and **Docker Compose** if missing
+- sets up the **firewall (ufw)** — **LAN-only** by default (SSH open, web UIs reachable only from your local subnet)
+- writes a `.env` with auto-generated **secrets** (Postgres password, LiteLLM master key)
+- starts the stack, **pulls the default model** and **registers all models with LiteLLM**
+
+**Default model:** `gemma3:12b` (change it with a single line in `.env`, e.g. `DEFAULT_MODEL=qwen2.5:14b`), or pick one at invocation time:
+
+```bash
+DEFAULT_MODEL=llama3.1:8b sudo ./install.sh
+```
+
+> **Note on `gemma4`:** Ollama's library currently has **no** `gemma4:12b`. The default is therefore `gemma3:12b` (the current 12B Gemma). Once `gemma4` ships, just update `DEFAULT_MODEL` in `.env` and run `docker exec ollama ollama pull gemma4:12b`.
+
+After install:
+
+| Service | URL |
+|---|---|
+| **Dashboard** (Apple style) | `http://<server-ip>:8600` |
+| **Chat** (Open WebUI) | `http://<server-ip>:3001` |
+| **LiteLLM admin UI** | `http://<server-ip>:4000/ui` (login `admin` + master key from `.env`) |
+
+### Dashboard
+
+The stack ships a small, self-contained **Apple-style dashboard** (`dashboard/`). It reads the Docker socket (read-only) and shows in real time **which services are online, which port they run on**, and links straight to them. It refreshes automatically and is available at `http://<server-ip>:8600`.
+
+### Register models with LiteLLM
+
+Any model you pull with `ollama pull` can be registered with LiteLLM automatically, so it shows up in the gateway and in Open WebUI right away:
+
+```bash
+docker exec ollama ollama pull qwen2.5:14b
+./scripts/sync-ollama-models.sh
+```
+
+The script is **idempotent**: already-registered models are skipped, only new ones are added.
+
+### Useful commands
+
+```bash
+docker compose -f docker-compose.rocm.yml ps                 # status
+docker compose -f docker-compose.rocm.yml logs -f open-webui # logs for one service
+docker compose -f docker-compose.rocm.yml down               # stop (data stays in volumes)
+```
+
+> The sections below describe the **original CPU/NVIDIA stack** (the `hwdsl2/*` images and AnythingLLM). For AMD, use the ROCm quick start above.
 
 ## Included services
 
@@ -130,25 +204,25 @@ Open `http://<server-ip>:4000/ui` in your browser. Log in with username `admin` 
 docker compose down
 ```
 
-## GPU acceleration (NVIDIA CUDA)
+## GPU acceleration (AMD ROCm)
 
-For NVIDIA GPU acceleration, use the CUDA compose file:
+For AMD GPUs (e.g. the **Ryzen AI Max+ 395** / Strix Halo), use the ROCm compose file — most easily via the [installer](#quick-start-amd-rocm--recommended), or manually:
 
 ```bash
-docker compose -f docker-compose.cuda.yml up -d
+docker compose -f docker-compose.rocm.yml up -d
 ```
 
-> **Tip:** To avoid adding `-f docker-compose.cuda.yml` to every subsequent `docker compose` command (`down`, `pull`, `logs`, etc.), set it once for your shell session:
->
-> ```bash
-> export COMPOSE_FILE=docker-compose.cuda.yml
-> ```
->
-> Then run plain `docker compose` commands as usual. To make it persistent, add `COMPOSE_FILE=docker-compose.cuda.yml` to a `.env` file in this directory. Run `unset COMPOSE_FILE` to switch back to the CPU configuration.
+The `ollama` service uses the official `ollama/ollama:rocm` image and gets the GPU passed through via `/dev/kfd` and `/dev/dri`.
 
-**Requirements:** NVIDIA GPU, [NVIDIA driver](https://www.nvidia.com/en-us/drivers/) 575.57.08+ (Linux) or 576.57+ (Windows), and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed on the host. CUDA images are `linux/amd64` only.
+**Requirements:**
 
-> **Podman users:** The Compose `deploy:` GPU block is ignored by Podman. Use CDI instead — see [Using Podman](#using-podman).
+- AMD GPU with the `amdgpu` kernel module loaded and **ROCm** (or `amdgpu-dkms`) installed
+- The devices `/dev/kfd` and `/dev/dri/renderD*` must be present
+- Your user must be in the `video` and `render` groups (the install script handles this)
+
+For the **Ryzen AI Max+ 395** (iGPU `gfx1151`) the stack sets `HSA_OVERRIDE_GFX_VERSION=11.5.1` in case ROCm doesn't detect the iGPU directly. You can adjust this value in `.env`. Thanks to the large unified memory, the iGPU can load very large models.
+
+> **Tip:** The [installer](#quick-start-amd-rocm--recommended) (`./install.sh`) checks all of this automatically and reports what's missing. For a check without changes: `./install.sh --check-only`.
 
 ## Lightweight stacks
 

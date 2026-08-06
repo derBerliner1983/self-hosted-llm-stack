@@ -206,7 +206,6 @@ check_standalone_compose() {
 
   local entries=(
     ".|docker-compose.yml|full|cpu"
-    ".|docker-compose.cuda.yml|full|cuda"
     "stacks/ai-tools|docker-compose.yml|ai-tools|cpu"
     "stacks/ai-tools|docker-compose.cuda.yml|ai-tools|cuda"
     "stacks/chat-only|docker-compose.yml|chat-only|cpu"
@@ -244,7 +243,6 @@ check_proxy_compose() {
 
   local entries=(
     ".|docker-compose.yml|docker-compose.proxy.yml|full|cpu"
-    ".|docker-compose.cuda.yml|docker-compose.proxy.yml|full|cuda"
     "stacks/chat-ui|docker-compose.yml|../../docker-compose.proxy.yml|chat-ui|cpu"
     "stacks/chat-ui|docker-compose.cuda.yml|../../docker-compose.proxy.yml|chat-ui|cuda"
     "stacks/voice-chat|docker-compose.yml|../../docker-compose.proxy.yml|voice-chat|cpu"
@@ -289,7 +287,6 @@ check_repository_consistency() {
 
   test -f "$ROOT_DIR/VERSION"
   grep -q 'AI_STACK_VARIANT: full' "$ROOT_DIR/docker-compose.yml"
-  grep -q 'AI_STACK_VARIANT: full' "$ROOT_DIR/docker-compose.cuda.yml"
 }
 
 main() {
