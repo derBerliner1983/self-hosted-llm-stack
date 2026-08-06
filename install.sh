@@ -395,6 +395,17 @@ else
   fi
   if command -v ufw >/dev/null 2>&1; then
     $SUDO ufw allow OpenSSH >/dev/null 2>&1 || $SUDO ufw allow 22/tcp >/dev/null 2>&1 || true
+    # WICHTIG für Docker: ufw setzt die FORWARD-Policy sonst auf DROP und kappt
+    # damit den Container-Egress (Container kommen nicht mehr ins Internet ->
+    # 'ollama pull' läuft in "i/o timeout"). Routing erlauben; der Ingress-
+    # Schutz über die ufw-Regeln bleibt davon unberührt.
+    if $SUDO ufw default allow routed >/dev/null 2>&1; then
+      ok "ufw: Routing/Forward erlaubt (Docker-Container behalten Internetzugang)."
+    else
+      note_warn "Konnte ufw-Forward-Policy nicht setzen — Container-Internetzugang ggf. prüfen."
+    fi
+    # Zusätzlich, falls vorhanden, die Konfigdatei absichern (harmlos, wenn sie fehlt).
+    [ -f /etc/default/ufw ] && $SUDO sed -i 's/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw 2>/dev/null || true
     if [ "$FIREWALL_MODE" = "lan" ]; then
       for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD"; do
         $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto tcp >/dev/null 2>&1 || true
@@ -435,6 +446,18 @@ POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(rand 32)}"
 LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-sk-$(rand 40)}"
 WEBUI_SECRET_KEY="${WEBUI_SECRET_KEY:-$(rand 40)}"
 
+# Host-MTU der Standardroute ermitteln und die Container-MTU daran anpassen.
+# Verhindert TLS-Timeouts ("i/o timeout") aus Containern hinter VPN/Cloud-Overlays.
+DEFAULT_DEV="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')"
+HOST_MTU=""
+[ -n "$DEFAULT_DEV" ] && HOST_MTU="$(cat "/sys/class/net/${DEFAULT_DEV}/mtu" 2>/dev/null || true)"
+DOCKER_MTU="${DOCKER_MTU:-${HOST_MTU:-1500}}"
+if [ "${DOCKER_MTU:-1500}" -lt 1500 ] 2>/dev/null; then
+  info "Host-MTU ${DOCKER_MTU} (auf ${DEFAULT_DEV}) — setze Container-MTU passend (verhindert TLS-Timeouts)."
+else
+  info "Host-MTU: ${DOCKER_MTU:-1500} (Standard)."
+fi
+
 cat > .env <<EOF
 # Automatisch erzeugt von install.sh — enthält Secrets, nicht committen!
 COMPOSE_FILE=${COMPOSE_FILE}
@@ -449,6 +472,9 @@ HSA_OVERRIDE_GFX_VERSION=${HSA_OVERRIDE_GFX_VERSION}
 VIDEO_GID=${VIDEO_GID}
 RENDER_GID=${RENDER_GID}
 OLLAMA_KEEP_ALIVE=30m
+
+# Docker-Netzwerk-MTU (an Host-MTU angepasst; verhindert TLS-Timeouts im Container)
+DOCKER_MTU=${DOCKER_MTU}
 
 # Ports
 PORT_WEBUI=${PORT_WEBUI}
