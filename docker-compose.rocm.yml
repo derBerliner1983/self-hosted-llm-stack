@@ -128,16 +128,16 @@ services:
 
   # ── Text → Vektoren (Text Embeddings Inference) ────────────────────────────
   embeddings:
-    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5
+    # cpu-1.5 bundled an old hf-hub crate (0.3.2) that crashed on certain
+    # huggingface.co CDN redirects with "relative URL without a base",
+    # restart-looping instead of ever serving. Pinned to a newer release
+    # where this is fixed (verified pullable; confirm it serves after deploy).
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
     container_name: embeddings
     restart: always
     ports:
       - "127.0.0.1:${PORT_EMBEDDINGS:-8000}:80/tcp"
     environment:
-      # Explizit setzen: falls der Docker-Client eine leere HF_ENDPOINT-Variable
-      # in den Container injiziert, baut hf-hub daraus eine URL ohne Schema
-      # ("relative URL without a base") und der Modell-Download crasht in
-      # einer Neustart-Schleife. Ein expliziter, gültiger Wert überschreibt das.
       - HF_ENDPOINT=https://huggingface.co
     command: ["--model-id", "${EMBEDDINGS_MODEL:-BAAI/bge-small-en-v1.5}"]
     volumes:
