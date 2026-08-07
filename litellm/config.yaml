@@ -28,3 +28,20 @@ general_settings:
 
 litellm_settings:
   drop_params: true
+
+# MCP Gateway (Werkzeuge: Dateisystem, Web-Fetch, GitHub, Suche, Datenbanken).
+# Der API-Key wird von scripts/wire-mcp.sh nach dem ersten Start automatisch
+# ausgelesen und als MCP_API_KEY in die .env geschrieben (siehe dort).
+#
+# code_sandbox: run_python/run_shell in isolierten Wegwerf-Containern (siehe
+# sandbox-mcp/). Nur intern erreichbar, kein API-Key nötig (kein Host-Port).
+mcp_servers:
+  mcp_gateway:
+    url: "http://mcp:3000/mcp"
+    transport: "http"
+    auth_type: "bearer_token"
+    auth_value: os.environ/MCP_API_KEY
+
+  code_sandbox:
+    url: "http://sandbox-mcp:8000/mcp"
+    transport: "http"

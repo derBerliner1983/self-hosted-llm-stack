@@ -4,7 +4,8 @@
 #
 # Prüft die Voraussetzungen, richtet die Firewall (LAN-only) ein, erzeugt die
 # .env, startet den kompletten Stack (docker-compose.rocm.yml), lädt das
-# Standardmodell und trägt alle Ollama-Modelle bei LiteLLM ein.
+# Standardmodell, verdrahtet MCP Gateway mit LiteLLM und trägt alle
+# Ollama-Modelle bei LiteLLM ein.
 #
 # Aufruf:   sudo ./install.sh
 #           ./install.sh --check-only        # nur prüfen, nichts ändern
@@ -194,8 +195,8 @@ BANNER
 
   # Übrig gebliebene Container (auch aus manuellem 'docker run') gezielt entfernen.
   local containers="ollama open-webui anythingllm litellm litellm-db db mcp \
-embeddings whisper whisper-live kokoro docling ai-stack-init ai-stack-dashboard \
-ai-stack-caddy"
+sandbox-mcp mcpo embeddings whisper whisper-live kokoro docling ai-stack-init \
+ai-stack-dashboard ai-stack-caddy"
   info "Entferne evtl. verbliebene Container…"
   for c in $containers; do
     docker rm -f "$c" >/dev/null 2>&1 && ok "Container entfernt: $c" || true
@@ -213,6 +214,9 @@ whisper-live-data kokoro-data mcp-data mcp-shared docling-data caddy-data caddy-
 
     if [ -f "$ROOT_DIR/.env" ]; then
       rm -f "$ROOT_DIR/.env" && ok ".env entfernt."
+    fi
+    if [ -f "$ROOT_DIR/mcpo/config.json" ]; then
+      rm -f "$ROOT_DIR/mcpo/config.json" && ok "mcpo/config.json entfernt (enthielt den MCP-API-Key)."
     fi
     warn "Firewall-Regeln (ufw) wurden NICHT verändert. Bei Bedarf manuell entfernen:"
     printf '    %s ufw status numbered\n' "${SUDO:-sudo}"
@@ -240,7 +244,7 @@ BANNER
 printf '%s' "$c_reset"
 
 # ════════════════════════════════════════════════════════════════════════════
-step "1/7 · System prüfen"
+step "1/8 · System prüfen"
 
 [ "$(uname -s)" = "Linux" ] || die "Dieser Stack braucht Linux."
 ok "Betriebssystem: Linux ($(uname -m))"
@@ -266,7 +270,7 @@ if [ "${FREE_GB:-0}" -ge 30 ]; then ok "Freier Speicher: ${FREE_GB} GB"
 else note_warn "Freier Speicher: ${FREE_GB} GB (Modelle brauchen viel Platz)."; fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "2/7 · AMD-GPU / ROCm prüfen"
+step "2/8 · AMD-GPU / ROCm prüfen"
 
 GPU_OK=1
 if lspci 2>/dev/null | grep -iE 'VGA|Display|3D' | grep -iq 'AMD\|ATI'; then
@@ -347,7 +351,7 @@ if [ "$GPU_OK" -ne 1 ]; then
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "3/7 · Docker prüfen"
+step "3/8 · Docker prüfen"
 
 if command -v docker >/dev/null 2>&1; then
   ok "Docker: $(docker --version 2>/dev/null | sed 's/,.*//')"
@@ -377,7 +381,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "4/7 · Firewall (Modus: ${FIREWALL_MODE})"
+step "4/8 · Firewall (Modus: ${FIREWALL_MODE})"
 
 detect_subnet() {
   ip -o -f inet addr show scope global 2>/dev/null \
@@ -431,7 +435,7 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "5/7 · Konfiguration schreiben (.env)"
+step "5/8 · Konfiguration schreiben (.env)"
 
 # Zufalls-String. Wichtig: '|| true' fängt den SIGPIPE von 'tr' ab (head schließt
 # die Pipe früh), sonst würde 'set -o pipefail' + 'set -e' das Skript abbrechen.
@@ -484,6 +488,16 @@ PORT_OLLAMA=11434
 PORT_WHISPER=9000
 PORT_EMBEDDINGS=8000
 
+# Code-Sandbox (run_python/run_shell fürs LLM; Wegwerf-Container pro Aufruf,
+# siehe README "Code-Sandbox"). SANDBOX_NETWORK=none = kein Internetzugriff
+# aus dem ausgeführten Code (Standard, sicherer). Docker-Socket nötig — falls
+# unerwünscht, den sandbox-mcp-Dienst aus docker-compose.rocm.yml entfernen.
+SANDBOX_IMAGE=python:3.12-slim
+SANDBOX_DEFAULT_TIMEOUT=15
+SANDBOX_MAX_TIMEOUT=60
+SANDBOX_MEM_LIMIT=256m
+SANDBOX_NETWORK=none
+
 # Secrets
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
@@ -495,8 +509,15 @@ EOF
 chmod 600 .env
 ok ".env geschrieben (Rechte 600)."
 
+# mcpo/config.json muss vor dem ersten Start existieren, sonst legt Docker beim
+# Bind-Mount einer fehlenden Datei ein leeres Verzeichnis an und mcpo crasht.
+# Platzhalter-Key wird gleich von scripts/wire-mcp.sh mit dem echten ersetzt.
+if [ -f mcpo/config.template.json ] && [ ! -f mcpo/config.json ]; then
+  cp mcpo/config.template.json mcpo/config.json
+fi
+
 # ════════════════════════════════════════════════════════════════════════════
-step "6/7 · Stack starten"
+step "6/8 · Stack starten"
 
 info "Ziehe Images und starte Container (kann beim ersten Mal dauern)…"
 $DC -f "$COMPOSE_FILE" up -d
@@ -532,7 +553,12 @@ else
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "7/7 · Modelle bei LiteLLM eintragen"
+step "7/8 · MCP Gateway mit LiteLLM verdrahten"
+
+bash "$ROOT_DIR/scripts/wire-mcp.sh" || note_warn "MCP-Wiring unvollständig — später erneut ausführen: ./scripts/wire-mcp.sh"
+
+# ════════════════════════════════════════════════════════════════════════════
+step "8/8 · Modelle bei LiteLLM eintragen"
 
 # HTTP-Check ohne curl-Abhängigkeit (Host hat evtl. kein curl, aber python3).
 http_ok() {
@@ -566,6 +592,7 @@ cat <<EOF
     Logs           ${DC} -f ${COMPOSE_FILE} logs -f <dienst>
     Modell laden   docker exec ollama ollama pull <modell>
     Modelle syncen ./scripts/sync-ollama-models.sh
+    MCP neu verdrahten ./scripts/wire-mcp.sh
     Stoppen        ${DC} -f ${COMPOSE_FILE} down
 
 EOF

@@ -56,5 +56,13 @@ printf '  http://%s:%s registrierst, wird automatisch Admin.\n' "$IP" "$PORT_WEB
 printf '  Interner Secret-Key (Sessions/Cookies): %s\n' "${WEBUI_SECRET_KEY:-<nicht gesetzt>}"
 echo
 
+printf '%sMCP Gateway%s\n' "$c_bold" "$c_reset"
+if [ -n "${MCP_API_KEY:-}" ]; then
+  printf '  API-Key (bei LiteLLM hinterlegt):   %s\n' "$MCP_API_KEY"
+else
+  printf '  %sNoch nicht verdrahtet.%s Ausführen: ./scripts/wire-mcp.sh\n' "$c_dim" "$c_reset"
+fi
+echo
+
 printf '%s%sHinweis:%s Diese Werte stehen im Klartext in %s.env%s — Datei nicht committen/teilen.\n' \
   "$c_blue" "$c_bold" "$c_reset$c_dim" "$c_bold" "$c_reset"

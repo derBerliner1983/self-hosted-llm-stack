@@ -38,7 +38,7 @@ This variant is rebuilt entirely on **upstream images** and targets **AMD GPUs**
 
 - **[Ollama (ROCm)](https://hub.docker.com/r/ollama/ollama)** as the LLM engine with AMD GPU acceleration
 - **[Open WebUI](https://github.com/open-webui/open-webui)** as the chat interface (replaces AnythingLLM)
-- **[LiteLLM](https://github.com/BerriAI/litellm)** gateway, **PostgreSQL/pgvector**, **Whisper** (STT) and **Embeddings** (TEI)
+- **[LiteLLM](https://github.com/BerriAI/litellm)** gateway, **MCP Gateway** + **code sandbox** (tools, incl. `run_python`/`run_shell` for self-testing), **PostgreSQL/pgvector**, **Whisper** (STT) and **Embeddings** (TEI)
 - a **[modern status dashboard](#dashboard)** showing the live status of every service
 
 Everything is checked and set up by a single script:
@@ -86,7 +86,12 @@ graph LR
     U["👤 User"] -->|chat| W["Open WebUI<br/>(port 3001)"]
     U -->|status| DASH["Dashboard<br/>(port 8600)"]
     W -->|OpenAI API| L["LiteLLM<br/>(AI gateway, port 4000)"]
+    W -->|OpenAPI tools| MO["mcpo<br/>(MCP → OpenAPI)"]
     L -->|routes to| O["Ollama<br/>(ROCm, AMD iGPU)"]
+    L -->|tools| M["MCP Gateway<br/>(filesystem, web, GitHub)"]
+    L -->|tools| S["Code sandbox<br/>(run_python/run_shell)"]
+    MO --> M
+    MO --> S
     L -->|metadata| DB[("PostgreSQL<br/>+ pgvector")]
     A["🎤 Audio"] --> WH["Whisper<br/>(speech-to-text)"]
     D["📄 Documents"] --> E["Embeddings<br/>(text-to-vectors)"]
@@ -99,11 +104,51 @@ graph LR
 ./scripts/show-credentials.sh
 ```
 
-Prints every URL, the LiteLLM master key, and the Postgres password straight from your `.env` — no `docker exec ... _manage` needed (that only exists in the old `hwdsl2` images, not the upstream images used here). Open WebUI has no seeded password: the **first account** you register at `http://<server-ip>:3001` automatically becomes admin.
+Prints every URL, the LiteLLM master key, the Postgres password, and the MCP API key straight from your `.env` — no `docker exec ... _manage` needed (that only exists in the old `hwdsl2` images, not the upstream images used here). Open WebUI has no seeded password: the **first account** you register at `http://<server-ip>:3001` automatically becomes admin.
 
 ### Dashboard
 
 The stack ships a small, self-contained **modern status dashboard** (`dashboard/`). It reads the Docker socket (read-only) and shows in real time **which services are online, which port they run on**, and links straight to them. It refreshes automatically and is available at `http://<server-ip>:8600`.
+
+### MCP Gateway (tools for the LLM)
+
+The stack ships **MCP Gateway** — gives you tools like filesystem, web fetch, GitHub, search, and database access. The installer wires it up with LiteLLM automatically (step 7/8); the API key is generated and written to `.env` for you.
+
+```bash
+./scripts/wire-mcp.sh   # re-run if the mcp container was recreated (new key)
+```
+
+### Code sandbox (`run_python` / `run_shell` for the LLM)
+
+Alongside MCP Gateway, the stack ships a dedicated **code sandbox** (`sandbox-mcp/`) so the model can **test code it writes, catch errors, and iterate** instead of handing you untested code. Two tools, exposed through the same LiteLLM MCP mechanism:
+
+- `run_python(code)` — runs Python code
+- `run_shell(command)` — runs a shell command
+
+**How isolation works:** every single call spins up a **brand-new, isolated, throwaway container** — no network access, read-only filesystem (only `/tmp` is writable), memory/CPU/process limits, no root, all Linux capabilities dropped, a timeout (15s default, 60s max). The container is deleted immediately after each run — there's no state to reset: every call starts from zero, guaranteed.
+
+> ⚠️ **Security note:** for the sandbox service to spin up a fresh container per call, it needs access to the host's **Docker socket** (`/var/run/docker.sock`). That's powerful — anyone who can reach this internal service can, in principle, start arbitrary containers on the host. It is therefore deliberately reachable **internally only**, with no port published outside the Docker network. For a single-user setup on your own LAN this is a reasonable tradeoff; if you don't want this capability, just remove the `sandbox-mcp` service (and the matching `code_sandbox` entry in `litellm/config.yaml`) and restart the stack.
+
+Configurable via `.env`: `SANDBOX_IMAGE` (the sandbox's base image, default `python:3.12-slim`), `SANDBOX_DEFAULT_TIMEOUT`, `SANDBOX_MAX_TIMEOUT`, `SANDBOX_MEM_LIMIT`, `SANDBOX_NETWORK` (default `none`; set e.g. `bridge` if the code needs internet access — you then lose the network-isolation protection).
+
+### Enable the tools in Open WebUI (mcpo)
+
+**Important:** Open WebUI doesn't speak raw MCP — only **OpenAPI**. The stack ships `mcpo` (the Open WebUI team's own official MCP-to-OpenAPI proxy) to bridge MCP Gateway and the code sandbox into a format Open WebUI understands directly. `scripts/wire-mcp.sh` sets this up automatically too.
+
+How to connect the tools in Open WebUI:
+
+1. **Admin panel** (gear icon, then **Settings → Tools**, or on some versions **Workspace → Tools → External Tool Servers**)
+2. Add a new tool server, URL: **`http://mcpo:8000/mcp_gateway`** (filesystem, web, GitHub, search, DB)
+3. Add a second one, URL: **`http://mcpo:8000/code_sandbox`** (`run_python`, `run_shell`)
+4. In chat: use the tool icon below the input box to enable the tools you want for that conversation
+
+```bash
+docker logs mcpo          # is mcpo running, are both servers loaded?
+docker logs sandbox-mcp   # is the code sandbox running?
+docker logs litellm | grep -i mcp   # does LiteLLM itself also see the MCP servers?
+```
+
+> **Note:** Exact menu paths and behavior can differ slightly by Open WebUI version (a fast-moving area) — verify together after deploy that the tools are actually invoked in chat.
 
 ### Register models with LiteLLM
 
@@ -120,6 +165,7 @@ The script is **idempotent**: already-registered models are skipped, only new on
 
 ```bash
 ./scripts/show-credentials.sh                                 # URLs, master key, passwords
+./scripts/wire-mcp.sh                                         # (re-)wire MCP Gateway with LiteLLM + Open WebUI (mcpo)
 docker compose -f docker-compose.rocm.yml ps                  # status
 docker compose -f docker-compose.rocm.yml logs -f open-webui  # logs for one service
 docker compose -f docker-compose.rocm.yml down                # stop (data stays in volumes)

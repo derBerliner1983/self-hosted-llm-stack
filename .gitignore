@@ -4,5 +4,13 @@
 *.env
 !*.env.example
 
+# Von scripts/wire-mcp.sh mit dem echten MCP-API-Key gerendert — niemals
+# committen (config.template.json mit dem Platzhalter bleibt versioniert).
+mcpo/config.json
+
 # Backups
 backups/
+
+# Python
+__pycache__/
+*.pyc

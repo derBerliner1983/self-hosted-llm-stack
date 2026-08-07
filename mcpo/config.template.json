@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "mcp_gateway": {
+      "type": "streamable-http",
+      "url": "http://mcp:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer __MCP_API_KEY__"
+      }
+    },
+    "code_sandbox": {
+      "type": "streamable-http",
+      "url": "http://sandbox-mcp:8000/mcp"
+    }
+  }
+}
