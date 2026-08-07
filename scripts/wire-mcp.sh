@@ -75,16 +75,27 @@ done
 ok "MCP Gateway ist mit LiteLLM verbunden."
 
 # ── mcpo (MCP → OpenAPI, für Open WebUI) ────────────────────────────────────
-info "Rendere mcpo/config.json (mit echtem Key statt Platzhalter)…"
 TEMPLATE="$ROOT_DIR/mcpo/config.template.json"
 RENDERED="$ROOT_DIR/mcpo/config.json"
 if [ -f "$TEMPLATE" ]; then
+  # Falls config.json noch nie eine echte Datei war, hat Docker beim allerersten
+  # Start (ohne vorheriges install.sh) ein leeres VERZEICHNIS an dieser Stelle
+  # angelegt (Bind-Mount einer fehlenden Datei). Das muss weg, sonst schlägt
+  # sowohl das Schreiben hier als auch mcpo selbst mit "Is a directory" fehl.
+  if [ -d "$RENDERED" ]; then
+    warn "mcpo/config.json ist ein Verzeichnis (Docker-Artefakt vom allerersten Start) — räume das auf…"
+    $DC -f "$COMPOSE_FILE" rm -sf mcpo >/dev/null 2>&1 || true
+    rmdir "$RENDERED" 2>/dev/null \
+      || die "Konnte mcpo/config.json (Verzeichnis) nicht entfernen — manuell prüfen: ls -la '$RENDERED'"
+  fi
+
+  info "Rendere mcpo/config.json (mit echtem Key statt Platzhalter)…"
   sed "s#__MCP_API_KEY__#${MCP_KEY}#" "$TEMPLATE" > "$RENDERED"
   chmod 600 "$RENDERED"
   ok "mcpo/config.json geschrieben (enthält den Key im Klartext, nicht committen — .gitignore deckt das ab)."
 
-  info "Starte mcpo neu, damit die Konfiguration übernommen wird…"
-  $DC -f "$COMPOSE_FILE" up -d mcpo >/dev/null
+  info "Erzeuge mcpo neu, damit die Konfiguration sicher übernommen wird…"
+  $DC -f "$COMPOSE_FILE" up -d --force-recreate mcpo >/dev/null
 
   info "Warte, bis mcpo bereit ist…"
   for i in $(seq 1 30); do
