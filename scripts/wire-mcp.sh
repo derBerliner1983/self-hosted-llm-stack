@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 #
-# Verdrahtet MCP Gateway mit LiteLLM.
+# Verdrahtet MCP Gateway mit LiteLLM UND mit Open WebUI.
 #
 # Das vanilla-LiteLLM-Image (im Gegensatz zu hwdsl2/litellm-server) teilt
 # API-Keys nicht automatisch über Volumes. Dieses Skript holt den vom
 # mcp-Container erzeugten API-Key, schreibt ihn als MCP_API_KEY in die .env
 # und startet LiteLLM neu, damit litellm/config.yaml (mcp_servers.*.auth_value
 # = os.environ/MCP_API_KEY) ihn übernimmt.
+#
+# Open WebUI spricht kein rohes MCP, sondern nur OpenAPI — deshalb rendert
+# dieses Skript zusätzlich mcpo/config.json (mit dem echten Key statt des
+# Platzhalters __MCP_API_KEY__) und startet den mcpo-Dienst (MCP→OpenAPI-
+# Proxy), den Open WebUI unter Admin-Einstellungen → Werkzeuge einbinden kann.
 #
 # Aufruf: ./scripts/wire-mcp.sh
 # Erneut ausführen, falls der mcp-Container neu erzeugt wurde (neuer Key).
@@ -68,6 +73,36 @@ for i in $(seq 1 40); do
 done
 
 ok "MCP Gateway ist mit LiteLLM verbunden."
+
+# ── mcpo (MCP → OpenAPI, für Open WebUI) ────────────────────────────────────
+info "Rendere mcpo/config.json (mit echtem Key statt Platzhalter)…"
+TEMPLATE="$ROOT_DIR/mcpo/config.template.json"
+RENDERED="$ROOT_DIR/mcpo/config.json"
+if [ -f "$TEMPLATE" ]; then
+  sed "s#__MCP_API_KEY__#${MCP_KEY}#" "$TEMPLATE" > "$RENDERED"
+  chmod 600 "$RENDERED"
+  ok "mcpo/config.json geschrieben (enthält den Key im Klartext, nicht committen — .gitignore deckt das ab)."
+
+  info "Starte mcpo neu, damit die Konfiguration übernommen wird…"
+  $DC -f "$COMPOSE_FILE" up -d mcpo >/dev/null
+
+  info "Warte, bis mcpo bereit ist…"
+  for i in $(seq 1 30); do
+    if docker exec mcpo python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs')" >/dev/null 2>&1; then
+      ok "mcpo ist bereit."
+      break
+    fi
+    sleep 2
+  done
+else
+  warn "mcpo/config.template.json nicht gefunden — mcpo-Schritt übersprungen."
+fi
+
 echo
-echo "Prüfen: docker logs litellm | grep -i mcp"
-echo "Direkter Test: docker exec mcp mcp_manage --getkey  (gleicher Key wie in .env)"
+echo "Prüfen (LiteLLM):        docker logs litellm | grep -i mcp"
+echo "Prüfen (mcpo/Open WebUI): docker logs mcpo"
+echo "Direkter Test:            docker exec mcp mcp_manage --getkey  (gleicher Key wie in .env)"
+echo
+echo "In Open WebUI einbinden: Admin-Einstellungen → Werkzeuge → Werkzeug-Server verwalten,"
+echo "  URL: http://mcpo:8000/mcp_gateway   (Dateisystem, Web, GitHub, ...)"
+echo "  URL: http://mcpo:8000/code_sandbox  (run_python, run_shell)"

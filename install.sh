@@ -195,7 +195,7 @@ BANNER
 
   # Übrig gebliebene Container (auch aus manuellem 'docker run') gezielt entfernen.
   local containers="ollama open-webui anythingllm litellm litellm-db db mcp \
-sandbox-mcp embeddings whisper whisper-live kokoro docling ai-stack-init \
+sandbox-mcp mcpo embeddings whisper whisper-live kokoro docling ai-stack-init \
 ai-stack-dashboard ai-stack-caddy"
   info "Entferne evtl. verbliebene Container…"
   for c in $containers; do
@@ -214,6 +214,9 @@ whisper-live-data kokoro-data mcp-data mcp-shared docling-data caddy-data caddy-
 
     if [ -f "$ROOT_DIR/.env" ]; then
       rm -f "$ROOT_DIR/.env" && ok ".env entfernt."
+    fi
+    if [ -f "$ROOT_DIR/mcpo/config.json" ]; then
+      rm -f "$ROOT_DIR/mcpo/config.json" && ok "mcpo/config.json entfernt (enthielt den MCP-API-Key)."
     fi
     warn "Firewall-Regeln (ufw) wurden NICHT verändert. Bei Bedarf manuell entfernen:"
     printf '    %s ufw status numbered\n' "${SUDO:-sudo}"
@@ -505,6 +508,13 @@ LAN_SUBNET=${LAN_SUBNET}
 EOF
 chmod 600 .env
 ok ".env geschrieben (Rechte 600)."
+
+# mcpo/config.json muss vor dem ersten Start existieren, sonst legt Docker beim
+# Bind-Mount einer fehlenden Datei ein leeres Verzeichnis an und mcpo crasht.
+# Platzhalter-Key wird gleich von scripts/wire-mcp.sh mit dem echten ersetzt.
+if [ -f mcpo/config.template.json ] && [ ! -f mcpo/config.json ]; then
+  cp mcpo/config.template.json mcpo/config.json
+fi
 
 # ════════════════════════════════════════════════════════════════════════════
 step "6/8 · Stack starten"

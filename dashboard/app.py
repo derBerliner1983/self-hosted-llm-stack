@@ -82,6 +82,14 @@ SERVICES = [
         "path": None,
     },
     {
+        "container": "mcpo",
+        "label": "mcpo",
+        "desc": "MCP → OpenAPI, für Open WebUI",
+        "icon": "🔌",
+        "port": None,
+        "path": None,
+    },
+    {
         "container": "litellm-db",
         "label": "PostgreSQL",
         "desc": "Datenbank · pgvector",

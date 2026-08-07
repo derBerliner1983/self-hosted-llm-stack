@@ -86,9 +86,12 @@ graph LR
     U["👤 Benutzer"] -->|Chat| W["Open WebUI<br/>(Port 3001)"]
     U -->|Status| DASH["Dashboard<br/>(Port 8600)"]
     W -->|OpenAI-API| L["LiteLLM<br/>(AI-Gateway, Port 4000)"]
+    W -->|OpenAPI-Werkzeuge| MO["mcpo<br/>(MCP → OpenAPI)"]
     L -->|routet zu| O["Ollama<br/>(ROCm, AMD-iGPU)"]
     L -->|Werkzeuge| M["MCP Gateway<br/>(Dateisystem, Web, GitHub)"]
     L -->|Werkzeuge| S["Code-Sandbox<br/>(run_python/run_shell)"]
+    MO --> M
+    MO --> S
     L -->|Metadaten| DB[("PostgreSQL<br/>+ pgvector")]
     A["🎤 Audio"] --> WH["Whisper<br/>(Sprache → Text)"]
     D["📄 Dokumente"] --> E["Embeddings<br/>(Text → Vektoren)"]
@@ -109,13 +112,11 @@ Der Stack bringt ein eigenes, schlankes **modernes Status-Dashboard** mit (`dash
 
 ### MCP Gateway (Werkzeuge fürs LLM)
 
-Der Stack bringt **MCP Gateway** mit — stellt LLM-Anfragen über LiteLLM Werkzeuge wie Dateisystem, Web-Fetch, GitHub, Suche und Datenbankzugriff zur Verfügung. Der Installer verdrahtet ihn automatisch mit LiteLLM (Schritt 7/8); der API-Key wird dabei automatisch erzeugt und in die `.env` geschrieben.
+Der Stack bringt **MCP Gateway** mit — stellt Werkzeuge wie Dateisystem, Web-Fetch, GitHub, Suche und Datenbankzugriff bereit. Der Installer verdrahtet ihn automatisch mit LiteLLM (Schritt 7/8); der API-Key wird dabei automatisch erzeugt und in die `.env` geschrieben.
 
 ```bash
 ./scripts/wire-mcp.sh   # erneut ausführen, falls der mcp-Container neu erzeugt wurde (neuer Key)
 ```
-
-> **Hinweis:** Ob dein Chat-Client (z. B. Open WebUI) die von LiteLLM bereitgestellten MCP-Werkzeuge automatisch nutzt, hängt von dessen MCP-Unterstützung ab — das ist ein sich schnell entwickelndes Feld. Prüfe nach der Einrichtung mit `docker logs litellm | grep -i mcp`, ob die Verbindung zum Gateway steht.
 
 ### Code-Sandbox (`run_python` / `run_shell` fürs LLM)
 
@@ -130,12 +131,24 @@ Zusätzlich zu MCP Gateway bringt der Stack eine eigene **Code-Sandbox** mit (`s
 
 Konfigurierbar über `.env`: `SANDBOX_IMAGE` (Basis-Image der Sandbox, Standard `python:3.12-slim`), `SANDBOX_DEFAULT_TIMEOUT`, `SANDBOX_MAX_TIMEOUT`, `SANDBOX_MEM_LIMIT`, `SANDBOX_NETWORK` (Standard `none`; z. B. `bridge` setzen, falls der Code Internetzugriff braucht — dann verlierst du den Netzwerk-Isolationsschutz).
 
+### Werkzeuge in Open WebUI aktivieren (mcpo)
+
+**Wichtig:** Open WebUI spricht kein rohes MCP-Protokoll, sondern nur **OpenAPI**. Der Stack bringt dafür `mcpo` mit (den offiziellen MCP→OpenAPI-Proxy des Open-WebUI-Teams) — er übersetzt MCP Gateway und Code-Sandbox in ein Format, das Open WebUI direkt versteht. `scripts/wire-mcp.sh` richtet auch das automatisch ein.
+
+So bindest du die Werkzeuge in Open WebUI ein:
+
+1. **Admin-Panel** (Zahnrad-Icon, dann **Einstellungen** → **Werkzeuge**, bzw. je nach Version **Workspace → Werkzeuge → Externe Werkzeug-Server**)
+2. Neuen Werkzeug-Server hinzufügen, URL: **`http://mcpo:8000/mcp_gateway`** (Dateisystem, Web, GitHub, Suche, DB)
+3. Einen zweiten hinzufügen, URL: **`http://mcpo:8000/code_sandbox`** (`run_python`, `run_shell`)
+4. Im Chat: Werkzeug-Icon unten im Eingabefeld → die gewünschten Werkzeuge für die Unterhaltung aktivieren
+
 ```bash
-docker logs sandbox-mcp        # Läuft der Dienst?
-docker logs litellm | grep -i mcp   # Sieht LiteLLM beide MCP-Server (mcp_gateway + code_sandbox)?
+docker logs mcpo          # Läuft mcpo, sind beide Server geladen?
+docker logs sandbox-mcp   # Läuft die Code-Sandbox?
+docker logs litellm | grep -i mcp   # Sieht (zusätzlich) LiteLLM selbst die MCP-Server?
 ```
 
-> Wie beim MCP Gateway gilt: Ob dein Chat-Client die Werkzeuge tatsächlich beim Programmieren einsetzt (statt nur auf Anfrage), hängt von dessen Tool-Use-Verhalten ab — nach dem Deploy gemeinsam verifizieren.
+> **Hinweis:** Menüpfade und genaues Verhalten können sich je nach Open-WebUI-Version leicht unterscheiden (schnelllebiges Feld) — nach dem Deploy gemeinsam verifizieren, ob die Werkzeuge im Chat tatsächlich aufgerufen werden.
 
 ### Modelle bei LiteLLM eintragen
 
@@ -152,7 +165,7 @@ Das Skript ist **idempotent**: bereits eingetragene Modelle werden übersprungen
 
 ```bash
 ./scripts/show-credentials.sh                                 # URLs, Master-Key, Passwörter
-./scripts/wire-mcp.sh                                         # MCP Gateway (neu) mit LiteLLM verdrahten
+./scripts/wire-mcp.sh                                         # MCP Gateway (neu) mit LiteLLM + Open WebUI (mcpo) verdrahten
 docker compose -f docker-compose.rocm.yml ps                  # Status
 docker compose -f docker-compose.rocm.yml logs -f open-webui  # Logs eines Dienstes
 docker compose -f docker-compose.rocm.yml down                # Stoppen (Daten bleiben in Volumes)

@@ -104,6 +104,30 @@ services:
       start_period: 30s
       retries: 3
 
+  # ── mcpo (MCP → OpenAPI-Proxy) ──────────────────────────────────────────────
+  # Open WebUI spricht kein rohes MCP, nur OpenAPI. mcpo übersetzt mcp und
+  # sandbox-mcp dafür. mcpo/config.json wird von scripts/wire-mcp.sh mit dem
+  # echten MCP-API-Key gerendert (enthält vor dem ersten Wiring nur den
+  # Platzhalter aus config.template.json). Nur intern erreichbar.
+  mcpo:
+    image: ghcr.io/open-webui/mcpo:main
+    container_name: mcpo
+    restart: always
+    volumes:
+      - ./mcpo/config.json:/config.json:ro
+    command: ["--config", "/config.json", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      mcp:
+        condition: service_healthy
+      sandbox-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
   # ── AI-Gateway (routet zu Ollama, spricht OpenAI-Protokoll, bindet MCP an) ──
   litellm:
     image: ghcr.io/berriai/litellm:main-stable
