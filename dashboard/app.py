@@ -74,6 +74,14 @@ SERVICES = [
         "path": None,
     },
     {
+        "container": "sandbox-mcp",
+        "label": "Code-Sandbox",
+        "desc": "run_python/run_shell · Wegwerf-Container",
+        "icon": "🧪",
+        "port": None,
+        "path": None,
+    },
+    {
         "container": "litellm-db",
         "label": "PostgreSQL",
         "desc": "Datenbank · pgvector",

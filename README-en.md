@@ -38,7 +38,7 @@ This variant is rebuilt entirely on **upstream images** and targets **AMD GPUs**
 
 - **[Ollama (ROCm)](https://hub.docker.com/r/ollama/ollama)** as the LLM engine with AMD GPU acceleration
 - **[Open WebUI](https://github.com/open-webui/open-webui)** as the chat interface (replaces AnythingLLM)
-- **[LiteLLM](https://github.com/BerriAI/litellm)** gateway, **MCP Gateway** (tools), **PostgreSQL/pgvector**, **Whisper** (STT) and **Embeddings** (TEI)
+- **[LiteLLM](https://github.com/BerriAI/litellm)** gateway, **MCP Gateway** + **code sandbox** (tools, incl. `run_python`/`run_shell` for self-testing), **PostgreSQL/pgvector**, **Whisper** (STT) and **Embeddings** (TEI)
 - a **[modern status dashboard](#dashboard)** showing the live status of every service
 
 Everything is checked and set up by a single script:
@@ -88,6 +88,7 @@ graph LR
     W -->|OpenAI API| L["LiteLLM<br/>(AI gateway, port 4000)"]
     L -->|routes to| O["Ollama<br/>(ROCm, AMD iGPU)"]
     L -->|tools| M["MCP Gateway<br/>(filesystem, web, GitHub)"]
+    L -->|tools| S["Code sandbox<br/>(run_python/run_shell)"]
     L -->|metadata| DB[("PostgreSQL<br/>+ pgvector")]
     A["🎤 Audio"] --> WH["Whisper<br/>(speech-to-text)"]
     D["📄 Documents"] --> E["Embeddings<br/>(text-to-vectors)"]
@@ -115,6 +116,26 @@ The stack ships **MCP Gateway** — gives LLM requests routed through LiteLLM ac
 ```
 
 > **Note:** Whether your chat client (e.g. Open WebUI) actually uses the MCP tools LiteLLM exposes depends on its own MCP support — a fast-moving area. After setup, check `docker logs litellm | grep -i mcp` to confirm the gateway connection.
+
+### Code sandbox (`run_python` / `run_shell` for the LLM)
+
+Alongside MCP Gateway, the stack ships a dedicated **code sandbox** (`sandbox-mcp/`) so the model can **test code it writes, catch errors, and iterate** instead of handing you untested code. Two tools, exposed through the same LiteLLM MCP mechanism:
+
+- `run_python(code)` — runs Python code
+- `run_shell(command)` — runs a shell command
+
+**How isolation works:** every single call spins up a **brand-new, isolated, throwaway container** — no network access, read-only filesystem (only `/tmp` is writable), memory/CPU/process limits, no root, all Linux capabilities dropped, a timeout (15s default, 60s max). The container is deleted immediately after each run — there's no state to reset: every call starts from zero, guaranteed.
+
+> ⚠️ **Security note:** for the sandbox service to spin up a fresh container per call, it needs access to the host's **Docker socket** (`/var/run/docker.sock`). That's powerful — anyone who can reach this internal service can, in principle, start arbitrary containers on the host. It is therefore deliberately reachable **internally only**, with no port published outside the Docker network. For a single-user setup on your own LAN this is a reasonable tradeoff; if you don't want this capability, just remove the `sandbox-mcp` service (and the matching `code_sandbox` entry in `litellm/config.yaml`) and restart the stack.
+
+Configurable via `.env`: `SANDBOX_IMAGE` (the sandbox's base image, default `python:3.12-slim`), `SANDBOX_DEFAULT_TIMEOUT`, `SANDBOX_MAX_TIMEOUT`, `SANDBOX_MEM_LIMIT`, `SANDBOX_NETWORK` (default `none`; set e.g. `bridge` if the code needs internet access — you then lose the network-isolation protection).
+
+```bash
+docker logs sandbox-mcp             # is the service running?
+docker logs litellm | grep -i mcp   # does LiteLLM see both MCP servers (mcp_gateway + code_sandbox)?
+```
+
+> As with MCP Gateway: whether your chat client actually uses these tools while coding (rather than only on request) depends on its tool-use behavior — verify together after deploy.
 
 ### Register models with LiteLLM
 

@@ -79,6 +79,31 @@ services:
       start_period: 60s
       retries: 3
 
+  # ── Code-Sandbox (MCP-Werkzeuge: run_python/run_shell in Wegwerf-Containern) ─
+  # ⚠️  Braucht Zugriff auf den Docker-Socket, um pro Ausführung einen frischen,
+  #     isolierten Container zu starten und danach zu löschen (kein Netzwerk,
+  #     read-only, Ressourcen-Limits, kein root — siehe sandbox-mcp/server.py).
+  #     Nur intern erreichbar, kein Host-Port. Details: README, "Code-Sandbox".
+  sandbox-mcp:
+    build: ./sandbox-mcp
+    image: ai-stack/sandbox-mcp:1
+    container_name: sandbox-mcp
+    restart: always
+    environment:
+      - SANDBOX_IMAGE=${SANDBOX_IMAGE:-python:3.12-slim}
+      - SANDBOX_DEFAULT_TIMEOUT=${SANDBOX_DEFAULT_TIMEOUT:-15}
+      - SANDBOX_MAX_TIMEOUT=${SANDBOX_MAX_TIMEOUT:-60}
+      - SANDBOX_MEM_LIMIT=${SANDBOX_MEM_LIMIT:-256m}
+      - SANDBOX_NETWORK=${SANDBOX_NETWORK:-none}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; socket.create_connection(('127.0.0.1',8000),3)\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
   # ── AI-Gateway (routet zu Ollama, spricht OpenAI-Protokoll, bindet MCP an) ──
   litellm:
     image: ghcr.io/berriai/litellm:main-stable
@@ -102,6 +127,8 @@ services:
       db:
         condition: service_healthy
       mcp:
+        condition: service_healthy
+      sandbox-mcp:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')\" || exit 1"]

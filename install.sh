@@ -195,8 +195,8 @@ BANNER
 
   # Übrig gebliebene Container (auch aus manuellem 'docker run') gezielt entfernen.
   local containers="ollama open-webui anythingllm litellm litellm-db db mcp \
-embeddings whisper whisper-live kokoro docling ai-stack-init ai-stack-dashboard \
-ai-stack-caddy"
+sandbox-mcp embeddings whisper whisper-live kokoro docling ai-stack-init \
+ai-stack-dashboard ai-stack-caddy"
   info "Entferne evtl. verbliebene Container…"
   for c in $containers; do
     docker rm -f "$c" >/dev/null 2>&1 && ok "Container entfernt: $c" || true
@@ -484,6 +484,16 @@ PORT_DASHBOARD=${PORT_DASHBOARD}
 PORT_OLLAMA=11434
 PORT_WHISPER=9000
 PORT_EMBEDDINGS=8000
+
+# Code-Sandbox (run_python/run_shell fürs LLM; Wegwerf-Container pro Aufruf,
+# siehe README "Code-Sandbox"). SANDBOX_NETWORK=none = kein Internetzugriff
+# aus dem ausgeführten Code (Standard, sicherer). Docker-Socket nötig — falls
+# unerwünscht, den sandbox-mcp-Dienst aus docker-compose.rocm.yml entfernen.
+SANDBOX_IMAGE=python:3.12-slim
+SANDBOX_DEFAULT_TIMEOUT=15
+SANDBOX_MAX_TIMEOUT=60
+SANDBOX_MEM_LIMIT=256m
+SANDBOX_NETWORK=none
 
 # Secrets
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
