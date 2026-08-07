@@ -290,10 +290,10 @@ docker compose down
 Für AMD-GPUs (z. B. den **Ryzen AI Max+ 395** / Strix Halo) nutzt du die ROCm-Compose-Datei — am einfachsten über den [Installer](#schnellstart-amd-rocm--empfohlen), oder manuell:
 
 ```bash
-docker compose -f docker-compose.rocm.yml up -d
+docker compose -f docker-compose.rocm.yml up -d --build
 ```
 
-Der `ollama`-Dienst nutzt das offizielle `ollama/ollama:rocm`-Image und bekommt die GPU über `/dev/kfd` und `/dev/dri` durchgereicht.
+Der `ollama`-Dienst nutzt das offizielle `ollama/ollama:rocm`-Image und bekommt die GPU über `/dev/kfd` und `/dev/dri` durchgereicht. `--build` sorgt dafür, dass der lokal gebaute `sandbox-mcp`-Dienst (Code-Sandbox) korrekt gebaut statt fälschlich von einer Registry gezogen wird.
 
 **Voraussetzungen:**
 

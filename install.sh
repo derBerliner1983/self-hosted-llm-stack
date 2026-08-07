@@ -509,18 +509,25 @@ EOF
 chmod 600 .env
 ok ".env geschrieben (Rechte 600)."
 
-# mcpo/config.json muss vor dem ersten Start existieren, sonst legt Docker beim
-# Bind-Mount einer fehlenden Datei ein leeres Verzeichnis an und mcpo crasht.
-# Platzhalter-Key wird gleich von scripts/wire-mcp.sh mit dem echten ersetzt.
-if [ -f mcpo/config.template.json ] && [ ! -f mcpo/config.json ]; then
+# mcpo/config.json muss vor dem ersten Start als echte DATEI existieren, sonst
+# legt Docker beim Bind-Mount einer fehlenden Datei ein leeres Verzeichnis an
+# und mcpo crasht dauerhaft mit "Is a directory". Ein evtl. von einem früheren
+# Start fälschlich angelegtes Verzeichnis wird zuerst entfernt (nur falls leer
+# — sonst lieber melden statt Daten zu löschen). Platzhalter-Key wird gleich
+# von scripts/wire-mcp.sh mit dem echten ersetzt.
+if [ -d mcpo/config.json ]; then
+  rmdir mcpo/config.json 2>/dev/null \
+    || note_warn "mcpo/config.json ist ein nicht-leeres Verzeichnis — bitte manuell prüfen: ls -la mcpo/config.json"
+fi
+if [ -f mcpo/config.template.json ] && [ ! -e mcpo/config.json ]; then
   cp mcpo/config.template.json mcpo/config.json
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
 step "6/8 · Stack starten"
 
-info "Ziehe Images und starte Container (kann beim ersten Mal dauern)…"
-$DC -f "$COMPOSE_FILE" up -d
+info "Ziehe Images, baue lokale Dienste (sandbox-mcp) und starte Container (kann beim ersten Mal dauern)…"
+$DC -f "$COMPOSE_FILE" up -d --build
 
 info "Warte, bis Ollama bereit ist…"
 for i in $(seq 1 60); do
