@@ -12,15 +12,23 @@ This file is part of Self-Hosted AI Stack.
 Licensed under the MIT License: https://opensource.org/licenses/MIT
 """
 
+import datetime
 import http.client
 import json
 import os
 import socket
+import time
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DOCKER_SOCK = os.environ.get("DOCKER_SOCK", "/var/run/docker.sock")
 LISTEN_PORT = int(os.environ.get("DASHBOARD_PORT", "8080"))
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# Interne Adresse von Ollama im Docker-Netz (nicht der Host-Port aus PORT_OLLAMA
+# — Container sprechen sich immer über den internen Port 11434 an).
+OLLAMA_INTERNAL_URL = "http://ollama:11434"
 
 # Bekannte Dienste des Stacks: Container-Name -> Anzeige.
 # "port" ist der Host-Port (aus Sicht des Browsers), "path" der Link-Pfad.
@@ -188,6 +196,71 @@ def build_status():
     return result
 
 
+# ── Ollama-Live-Status (geladene Modelle, RAM/VRAM, Aktivität) ──────────────
+#
+# Ollama hat keine "läuft gerade eine Anfrage"-API. Wir nähern das an: jede
+# Anfrage an ein Modell verlängert dessen Keep-Alive (expires_at). Wenn sich
+# expires_at seit dem letzten Poll verschoben hat, gab es zwischenzeitlich
+# eine Anfrage -> "kürzlich aktiv". So sieht man näherungsweise, ob gerade
+# etwas passiert, ohne dass Ollama das explizit anbieten muss.
+_last_expires_at = {}   # Modellname -> zuletzt gesehenes expires_at (String)
+_last_activity_ts = {}  # Modellname -> Unix-Timestamp der letzten Änderung
+
+
+def _human_size(num_bytes):
+    if not num_bytes:
+        return "0 GB"
+    gb = num_bytes / (1024 ** 3)
+    return f"{gb:.1f} GB"
+
+
+def build_ollama_status():
+    try:
+        req = urllib.request.Request(f"{OLLAMA_INTERNAL_URL}/api/ps")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return {"ok": False, "error": str(exc), "models": []}
+    except json.JSONDecodeError as exc:
+        return {"ok": False, "error": f"Ungültige Antwort von Ollama: {exc}", "models": []}
+
+    now = time.time()
+    models = []
+    for m in data.get("models", []):
+        name = m.get("name") or m.get("model") or "?"
+        expires_at_raw = m.get("expires_at")
+        seconds_left = None
+        if expires_at_raw:
+            try:
+                exp = datetime.datetime.fromisoformat(expires_at_raw)
+                seconds_left = max(0, int((exp - datetime.datetime.now(exp.tzinfo)).total_seconds()))
+            except ValueError:
+                pass
+
+        changed = _last_expires_at.get(name) != expires_at_raw
+        if changed:
+            _last_expires_at[name] = expires_at_raw
+            _last_activity_ts[name] = now
+        last_activity = _last_activity_ts.get(name)
+        seconds_since_activity = int(now - last_activity) if last_activity else None
+
+        size = m.get("size", 0)
+        size_vram = m.get("size_vram", 0)
+        models.append(
+            {
+                "name": name,
+                "size": _human_size(size),
+                "size_vram": _human_size(size_vram),
+                "fully_in_vram": bool(size) and size_vram >= size,
+                "unloads_in_seconds": seconds_left,
+                "recently_active": changed,
+                "seconds_since_activity": seconds_since_activity,
+            }
+        )
+
+    return {"ok": True, "models": models, "checked_at": now}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "AIStackDashboard/1.0"
 
@@ -204,6 +277,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802 - vorgegebene Signatur
         if self.path.startswith("/api/status"):
             self._send(200, json.dumps(build_status()), "application/json")
+            return
+        if self.path.startswith("/api/ollama/status"):
+            self._send(200, json.dumps(build_ollama_status()), "application/json")
             return
         if self.path.startswith("/healthz"):
             self._send(200, "ok", "text/plain")
