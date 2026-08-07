@@ -66,6 +66,14 @@ SERVICES = [
         "path": "/docs",
     },
     {
+        "container": "mcp",
+        "label": "MCP Gateway",
+        "desc": "Werkzeuge · Dateisystem, Web, GitHub",
+        "icon": "🛠️",
+        "port": None,
+        "path": None,
+    },
+    {
         "container": "litellm-db",
         "label": "PostgreSQL",
         "desc": "Datenbank · pgvector",

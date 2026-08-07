@@ -38,7 +38,7 @@ Diese Variante ist komplett auf **Upstream-Images** umgebaut und für **AMD-GPUs
 
 - **[Ollama (ROCm)](https://hub.docker.com/r/ollama/ollama)** als LLM-Engine mit AMD-GPU-Beschleunigung
 - **[Open WebUI](https://github.com/open-webui/open-webui)** als Chat-Oberfläche (ersetzt AnythingLLM)
-- **[LiteLLM](https://github.com/BerriAI/litellm)** als AI-Gateway, **PostgreSQL/pgvector**, **Whisper** (STT) und **Embeddings** (TEI)
+- **[LiteLLM](https://github.com/BerriAI/litellm)** als AI-Gateway, **MCP Gateway** (Werkzeuge), **PostgreSQL/pgvector**, **Whisper** (STT) und **Embeddings** (TEI)
 - ein **[modernes Status-Dashboard](#dashboard)**, das den Live-Status aller Dienste zeigt
 
 Alles wird über ein einziges Skript geprüft und eingerichtet:
@@ -87,6 +87,7 @@ graph LR
     U -->|Status| DASH["Dashboard<br/>(Port 8600)"]
     W -->|OpenAI-API| L["LiteLLM<br/>(AI-Gateway, Port 4000)"]
     L -->|routet zu| O["Ollama<br/>(ROCm, AMD-iGPU)"]
+    L -->|Werkzeuge| M["MCP Gateway<br/>(Dateisystem, Web, GitHub)"]
     L -->|Metadaten| DB[("PostgreSQL<br/>+ pgvector")]
     A["🎤 Audio"] --> WH["Whisper<br/>(Sprache → Text)"]
     D["📄 Dokumente"] --> E["Embeddings<br/>(Text → Vektoren)"]
@@ -99,11 +100,21 @@ graph LR
 ./scripts/show-credentials.sh
 ```
 
-Zeigt alle URLs, den LiteLLM-Master-Key und das Postgres-Passwort direkt aus deiner `.env` an — kein `docker exec ... _manage` nötig (das gibt es nur in den alten `hwdsl2`-Images, nicht in den hier verwendeten Upstream-Images). Open WebUI hat kein vorgegebenes Passwort: Der **erste Account**, den du unter `http://<server-ip>:3001` registrierst, wird automatisch Admin.
+Zeigt alle URLs, den LiteLLM-Master-Key, das Postgres-Passwort und den MCP-API-Key direkt aus deiner `.env` an — kein `docker exec ... _manage` nötig (das gibt es nur in den alten `hwdsl2`-Images, nicht in den hier verwendeten Upstream-Images). Open WebUI hat kein vorgegebenes Passwort: Der **erste Account**, den du unter `http://<server-ip>:3001` registrierst, wird automatisch Admin.
 
 ### Dashboard
 
 Der Stack bringt ein eigenes, schlankes **modernes Status-Dashboard** mit (`dashboard/`). Es liest den Docker-Socket (nur lesend) und zeigt in Echtzeit, **welche Dienste online sind, auf welchem Port sie laufen** und verlinkt direkt darauf. Es aktualisiert sich automatisch und ist unter `http://<server-ip>:8600` erreichbar.
+
+### MCP Gateway (Werkzeuge fürs LLM)
+
+Der Stack bringt **MCP Gateway** mit — stellt LLM-Anfragen über LiteLLM Werkzeuge wie Dateisystem, Web-Fetch, GitHub, Suche und Datenbankzugriff zur Verfügung. Der Installer verdrahtet ihn automatisch mit LiteLLM (Schritt 7/8); der API-Key wird dabei automatisch erzeugt und in die `.env` geschrieben.
+
+```bash
+./scripts/wire-mcp.sh   # erneut ausführen, falls der mcp-Container neu erzeugt wurde (neuer Key)
+```
+
+> **Hinweis:** Ob dein Chat-Client (z. B. Open WebUI) die von LiteLLM bereitgestellten MCP-Werkzeuge automatisch nutzt, hängt von dessen MCP-Unterstützung ab — das ist ein sich schnell entwickelndes Feld. Prüfe nach der Einrichtung mit `docker logs litellm | grep -i mcp`, ob die Verbindung zum Gateway steht.
 
 ### Modelle bei LiteLLM eintragen
 
@@ -120,6 +131,7 @@ Das Skript ist **idempotent**: bereits eingetragene Modelle werden übersprungen
 
 ```bash
 ./scripts/show-credentials.sh                                 # URLs, Master-Key, Passwörter
+./scripts/wire-mcp.sh                                         # MCP Gateway (neu) mit LiteLLM verdrahten
 docker compose -f docker-compose.rocm.yml ps                  # Status
 docker compose -f docker-compose.rocm.yml logs -f open-webui  # Logs eines Dienstes
 docker compose -f docker-compose.rocm.yml down                # Stoppen (Daten bleiben in Volumes)

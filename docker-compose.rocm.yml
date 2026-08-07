@@ -2,7 +2,8 @@
 #
 # Kompletter Stack, komplett auf Upstream-Images umgebaut:
 #   Ollama (ROCm)  ·  Open WebUI  ·  LiteLLM  ·  PostgreSQL/pgvector
-#   Whisper (STT)  ·  Embeddings (TEI)  ·  Dashboard (modernes UI)
+#   Whisper (STT)  ·  Embeddings (TEI)  ·  MCP Gateway (Werkzeuge)
+#   Dashboard (modernes UI)
 #
 # Start am einfachsten über ./install.sh (prüft Hardware, Firewall, Modell).
 # Manuell:  docker compose -f docker-compose.rocm.yml up -d
@@ -61,7 +62,24 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── AI-Gateway (routet zu Ollama, spricht OpenAI-Protokoll) ────────────────
+  # ── MCP Gateway (Werkzeuge: Dateisystem, Web-Fetch, GitHub, Suche, DB) ──────
+  mcp:
+    image: hwdsl2/mcp-gateway
+    container_name: mcp
+    restart: always
+    # ports:
+    #   - "127.0.0.1:${PORT_MCP:-3000}:3000/tcp"  # nur für direkte MCP-Clients (Claude Desktop, Cursor)
+    volumes:
+      - mcp-data:/var/lib/mcp
+      - mcp-shared:/var/lib/mcp-shared
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 3s
+      start_period: 60s
+      retries: 3
+
+  # ── AI-Gateway (routet zu Ollama, spricht OpenAI-Protokoll, bindet MCP an) ──
   litellm:
     image: ghcr.io/berriai/litellm:main-stable
     container_name: litellm
@@ -72,6 +90,9 @@ services:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-1234}
       - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD:-litellm}@db:5432/litellm
       - STORE_MODEL_IN_DB=True
+      # Vom mcp-Container erzeugter API-Key; wird von scripts/wire-mcp.sh nach dem
+      # ersten Start in die .env geschrieben (siehe litellm/config.yaml: mcp_servers).
+      - MCP_API_KEY=${MCP_API_KEY:-}
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000"]
@@ -79,6 +100,8 @@ services:
       ollama:
         condition: service_healthy
       db:
+        condition: service_healthy
+      mcp:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')\" || exit 1"]
@@ -183,3 +206,7 @@ volumes:
     name: whisper-data
   embeddings-data:
     name: embeddings-data
+  mcp-data:
+    name: mcp-data
+  mcp-shared:
+    name: mcp-shared

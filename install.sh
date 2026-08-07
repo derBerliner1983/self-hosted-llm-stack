@@ -4,7 +4,8 @@
 #
 # Prüft die Voraussetzungen, richtet die Firewall (LAN-only) ein, erzeugt die
 # .env, startet den kompletten Stack (docker-compose.rocm.yml), lädt das
-# Standardmodell und trägt alle Ollama-Modelle bei LiteLLM ein.
+# Standardmodell, verdrahtet MCP Gateway mit LiteLLM und trägt alle
+# Ollama-Modelle bei LiteLLM ein.
 #
 # Aufruf:   sudo ./install.sh
 #           ./install.sh --check-only        # nur prüfen, nichts ändern
@@ -240,7 +241,7 @@ BANNER
 printf '%s' "$c_reset"
 
 # ════════════════════════════════════════════════════════════════════════════
-step "1/7 · System prüfen"
+step "1/8 · System prüfen"
 
 [ "$(uname -s)" = "Linux" ] || die "Dieser Stack braucht Linux."
 ok "Betriebssystem: Linux ($(uname -m))"
@@ -266,7 +267,7 @@ if [ "${FREE_GB:-0}" -ge 30 ]; then ok "Freier Speicher: ${FREE_GB} GB"
 else note_warn "Freier Speicher: ${FREE_GB} GB (Modelle brauchen viel Platz)."; fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "2/7 · AMD-GPU / ROCm prüfen"
+step "2/8 · AMD-GPU / ROCm prüfen"
 
 GPU_OK=1
 if lspci 2>/dev/null | grep -iE 'VGA|Display|3D' | grep -iq 'AMD\|ATI'; then
@@ -347,7 +348,7 @@ if [ "$GPU_OK" -ne 1 ]; then
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "3/7 · Docker prüfen"
+step "3/8 · Docker prüfen"
 
 if command -v docker >/dev/null 2>&1; then
   ok "Docker: $(docker --version 2>/dev/null | sed 's/,.*//')"
@@ -377,7 +378,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "4/7 · Firewall (Modus: ${FIREWALL_MODE})"
+step "4/8 · Firewall (Modus: ${FIREWALL_MODE})"
 
 detect_subnet() {
   ip -o -f inet addr show scope global 2>/dev/null \
@@ -431,7 +432,7 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "5/7 · Konfiguration schreiben (.env)"
+step "5/8 · Konfiguration schreiben (.env)"
 
 # Zufalls-String. Wichtig: '|| true' fängt den SIGPIPE von 'tr' ab (head schließt
 # die Pipe früh), sonst würde 'set -o pipefail' + 'set -e' das Skript abbrechen.
@@ -496,7 +497,7 @@ chmod 600 .env
 ok ".env geschrieben (Rechte 600)."
 
 # ════════════════════════════════════════════════════════════════════════════
-step "6/7 · Stack starten"
+step "6/8 · Stack starten"
 
 info "Ziehe Images und starte Container (kann beim ersten Mal dauern)…"
 $DC -f "$COMPOSE_FILE" up -d
@@ -532,7 +533,12 @@ else
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
-step "7/7 · Modelle bei LiteLLM eintragen"
+step "7/8 · MCP Gateway mit LiteLLM verdrahten"
+
+bash "$ROOT_DIR/scripts/wire-mcp.sh" || note_warn "MCP-Wiring unvollständig — später erneut ausführen: ./scripts/wire-mcp.sh"
+
+# ════════════════════════════════════════════════════════════════════════════
+step "8/8 · Modelle bei LiteLLM eintragen"
 
 # HTTP-Check ohne curl-Abhängigkeit (Host hat evtl. kein curl, aber python3).
 http_ok() {
@@ -566,6 +572,7 @@ cat <<EOF
     Logs           ${DC} -f ${COMPOSE_FILE} logs -f <dienst>
     Modell laden   docker exec ollama ollama pull <modell>
     Modelle syncen ./scripts/sync-ollama-models.sh
+    MCP neu verdrahten ./scripts/wire-mcp.sh
     Stoppen        ${DC} -f ${COMPOSE_FILE} down
 
 EOF
