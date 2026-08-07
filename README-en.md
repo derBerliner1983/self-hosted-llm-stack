@@ -110,6 +110,8 @@ Prints every URL, the LiteLLM master key, the Postgres password, and the MCP API
 
 The stack ships a small, self-contained **modern status dashboard** (`dashboard/`). It reads the Docker socket (read-only) and shows in real time **which services are online, which port they run on**, and links straight to them. It refreshes automatically and is available at `http://<server-ip>:8600`.
 
+**Ollama details:** the Ollama tile has a **"Details"** button that opens a popup showing the models currently loaded in (V)RAM — size, how much of it sits in the GPU, time remaining until auto-unload, and an activity indicator (Ollama has no direct "is a request running right now" API; the dashboard approximates this by detecting when a model's keep-alive time gets extended by a fresh request). Refreshes every 3 seconds while the popup is open.
+
 ### MCP Gateway (tools for the LLM)
 
 The stack ships **MCP Gateway** — gives you tools like filesystem, web fetch, GitHub, search, and database access. The installer wires it up with LiteLLM automatically (step 7/8); the API key is generated and written to `.env` for you.
