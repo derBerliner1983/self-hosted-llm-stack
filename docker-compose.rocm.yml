@@ -85,8 +85,13 @@ services:
   #     read-only, Ressourcen-Limits, kein root — siehe sandbox-mcp/server.py).
   #     Nur intern erreichbar, kein Host-Port. Details: README, "Code-Sandbox".
   sandbox-mcp:
+    # NUR "build:", kein "image:"-Tag: Ein zusätzlicher image-Tag ließ Docker
+    # Compose bei "up -d" fälschlich versuchen, "ai-stack/sandbox-mcp" von
+    # einer Registry zu ZIEHEN (sieht aus wie ein normaler Docker-Hub-Name),
+    # statt lokal aus ./sandbox-mcp zu BAUEN — das schlug fehl ("pull access
+    # denied", da dieses Image nirgends veröffentlicht ist). Compose vergibt
+    # ohne image: automatisch einen lokalen Namen und baut immer lokal.
     build: ./sandbox-mcp
-    image: ai-stack/sandbox-mcp:1
     container_name: sandbox-mcp
     restart: always
     environment:

@@ -519,8 +519,8 @@ fi
 # ════════════════════════════════════════════════════════════════════════════
 step "6/8 · Stack starten"
 
-info "Ziehe Images und starte Container (kann beim ersten Mal dauern)…"
-$DC -f "$COMPOSE_FILE" up -d
+info "Ziehe Images, baue lokale Dienste (sandbox-mcp) und starte Container (kann beim ersten Mal dauern)…"
+$DC -f "$COMPOSE_FILE" up -d --build
 
 info "Warte, bis Ollama bereit ist…"
 for i in $(seq 1 60); do
