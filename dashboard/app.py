@@ -30,6 +30,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # Interne Adresse von Ollama im Docker-Netz (nicht der Host-Port aus PORT_OLLAMA
 # — Container sprechen sich immer über den internen Port 11434 an).
 OLLAMA_INTERNAL_URL = "http://ollama:11434"
+LITELLM_INTERNAL_URL = "http://litellm:4000"
+LITELLM_MASTER_KEY = os.environ.get("LITELLM_MASTER_KEY", "")
+# Wie oft im Hintergrund geprüft wird, ob Ollama Modelle kennt, die LiteLLM
+# noch nicht hat (z. B. per 'docker exec ollama ollama pull' oder CLI
+# heruntergeladen, nicht über das Dashboard) — macht scripts/sync-ollama-
+# models.sh für den Normalfall überflüssig, das bleibt als manueller Fallback.
+MODEL_SYNC_INTERVAL = int(os.environ.get("DASHBOARD_MODEL_SYNC_INTERVAL", "60"))
 
 # Bekannte Dienste des Stacks: Container-Name -> Anzeige.
 # "port" ist der Host-Port (aus Sicht des Browsers), "path" der Link-Pfad.
@@ -345,6 +352,12 @@ def _pull_model(name):
                 if status == "success":
                     fields["done"] = True
                 _set_job(name, **fields)
+        if _pull_jobs.get(name, {}).get("done") and not _pull_jobs[name].get("error"):
+            # Sofort mit LiteLLM abgleichen statt bis zum nächsten Intervall-
+            # Tick zu warten — sonst müsste man nach dem Laden bis zu
+            # MODEL_SYNC_INTERVAL Sekunden warten, bis das Modell in Open
+            # WebUI (über LiteLLM) auftaucht.
+            threading.Thread(target=_run_sync_and_update_state, daemon=True).start()
     except urllib.error.HTTPError as exc:
         body = exc.read().decode(errors="replace")
         _set_job(name, status=f"Fehler {exc.code}", done=True, error=body or str(exc))
@@ -389,6 +402,104 @@ def delete_ollama_model(name):
         return {"ok": False, "error": str(exc)}
 
 
+# ── Automatische LiteLLM-Registrierung (WebUI/Claude/... "verdrahten") ─────
+#
+# Damit jedes bei Ollama installierte Modell automatisch bei LiteLLM auftaucht
+# (und damit in Open WebUI über die MCP-fähige Verbindung nutzbar ist), ohne
+# jedes Mal manuell scripts/sync-ollama-models.sh auszuführen: ein Hintergrund-
+# Thread gleicht in Intervallen ab, welche Ollama-Modelle LiteLLM noch nicht
+# kennt, und trägt sie automatisch ein (gleiche Logik/API wie das Skript,
+# nur fortlaufend statt manuell angestoßen). Läuft nur, wenn LITELLM_MASTER_KEY
+# gesetzt ist (siehe docker-compose.rocm.yml).
+_sync_lock = threading.Lock()
+_sync_state = {
+    "enabled": bool(LITELLM_MASTER_KEY),
+    "last_run": None,
+    "added": 0,
+    "known": 0,
+    "error": None,
+}
+
+
+def _litellm_api(path, method="GET", payload=None, timeout=15):
+    req = urllib.request.Request(
+        f"{LITELLM_INTERNAL_URL}{path}", method=method,
+        headers={"Authorization": f"Bearer {LITELLM_MASTER_KEY}", "Content-Type": "application/json"},
+    )
+    if payload is not None:
+        req.data = json.dumps(payload).encode()
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read()
+        return json.loads(raw) if raw else {}
+
+
+def sync_models_with_litellm():
+    """Trägt alle in Ollama installierten, bei LiteLLM noch fehlenden Modelle
+    dort ein (model_name "ollama/<name>", api_base auf den Ollama-Container).
+    Idempotent: bereits vorhandene werden übersprungen. Gibt (added, known,
+    error) zurück; error ist None bei Erfolg (auch wenn added == 0)."""
+    if not LITELLM_MASTER_KEY:
+        return 0, 0, "LITELLM_MASTER_KEY nicht gesetzt — automatische Registrierung deaktiviert."
+
+    try:
+        req = urllib.request.Request(f"{OLLAMA_INTERNAL_URL}/api/tags")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            tags = json.loads(resp.read())
+        ollama_models = {
+            m.get("name") or m.get("model")
+            for m in tags.get("models", [])
+            if m.get("name") or m.get("model")
+        }
+    except Exception as exc:  # noqa: BLE001
+        return 0, 0, f"Ollama nicht erreichbar: {exc}"
+
+    try:
+        data = _litellm_api("/v1/models")
+        existing = {
+            m.get("id", "")[len("ollama/"):]
+            for m in data.get("data", [])
+            if m.get("id", "").startswith("ollama/")
+        }
+    except Exception as exc:  # noqa: BLE001
+        return 0, 0, f"LiteLLM nicht erreichbar: {exc}"
+
+    added = 0
+    for name in sorted(ollama_models - existing):
+        try:
+            _litellm_api("/model/new", "POST", {
+                "model_name": f"ollama/{name}",
+                "litellm_params": {"model": f"ollama/{name}", "api_base": OLLAMA_INTERNAL_URL},
+            })
+            added += 1
+        except Exception as exc:  # noqa: BLE001
+            print(f"! LiteLLM-Registrierung fehlgeschlagen für ollama/{name}: {exc}")
+
+    return added, len(ollama_models), None
+
+
+def _run_sync_and_update_state():
+    added, known, error = sync_models_with_litellm()
+    with _sync_lock:
+        _sync_state.update(
+            enabled=bool(LITELLM_MASTER_KEY),
+            last_run=time.time(),
+            added=_sync_state["added"] + added,
+            known=known,
+            error=error,
+        )
+
+
+def _model_sync_loop():
+    while True:
+        _run_sync_and_update_state()
+        time.sleep(MODEL_SYNC_INTERVAL)
+
+
+def build_sync_status():
+    with _sync_lock:
+        return dict(_sync_state)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "AIStackDashboard/1.0"
 
@@ -417,6 +528,9 @@ class Handler(BaseHTTPRequestHandler):
             with _pull_lock:
                 snapshot = {name: dict(job) for name, job in _pull_jobs.items()}
             self._send(200, json.dumps(snapshot), "application/json")
+            return
+        if self.path.startswith("/api/ollama/sync"):
+            self._send(200, json.dumps(build_sync_status()), "application/json")
             return
         if self.path.startswith("/healthz"):
             self._send(200, "ok", "text/plain")
@@ -465,6 +579,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    if LITELLM_MASTER_KEY:
+        threading.Thread(target=_model_sync_loop, daemon=True).start()
+        print(f"Automatische LiteLLM-Modellregistrierung aktiv (alle {MODEL_SYNC_INTERVAL}s).")
+    else:
+        print("LITELLM_MASTER_KEY nicht gesetzt — automatische LiteLLM-Registrierung deaktiviert.")
     httpd = ThreadingHTTPServer(("0.0.0.0", LISTEN_PORT), Handler)
     print(f"Dashboard läuft auf Port {LISTEN_PORT} (Docker-Socket: {DOCKER_SOCK})")
     httpd.serve_forever()

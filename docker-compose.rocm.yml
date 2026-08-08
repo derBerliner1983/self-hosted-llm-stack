@@ -94,13 +94,17 @@ services:
   #     verschleiert — das ist KEINE echte Verschlüsselung. Nutze unbedingt
   #     ein dediziertes Nextcloud-App-Passwort (Profil -> Sicherheit), nie
   #     das Hauptpasswort. Web-UI zum Verbinden/Konfigurieren: siehe
-  #     PORT_VAULT_BRIDGE bzw. den Link im Dashboard. Nur intern + localhost.
+  #     PORT_VAULT_BRIDGE bzw. den Link im Dashboard.
+  #     Bewusst wie Dashboard/Open WebUI/LiteLLM auf allen Interfaces
+  #     erreichbar (nicht nur localhost) — sonst kein Browser-Zugriff vom
+  #     LAN aus möglich. install.sh öffnet PORT_VAULT_BRIDGE in der Firewall
+  #     im selben Umfang (LAN-Subnetz bzw. alle, je nach Firewall-Modus).
   vault-bridge:
     build: ./vault-bridge
     container_name: vault-bridge
     restart: always
     ports:
-      - "127.0.0.1:${PORT_VAULT_BRIDGE:-8700}:8080/tcp"
+      - "${PORT_VAULT_BRIDGE:-8700}:8080/tcp"
     volumes:
       - vault-bridge-data:/data
       - vault-data:/vault
@@ -255,6 +259,11 @@ services:
       - embeddings-data:/data
 
   # ── Dashboard (klares, modernes UI; liest Docker-Socket read-only) ─────────
+  # LITELLM_MASTER_KEY: registriert neu bei Ollama installierte Modelle im
+  # Hintergrund automatisch bei LiteLLM ("ollama/<modell>"), damit sie ohne
+  # manuelles scripts/sync-ollama-models.sh in Open WebUI (via LiteLLM,
+  # inkl. MCP-Werkzeugen) auftauchen. Siehe README, "Modelle bei LiteLLM
+  # eintragen".
   dashboard:
     image: python:3.12-slim
     container_name: ai-stack-dashboard
@@ -268,6 +277,7 @@ services:
       - PORT_OLLAMA=${PORT_OLLAMA:-11434}
       - PORT_WHISPER=${PORT_WHISPER:-9000}
       - PORT_EMBEDDINGS=${PORT_EMBEDDINGS:-8000}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
       - PORT_VAULT_BRIDGE=${PORT_VAULT_BRIDGE:-8700}
     volumes:
       - ./dashboard:/app:ro

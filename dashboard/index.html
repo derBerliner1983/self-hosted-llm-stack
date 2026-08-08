@@ -260,6 +260,7 @@
         <button class="pull-btn" id="pullBtn">Laden</button>
       </div>
       <p class="pull-hint">Ollama-Bibliotheksname oder Hugging-Face-Referenz (hf.co/…). Mehrere Downloads gleichzeitig möglich.</p>
+      <p class="pull-hint" id="syncStatus"></p>
 
       <div id="activePulls"></div>
 
@@ -365,6 +366,7 @@
   const activePulls = document.getElementById('activePulls');
   const pullInput = document.getElementById('pullInput');
   const pullBtn = document.getElementById('pullBtn');
+  const syncStatus = document.getElementById('syncStatus');
   let ollamaPollTimer = null;
 
   function formatEta(seconds) {
@@ -419,20 +421,41 @@
     </div>`;
   }
 
+  function fmtAgo(ts) {
+    if (!ts) return null;
+    const s = Math.max(0, Math.round(Date.now() / 1000 - ts));
+    if (s < 60) return `vor ${s}s`;
+    return `vor ${Math.round(s / 60)} Min`;
+  }
+
   async function pollOllama() {
-    let modelsData, statusData, pullsData;
+    let modelsData, statusData, pullsData, syncData;
     try {
-      const [mr, sr, pr] = await Promise.all([
+      const [mr, sr, pr, yr] = await Promise.all([
         fetch('/api/ollama/models', { cache: 'no-store' }),
         fetch('/api/ollama/status', { cache: 'no-store' }),
         fetch('/api/ollama/pulls', { cache: 'no-store' }),
+        fetch('/api/ollama/sync', { cache: 'no-store' }),
       ]);
-      [modelsData, statusData, pullsData] = await Promise.all([mr.json(), sr.json(), pr.json()]);
+      [modelsData, statusData, pullsData, syncData] = await Promise.all([mr.json(), sr.json(), pr.json(), yr.json()]);
     } catch (e) {
       ollamaLoaded.innerHTML = '<p class="modal-empty">Dashboard nicht erreichbar.</p>';
       ollamaBody.innerHTML = '';
       activePulls.innerHTML = '';
       return;
+    }
+
+    if (syncData) {
+      if (!syncData.enabled) {
+        syncStatus.textContent = '⚠ Automatische LiteLLM-Registrierung inaktiv (LITELLM_MASTER_KEY fehlt).';
+      } else if (syncData.error) {
+        syncStatus.textContent = `⚠ Automatische LiteLLM-Registrierung: ${syncData.error}`;
+      } else {
+        const ago = fmtAgo(syncData.last_run);
+        syncStatus.textContent = ago
+          ? `✓ Automatisch mit LiteLLM synchronisiert (${syncData.known} Modelle bekannt, zuletzt ${ago})`
+          : '✓ Automatische LiteLLM-Registrierung aktiv (erster Abgleich läuft …)';
+      }
     }
 
     const jobNames = Object.keys(pullsData);
