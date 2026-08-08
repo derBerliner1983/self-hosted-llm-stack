@@ -181,14 +181,16 @@ Configurable via `.env`: `PORT_VAULT_BRIDGE` (default `8700`), plus `MCP_SERVERS
 
 ### Register models with LiteLLM
 
-Any model you pull with `ollama pull` can be registered with LiteLLM automatically, so it shows up in the gateway and in Open WebUI right away:
+New models get registered with LiteLLM **automatically** — whether you pull them via the [dashboard's model manager](#dashboard) or directly with `docker exec ollama ollama pull …`. The dashboard reconciles in the background roughly every 60 seconds, registering any installed Ollama model LiteLLM doesn't know yet under `ollama/<model>` (idempotent — already-registered ones are skipped), and triggers an immediate sync right after a dashboard-initiated download instead of waiting for the next interval. Status ("✓ auto-synced with LiteLLM …") is shown in the dashboard's "Load models" popup.
+
+This needs `LITELLM_MASTER_KEY` to reach the dashboard container (`install.sh`/`.env` do this automatically); without a key the popup shows "⚠ automatic LiteLLM registration inactive" and you register manually instead:
 
 ```bash
 docker exec ollama ollama pull qwen2.5:14b
 ./scripts/sync-ollama-models.sh
 ```
 
-The script is **idempotent**: already-registered models are skipped, only new ones are added.
+The script stays available as a manual fallback (e.g. for instant control instead of waiting up to 60s) and is likewise **idempotent**.
 
 ### Useful commands
 

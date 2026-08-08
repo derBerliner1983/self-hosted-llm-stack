@@ -34,6 +34,7 @@ MIN_RAM_GB="${MIN_RAM_GB:-16}"
 PORT_WEBUI="${PORT_WEBUI:-3001}"
 PORT_LITELLM="${PORT_LITELLM:-4000}"
 PORT_DASHBOARD="${PORT_DASHBOARD:-8600}"
+PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
@@ -412,15 +413,15 @@ else
     # Zusätzlich, falls vorhanden, die Konfigdatei absichern (harmlos, wenn sie fehlt).
     [ -f /etc/default/ufw ] && $SUDO sed -i 's/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw 2>/dev/null || true
     if [ "$FIREWALL_MODE" = "lan" ]; then
-      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD"; do
+      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE"; do
         $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto tcp >/dev/null 2>&1 || true
       done
-      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD} nur aus ${LAN_SUBNET}."
+      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE} nur aus ${LAN_SUBNET}."
     else
-      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD"; do
+      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE"; do
         $SUDO ufw allow "$p"/tcp >/dev/null 2>&1 || true
       done
-      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD} für ALLE offen (nur mit HTTPS davor empfohlen)."
+      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE} für ALLE offen (nur mit HTTPS davor empfohlen)."
     fi
     $SUDO ufw --force enable >/dev/null 2>&1 || true
   else
