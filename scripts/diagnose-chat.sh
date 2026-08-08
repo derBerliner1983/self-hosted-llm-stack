@@ -117,39 +117,71 @@ fi
 
 # ── 3) LiteLLM ansprechen (wie Open WebUI es tut) ───────────────────────────
 step "3/3 · LiteLLM (http://localhost:${PORT_LITELLM}/v1/chat/completions)"
+# scripts/sync-ollama-models.sh registriert neu gesyncte Ollama-Modelle bei
+# LiteLLM unter dem Namen "ollama/<modell>" (Präfix), nicht unter dem nackten
+# Ollama-Namen. Erst den genau angegebenen Namen versuchen; schlägt das mit
+# "Invalid model name" fehl und der Name hat noch kein Präfix, automatisch
+# mit "ollama/<modell>" nochmal versuchen (das ist vermutlich, was gemeint war).
 LITELLM_OUT="$(python3 - "$PORT_LITELLM" "$LITELLM_KEY" "$MODEL" "$MESSAGE" <<'PY'
 import json, sys, urllib.request, urllib.error
 
 port, key, model, message = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-payload = json.dumps({
-    "model": model,
-    "messages": [{"role": "user", "content": message}],
-    "stream": False,
-}).encode()
-req = urllib.request.Request(
-    f"http://127.0.0.1:{port}/v1/chat/completions", data=payload,
-    headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
-    method="POST",
-)
-try:
+
+def call(model_name):
+    payload = json.dumps({
+        "model": model_name,
+        "messages": [{"role": "user", "content": message}],
+        "stream": False,
+    }).encode()
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{port}/v1/chat/completions", data=payload,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
+        method="POST",
+    )
     with urllib.request.urlopen(req, timeout=120) as resp:
         body = json.loads(resp.read())
-    content = body["choices"][0]["message"].get("content", "")
-    print("OK")
+    return body["choices"][0]["message"].get("content", "")
+
+def try_model(model_name):
+    try:
+        return ("OK", model_name, call(model_name))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")[:500]
+        return ("ERROR", model_name, f"HTTP {exc.code}: {detail}")
+    except Exception as exc:  # noqa: BLE001
+        return ("ERROR", model_name, str(exc))
+
+status, used_model, content = try_model(model)
+if status == "ERROR" and "Invalid model name" in content and not model.startswith("ollama/"):
+    fallback = f"ollama/{model}"
+    fb_status, fb_used, fb_content = try_model(fallback)
+    if fb_status == "OK":
+        print("OK-FALLBACK")
+        print(fb_used)
+        print(fb_content)
+    else:
+        print(status)
+        print(used_model)
+        print(content)
+else:
+    print(status)
+    print(used_model)
     print(content)
-except urllib.error.HTTPError as exc:
-    print("ERROR")
-    print(f"HTTP {exc.code}: {exc.read().decode(errors='replace')[:500]}")
-except Exception as exc:  # noqa: BLE001
-    print("ERROR")
-    print(str(exc))
 PY
 )"
-LITELLM_STATUS="$(echo "$LITELLM_OUT" | head -1)"
-LITELLM_CONTENT="$(echo "$LITELLM_OUT" | tail -n +2)"
+LITELLM_STATUS="$(echo "$LITELLM_OUT" | sed -n '1p')"
+LITELLM_USED_MODEL="$(echo "$LITELLM_OUT" | sed -n '2p')"
+LITELLM_CONTENT="$(echo "$LITELLM_OUT" | tail -n +3)"
+
+if [ "$LITELLM_STATUS" = "OK-FALLBACK" ]; then
+  warn "'$MODEL' wurde bei LiteLLM abgelehnt (\"Invalid model name\")."
+  warn "-> Unter '$LITELLM_USED_MODEL' (mit ollama/-Präfix, so trägt es"
+  warn "   scripts/sync-ollama-models.sh ein) hat es funktioniert."
+  LITELLM_STATUS="OK"
+fi
 
 if [ "$LITELLM_STATUS" = "OK" ]; then
-  printf '  Antwort: %s"%s"%s\n' "$c_dim" "$(echo "$LITELLM_CONTENT" | head -c 300)" "$c_reset"
+  printf '  Antwort (Modell "%s"): %s"%s"%s\n' "$LITELLM_USED_MODEL" "$c_dim" "$(echo "$LITELLM_CONTENT" | head -c 300)" "$c_reset"
   if echo "$LITELLM_CONTENT" | grep -qE '^\s*\{.*"title"'; then
     if [ "$OLLAMA_STATUS" = "OK" ] && ! echo "$OLLAMA_CONTENT" | grep -qE '^\s*\{.*"title"'; then
       fail "LiteLLM liefert die kaputte {\"title\": ...}-Antwort, Ollama direkt aber NICHT."
