@@ -110,7 +110,14 @@ Zeigt alle URLs, den LiteLLM-Master-Key, das Postgres-Passwort und den MCP-API-K
 
 Der Stack bringt ein eigenes, schlankes **modernes Status-Dashboard** mit (`dashboard/`). Es liest den Docker-Socket (nur lesend) und zeigt in Echtzeit, **welche Dienste online sind, auf welchem Port sie laufen** und verlinkt direkt darauf. Es aktualisiert sich automatisch und ist unter `http://<server-ip>:8600` erreichbar.
 
-**Ollama-Details:** Auf der Ollama-Kachel gibt es einen **„Details"**-Knopf, der ein Popup mit den aktuell im (V)RAM geladenen Modellen öffnet — Größe, wie viel davon in der GPU liegt, verbleibende Zeit bis zum automatischen Entladen und ein Aktivitäts-Indikator (Ollama hat keine direkte „läuft gerade eine Anfrage"-API; das Dashboard nähert das an, indem es erkennt, wenn sich die Keep-Alive-Zeit eines Modells durch eine neue Anfrage verlängert). Aktualisiert sich alle 3 Sekunden, solange das Popup offen ist.
+**Ollama-Details & Modellverwaltung:** Die Ollama-Kachel ist doppelt so breit wie die anderen und hat einen **„Details"**-Knopf, der ein Popup öffnet mit:
+
+- **Modelle laden:** Eingabefeld für einen Ollama-Bibliotheksnamen (`llama3.1:8b`) oder eine Hugging-Face-Referenz (`hf.co/user/repo:tag`) — Ollama akzeptiert beides über denselben Mechanismus. **Mehrere Downloads gleichzeitig** sind möglich, jeder mit eigenem Live-Fortschrittsbalken.
+- **Installierte Modelle:** Liste aller heruntergeladenen Modelle mit Größe, „Löschen"-Knopf (mit Sicherheitsabfrage) und — falls gerade im RAM geladen — Aktivitäts-Indikator und verbleibende Zeit bis zum automatischen Entladen (Ollama hat keine direkte „läuft gerade eine Anfrage"-API; das Dashboard nähert das an, indem es erkennt, wenn sich die Keep-Alive-Zeit eines Modells durch eine neue Anfrage verlängert).
+
+Aktualisiert sich alle 3 Sekunden, solange das Popup offen ist.
+
+> ⚠️ **Sicherheitshinweis:** Damit wird das Dashboard erstmals **schreibfähig** (Modelle laden/löschen), nicht nur lesend. Da es weiterhin nur im LAN erreichbar und ohne eigenes Login ist, kann jeder im selben Netz Downloads anstoßen oder Modelle löschen. Für ein Einzelnutzer-Heimnetz ein vertretbarer Kompromiss — falls nicht gewünscht, das Dashboard zusätzlich hinter einen eigenen Login/Reverse-Proxy stellen oder den `dashboard`-Dienst ganz weglassen.
 
 ### MCP Gateway (Werkzeuge fürs LLM)
 

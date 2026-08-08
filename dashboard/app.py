@@ -17,6 +17,7 @@ import http.client
 import json
 import os
 import socket
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -261,6 +262,125 @@ def build_ollama_status():
     return {"ok": True, "models": models, "checked_at": now}
 
 
+# ── Modelle laden / löschen / auflisten (schreibender Zugriff auf Ollama) ───
+#
+# Läuft über Ollamas eigene REST-API (/api/pull, /api/delete, /api/tags) —
+# kein Docker-Socket-Zugriff nötig. Ollama akzeptiert im "name"-Feld sowohl
+# normale Bibliotheksnamen (z. B. "llama3.1:8b") als auch Hugging-Face-
+# Referenzen (z. B. "hf.co/user/repo:tag") über denselben Mechanismus, wir
+# reichen also einfach durch, was eingegeben wurde.
+#
+# Mehrere Downloads gleichzeitig sind möglich: jeder Pull läuft in einem
+# eigenen Hintergrund-Thread; _pull_jobs hält den Fortschritt pro Modellname.
+_pull_jobs = {}
+_pull_lock = threading.Lock()
+_PULL_JOB_TTL = 600  # abgeschlossene Jobs nach 10 Min aus der Liste entfernen
+
+
+def _prune_pull_jobs():
+    now = time.time()
+    with _pull_lock:
+        stale = [
+            name for name, j in _pull_jobs.items()
+            if j.get("done") and (now - j.get("updated_at", now)) > _PULL_JOB_TTL
+        ]
+        for name in stale:
+            del _pull_jobs[name]
+
+
+def _set_job(name, **fields):
+    with _pull_lock:
+        job = _pull_jobs.setdefault(name, {})
+        job.update(fields)
+        job["updated_at"] = time.time()
+
+
+def _pull_model(name):
+    _set_job(
+        name, status="wird gestartet …", completed=0, total=0, percent=None,
+        done=False, error=None, started_at=time.time(),
+    )
+    try:
+        payload = json.dumps({"name": name, "stream": True}).encode()
+        req = urllib.request.Request(
+            f"{OLLAMA_INTERNAL_URL}/api/pull", data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=3600) as resp:
+            while True:
+                line = resp.readline()
+                if not line:
+                    break
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if "error" in obj:
+                    _set_job(name, status=obj["error"], done=True, error=obj["error"])
+                    return
+                status = obj.get("status", "")
+                total = obj.get("total")
+                completed = obj.get("completed")
+                percent = None
+                if total and completed is not None and total > 0:
+                    percent = round(completed / total * 100, 1)
+                fields = {"status": status}
+                if total is not None:
+                    fields["total"] = total
+                if completed is not None:
+                    fields["completed"] = completed
+                if percent is not None:
+                    fields["percent"] = percent
+                if status == "success":
+                    fields["done"] = True
+                _set_job(name, **fields)
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        _set_job(name, status=f"Fehler {exc.code}", done=True, error=body or str(exc))
+    except Exception as exc:  # noqa: BLE001 - jeder Fehler soll den Job sauber beenden
+        _set_job(name, status="Fehler", done=True, error=str(exc))
+
+
+def build_ollama_models():
+    try:
+        req = urllib.request.Request(f"{OLLAMA_INTERNAL_URL}/api/tags")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return {"ok": False, "error": str(exc), "models": []}
+    except json.JSONDecodeError as exc:
+        return {"ok": False, "error": f"Ungültige Antwort von Ollama: {exc}", "models": []}
+
+    models = [
+        {
+            "name": m.get("name") or m.get("model") or "?",
+            "size": _human_size(m.get("size", 0)),
+            "modified_at": m.get("modified_at"),
+        }
+        for m in data.get("models", [])
+    ]
+    return {"ok": True, "models": models}
+
+
+def delete_ollama_model(name):
+    try:
+        payload = json.dumps({"name": name}).encode()
+        req = urllib.request.Request(
+            f"{OLLAMA_INTERNAL_URL}/api/delete", data=payload,
+            headers={"Content-Type": "application/json"}, method="DELETE",
+        )
+        with urllib.request.urlopen(req, timeout=15):
+            return {"ok": True}
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        return {"ok": False, "error": f"{exc.code}: {body or exc.reason}"}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "AIStackDashboard/1.0"
 
@@ -281,6 +401,15 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.startswith("/api/ollama/status"):
             self._send(200, json.dumps(build_ollama_status()), "application/json")
             return
+        if self.path.startswith("/api/ollama/models"):
+            self._send(200, json.dumps(build_ollama_models()), "application/json")
+            return
+        if self.path.startswith("/api/ollama/pulls"):
+            _prune_pull_jobs()
+            with _pull_lock:
+                snapshot = {name: dict(job) for name, job in _pull_jobs.items()}
+            self._send(200, json.dumps(snapshot), "application/json")
+            return
         if self.path.startswith("/healthz"):
             self._send(200, "ok", "text/plain")
             return
@@ -290,6 +419,38 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, fh.read(), "text/html; charset=utf-8")
         except OSError:
             self._send(404, "not found", "text/plain")
+
+    def do_POST(self):  # noqa: N802 - vorgegebene Signatur
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b""
+        try:
+            body = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            body = {}
+        name = str(body.get("model") or "").strip()
+
+        if self.path == "/api/ollama/pull":
+            if not name:
+                self._send(400, json.dumps({"ok": False, "error": "Kein Modellname angegeben."}), "application/json")
+                return
+            with _pull_lock:
+                existing = _pull_jobs.get(name)
+            if existing and not existing.get("done"):
+                self._send(200, json.dumps({"ok": True, "note": "Download läuft bereits."}), "application/json")
+                return
+            threading.Thread(target=_pull_model, args=(name,), daemon=True).start()
+            self._send(200, json.dumps({"ok": True}), "application/json")
+            return
+
+        if self.path == "/api/ollama/delete":
+            if not name:
+                self._send(400, json.dumps({"ok": False, "error": "Kein Modellname angegeben."}), "application/json")
+                return
+            result = delete_ollama_model(name)
+            self._send(200 if result["ok"] else 400, json.dumps(result), "application/json")
+            return
+
+        self._send(404, json.dumps({"ok": False, "error": "not found"}), "application/json")
 
     def log_message(self, *args):  # Logs ruhig halten
         return
