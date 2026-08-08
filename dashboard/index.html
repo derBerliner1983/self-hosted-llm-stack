@@ -131,9 +131,6 @@
     color: var(--offline); font-size: 13px;
   }
 
-  .card.ollama-card { grid-column: span 2; }
-  @media (max-width: 600px) { .card.ollama-card { grid-column: span 1; } }
-
   .details-btn {
     border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
     font: inherit; font-size: 12px; font-weight: 500; border-radius: 6px;
@@ -266,6 +263,9 @@
 
       <div id="activePulls"></div>
 
+      <p class="section-title">Aktuell im Speicher</p>
+      <div id="ollamaLoaded"><p class="modal-empty">Lade …</p></div>
+
       <p class="section-title">Installierte Modelle</p>
       <div id="ollamaBody"><p class="modal-empty">Lade …</p></div>
 
@@ -358,6 +358,7 @@
 
   // ── Ollama-Modelle-Popup: Status, Laden (parallel), Löschen ──────────────
   const ollamaOverlay = document.getElementById('ollamaOverlay');
+  const ollamaLoaded = document.getElementById('ollamaLoaded');
   const ollamaBody = document.getElementById('ollamaBody');
   const ollamaClose = document.getElementById('ollamaClose');
   const activePulls = document.getElementById('activePulls');
@@ -387,16 +388,33 @@
     </div>`;
   }
 
-  function mergedModelRow(m, ram) {
-    const ramBadge = ram
-      ? `<span class="ram-badge"><span class="pulse ${ram.recently_active ? 'active' : ''}"></span>im RAM · entlädt ${formatEta(ram.unloads_in_seconds)}</span>`
-      : '';
+  function loadedModelRow(m) {
+    const vram = m.fully_in_vram
+      ? `${esc(m.size_vram)} (vollständig GPU)`
+      : `${esc(m.size_vram)} / ${esc(m.size)} (teilweise GPU)`;
+    const activityText = m.recently_active
+      ? 'Gerade aktiv'
+      : (m.seconds_since_activity !== null && m.seconds_since_activity !== undefined)
+        ? `zuletzt aktiv vor ${m.seconds_since_activity} Sek`
+        : 'keine Aktivität erfasst';
+    return `<div class="model-row">
+      <div class="model-name">${esc(m.name)}</div>
+      <dl class="model-meta">
+        <dt>Größe</dt><dd>${esc(m.size)}</dd>
+        <dt>Im GPU-Speicher</dt><dd>${vram}</dd>
+        <dt>Entlädt</dt><dd>${formatEta(m.unloads_in_seconds)}</dd>
+        <dt>Aktivität</dt><dd><span class="activity"><span class="pulse ${m.recently_active ? 'active' : ''}"></span>${esc(activityText)}</span></dd>
+      </dl>
+    </div>`;
+  }
+
+  function installedModelRow(m) {
     return `<div class="model-row">
       <div class="model-row-top">
         <span class="model-name">${esc(m.name)}</span>
         <button class="delete-btn" data-model="${esc(m.name)}">Löschen</button>
       </div>
-      <div class="model-row-meta"><span>${esc(m.size)}</span>${ramBadge ? '<span>·</span>' + ramBadge : ''}</div>
+      <div class="model-row-meta"><span>${esc(m.size)}</span></div>
     </div>`;
   }
 
@@ -410,7 +428,8 @@
       ]);
       [modelsData, statusData, pullsData] = await Promise.all([mr.json(), sr.json(), pr.json()]);
     } catch (e) {
-      ollamaBody.innerHTML = '<p class="modal-empty">Dashboard nicht erreichbar.</p>';
+      ollamaLoaded.innerHTML = '<p class="modal-empty">Dashboard nicht erreichbar.</p>';
+      ollamaBody.innerHTML = '';
       activePulls.innerHTML = '';
       return;
     }
@@ -420,6 +439,16 @@
       ? '<p class="section-title">Läuft gerade</p>' + jobNames.map(n => pullRow(n, pullsData[n])).join('')
       : '';
 
+    // Aktuell im (V)RAM geladene Modelle
+    if (!statusData.ok) {
+      ollamaLoaded.innerHTML = `<p class="modal-empty">Ollama nicht erreichbar: ${esc(statusData.error || 'unbekannter Fehler')}</p>`;
+    } else if (!statusData.models.length) {
+      ollamaLoaded.innerHTML = '<p class="modal-empty">Aktuell ist kein Modell im Speicher geladen.</p>';
+    } else {
+      ollamaLoaded.innerHTML = statusData.models.map(loadedModelRow).join('');
+    }
+
+    // Alle installierten Modelle (Festplatte), unabhängig davon ob gerade geladen
     if (!modelsData.ok) {
       ollamaBody.innerHTML = `<p class="modal-empty">Ollama nicht erreichbar: ${esc(modelsData.error || 'unbekannter Fehler')}</p>`;
       return;
@@ -428,9 +457,7 @@
       ollamaBody.innerHTML = '<p class="modal-empty">Keine Modelle installiert.</p>';
       return;
     }
-    const ramByName = {};
-    if (statusData.ok) statusData.models.forEach(m => { ramByName[m.name] = m; });
-    ollamaBody.innerHTML = modelsData.models.map(m => mergedModelRow(m, ramByName[m.name])).join('');
+    ollamaBody.innerHTML = modelsData.models.map(installedModelRow).join('');
   }
 
   function submitPull() {
