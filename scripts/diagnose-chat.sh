@@ -41,11 +41,22 @@ else
   warn "Keine .env gefunden unter $ENV_FILE — nutze Standardwerte."
 fi
 
-LITELLM_KEY="${LITELLM_MASTER_KEY:-sk-1234}"
+# LITELLM_KEY_OVERRIDE testet mit einem ANDEREN Key als dem Master-Key aus
+# der .env — z. B. einem LiteLLM-Virtual-Key, den Open WebUI tatsächlich
+# benutzt (Admin-Einstellungen -> Verbindungen). Wichtig: die .env wird oben
+# per 'source' geladen und würde ein von außen gesetztes LITELLM_MASTER_KEY
+# überschreiben — deshalb ein eigener Variablenname, statt LITELLM_MASTER_KEY
+# beim Aufruf voranzustellen (das würde stillschweigend ignoriert).
+LITELLM_KEY="${LITELLM_KEY_OVERRIDE:-${LITELLM_MASTER_KEY:-sk-1234}}"
 PORT_LITELLM="${PORT_LITELLM:-4000}"
 PORT_OLLAMA="${PORT_OLLAMA:-11434}"
 MODEL="${1:-${DEFAULT_MODEL:-}}"
 MESSAGE="${2:-hallo}"
+
+if [ -n "${LITELLM_KEY_OVERRIDE:-}" ]; then
+  info_key="${LITELLM_KEY:0:8}…${LITELLM_KEY: -4}"
+  printf '%s(Nutze LITELLM_KEY_OVERRIDE statt Master-Key: %s)%s\n' "$c_dim" "$info_key" "$c_reset"
+fi
 
 if [ -z "$MODEL" ]; then
   fail "Kein Modell angegeben und DEFAULT_MODEL nicht in .env gesetzt."
@@ -194,6 +205,13 @@ if [ "$LITELLM_STATUS" = "OK" ]; then
   fi
 else
   fail "LiteLLM-Aufruf fehlgeschlagen: $LITELLM_CONTENT"
+  if echo "$LITELLM_CONTENT" | grep -qiE 'not allowed|auth|401|403'; then
+    warn "Sieht nach einem Rechte-/Auth-Fehler aus, nicht nach dem Titel-Problem."
+    warn "Falls das mit einem LiteLLM-Virtual-Key getestet wurde: in der LiteLLM-"
+    warn "Admin-UI (http://<ip>:PORT_LITELLM/ui -> Keys) prüfen, ob der Key auf"
+    warn "bestimmte Modelle eingeschränkt ist ('Models'-Feld) und ob"
+    warn "'$LITELLM_USED_MODEL' darin enthalten ist."
+  fi
 fi
 
 # ── Fazit ────────────────────────────────────────────────────────────────
