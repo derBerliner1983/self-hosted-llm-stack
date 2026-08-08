@@ -110,7 +110,14 @@ Prints every URL, the LiteLLM master key, the Postgres password, and the MCP API
 
 The stack ships a small, self-contained **modern status dashboard** (`dashboard/`). It reads the Docker socket (read-only) and shows in real time **which services are online, which port they run on**, and links straight to them. It refreshes automatically and is available at `http://<server-ip>:8600`.
 
-**Ollama details:** the Ollama tile has a **"Details"** button that opens a popup showing the models currently loaded in (V)RAM — size, how much of it sits in the GPU, time remaining until auto-unload, and an activity indicator (Ollama has no direct "is a request running right now" API; the dashboard approximates this by detecting when a model's keep-alive time gets extended by a fresh request). Refreshes every 3 seconds while the popup is open.
+**Ollama details & model management:** the Ollama tile is twice as wide as the others and has a **"Details"** button opening a popup with:
+
+- **Load models:** a text field for an Ollama library name (`llama3.1:8b`) or a Hugging Face reference (`hf.co/user/repo:tag`) — Ollama accepts both through the same mechanism. **Multiple downloads at once** are supported, each with its own live progress bar.
+- **Installed models:** a list of every downloaded model with its size, a "Delete" button (with a confirmation prompt), and — if currently loaded in RAM — an activity indicator and time remaining until auto-unload (Ollama has no direct "is a request running right now" API; the dashboard approximates this by detecting when a model's keep-alive time gets extended by a fresh request).
+
+Refreshes every 3 seconds while the popup is open.
+
+> ⚠️ **Security note:** this makes the dashboard **write-capable** for the first time (loading/deleting models), not just read-only. Since it's still LAN-only and has no login of its own, anyone on the same network can trigger downloads or delete models. For a single-user home network this is a reasonable tradeoff — if that's not acceptable, put the dashboard behind its own login/reverse proxy, or drop the `dashboard` service entirely.
 
 ### MCP Gateway (tools for the LLM)
 
