@@ -195,6 +195,7 @@ The script is **idempotent**: already-registered models are skipped, only new on
 ```bash
 ./scripts/show-credentials.sh                                 # URLs, master key, passwords
 ./scripts/wire-mcp.sh                                         # (re-)wire MCP Gateway with LiteLLM + Open WebUI (mcpo)
+./scripts/diagnose-chat.sh <model> ["message"]                # narrow down broken replies layer by layer (Ollama/LiteLLM/WebUI)
 docker compose -f docker-compose.rocm.yml ps                  # status
 docker compose -f docker-compose.rocm.yml logs -f open-webui  # logs for one service
 docker compose -f docker-compose.rocm.yml down                # stop (data stays in volumes)
