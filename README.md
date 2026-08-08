@@ -196,6 +196,7 @@ Das Skript ist **idempotent**: bereits eingetragene Modelle werden übersprungen
 ./scripts/show-credentials.sh                                 # URLs, Master-Key, Passwörter
 ./scripts/wire-mcp.sh                                         # MCP Gateway (neu) mit LiteLLM + Open WebUI (mcpo) verdrahten
 ./scripts/diagnose-chat.sh <modell> ["nachricht"]             # Kaputte Antworten Schicht für Schicht eingrenzen (Ollama/LiteLLM/WebUI)
+LITELLM_KEY_OVERRIDE=<key> ./scripts/diagnose-chat.sh <modell> # ...testweise mit einem LiteLLM-Virtual-Key statt dem Master-Key
 docker compose -f docker-compose.rocm.yml ps                  # Status
 docker compose -f docker-compose.rocm.yml logs -f open-webui  # Logs eines Dienstes
 docker compose -f docker-compose.rocm.yml down                # Stoppen (Daten bleiben in Volumes)
