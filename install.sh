@@ -195,7 +195,7 @@ BANNER
 
   # Übrig gebliebene Container (auch aus manuellem 'docker run') gezielt entfernen.
   local containers="ollama open-webui anythingllm litellm litellm-db db mcp \
-sandbox-mcp mcpo embeddings whisper whisper-live kokoro docling ai-stack-init \
+sandbox-mcp mcpo vault-bridge embeddings whisper whisper-live kokoro docling ai-stack-init \
 ai-stack-dashboard ai-stack-caddy"
   info "Entferne evtl. verbliebene Container…"
   for c in $containers; do
@@ -206,7 +206,8 @@ ai-stack-dashboard ai-stack-caddy"
     # Bekannte Volumes beider Stacks (alte + neue Namen) löschen.
     local volumes="ollama-data ollama-shared litellm-data litellm-db litellm-shared \
 ai-stack-shared open-webui-data anythingllm-data embeddings-data whisper-data \
-whisper-live-data kokoro-data mcp-data mcp-shared docling-data caddy-data caddy-config"
+whisper-live-data kokoro-data mcp-data mcp-shared vault-data vault-bridge-data \
+docling-data caddy-data caddy-config"
     info "Lösche Daten-Volumes…"
     for v in $volumes; do
       docker volume rm "$v" >/dev/null 2>&1 && ok "Volume gelöscht: $v" || true
@@ -487,6 +488,7 @@ PORT_DASHBOARD=${PORT_DASHBOARD}
 PORT_OLLAMA=11434
 PORT_WHISPER=9000
 PORT_EMBEDDINGS=8000
+PORT_VAULT_BRIDGE=8700
 
 # Code-Sandbox (run_python/run_shell fürs LLM; Wegwerf-Container pro Aufruf,
 # siehe README "Code-Sandbox"). SANDBOX_NETWORK=none = kein Internetzugriff
@@ -497,6 +499,14 @@ SANDBOX_DEFAULT_TIMEOUT=15
 SANDBOX_MAX_TIMEOUT=60
 SANDBOX_MEM_LIMIT=256m
 SANDBOX_NETWORK=none
+
+# Vault-Bridge (Obsidian-Vault auf Nextcloud <-> MCP-Gateway-Dateisystem-
+# Werkzeug, siehe README "Vault-Bridge"). Verbindung wird über die eigene
+# Web-Oberfläche (Port PORT_VAULT_BRIDGE) hergestellt, nicht hier — hier nur
+# der Port. MCP_SERVERS/MCP_FILESYSTEM_DIRS unten steuern, welche MCP-
+# Gateway-Werkzeuge aktiv sind und welche Verzeichnisse sie sehen.
+MCP_SERVERS=fetch,filesystem
+MCP_FILESYSTEM_DIRS=/vault
 
 # Secrets
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -526,7 +536,7 @@ fi
 # ════════════════════════════════════════════════════════════════════════════
 step "6/8 · Stack starten"
 
-info "Ziehe Images, baue lokale Dienste (sandbox-mcp) und starte Container (kann beim ersten Mal dauern)…"
+info "Ziehe Images, baue lokale Dienste (sandbox-mcp, vault-bridge) und starte Container (kann beim ersten Mal dauern)…"
 $DC -f "$COMPOSE_FILE" up -d --build
 
 info "Warte, bis Ollama bereit ist…"
