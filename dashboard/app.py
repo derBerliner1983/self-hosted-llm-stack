@@ -106,6 +106,14 @@ SERVICES = [
         "port": None,
         "path": None,
     },
+    {
+        "container": "vault-bridge",
+        "label": "Vault-Bridge",
+        "desc": "Obsidian/Nextcloud → MCP-Dateisystem",
+        "icon": "📓",
+        "port": int(os.environ.get("PORT_VAULT_BRIDGE", "8700")),
+        "path": "/",
+    },
 ]
 
 

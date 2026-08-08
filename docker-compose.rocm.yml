@@ -3,6 +3,7 @@
 # Kompletter Stack, komplett auf Upstream-Images umgebaut:
 #   Ollama (ROCm)  ·  Open WebUI  ·  LiteLLM  ·  PostgreSQL/pgvector
 #   Whisper (STT)  ·  Embeddings (TEI)  ·  MCP Gateway (Werkzeuge)
+#   Code-Sandbox  ·  mcpo (MCP→OpenAPI)  ·  Vault-Bridge (Obsidian/Nextcloud)
 #   Dashboard (modernes UI)
 #
 # Start am einfachsten über ./install.sh (prüft Hardware, Firewall, Modell).
@@ -63,20 +64,51 @@ services:
       retries: 5
 
   # ── MCP Gateway (Werkzeuge: Dateisystem, Web-Fetch, GitHub, Suche, DB) ──────
+  # Das "filesystem"-Werkzeug zeigt auf vault-data (:ro) — dorthin synct
+  # vault-bridge den Nextcloud/Obsidian-Vault. Sobald vault-bridge erfolgreich
+  # verbunden hat, sieht dieses Werkzeug den Vault automatisch (gleiches
+  # Volume, kein Neustart von mcp nötig). Details: README, "Vault-Bridge".
   mcp:
     image: hwdsl2/mcp-gateway
     container_name: mcp
     restart: always
+    environment:
+      - MCP_SERVERS=${MCP_SERVERS:-fetch,filesystem}
+      - MCP_FILESYSTEM_DIRS=${MCP_FILESYSTEM_DIRS:-/vault}
     # ports:
     #   - "127.0.0.1:${PORT_MCP:-3000}:3000/tcp"  # nur für direkte MCP-Clients (Claude Desktop, Cursor)
     volumes:
       - mcp-data:/var/lib/mcp
       - mcp-shared:/var/lib/mcp-shared
+      - vault-data:/vault:ro
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:3000/health"]
       interval: 15s
       timeout: 3s
       start_period: 60s
+      retries: 3
+
+  # ── Vault-Bridge (Nextcloud/Obsidian-Vault → MCP-Dateisystem-Werkzeug) ──────
+  # ⚠️  Speichert Nextcloud-Zugangsdaten im eigenen Volume (vault-bridge-data).
+  #     Das App-Passwort wird vor dem Schreiben mit `rclone obscure`
+  #     verschleiert — das ist KEINE echte Verschlüsselung. Nutze unbedingt
+  #     ein dediziertes Nextcloud-App-Passwort (Profil -> Sicherheit), nie
+  #     das Hauptpasswort. Web-UI zum Verbinden/Konfigurieren: siehe
+  #     PORT_VAULT_BRIDGE bzw. den Link im Dashboard. Nur intern + localhost.
+  vault-bridge:
+    build: ./vault-bridge
+    container_name: vault-bridge
+    restart: always
+    ports:
+      - "127.0.0.1:${PORT_VAULT_BRIDGE:-8700}:8080/tcp"
+    volumes:
+      - vault-bridge-data:/data
+      - vault-data:/vault
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
       retries: 3
 
   # ── Code-Sandbox (MCP-Werkzeuge: run_python/run_shell in Wegwerf-Containern) ─
@@ -236,6 +268,7 @@ services:
       - PORT_OLLAMA=${PORT_OLLAMA:-11434}
       - PORT_WHISPER=${PORT_WHISPER:-9000}
       - PORT_EMBEDDINGS=${PORT_EMBEDDINGS:-8000}
+      - PORT_VAULT_BRIDGE=${PORT_VAULT_BRIDGE:-8700}
     volumes:
       - ./dashboard:/app:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -266,3 +299,7 @@ volumes:
     name: mcp-data
   mcp-shared:
     name: mcp-shared
+  vault-data:
+    name: vault-data
+  vault-bridge-data:
+    name: vault-bridge-data

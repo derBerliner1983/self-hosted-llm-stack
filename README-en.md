@@ -96,6 +96,8 @@ graph LR
     A["🎤 Audio"] --> WH["Whisper<br/>(speech-to-text)"]
     D["📄 Documents"] --> E["Embeddings<br/>(text-to-vectors)"]
     DASH -.->|reads status| SOCK[("Docker socket<br/>(read-only)")]
+    VB["Vault-Bridge<br/>(Nextcloud/Obsidian, port 8700)"] -->|rclone sync| VD[("vault-data<br/>(volume)")]
+    VD -.->|read-only| M
 ```
 
 **Show credentials**
@@ -158,6 +160,24 @@ docker logs litellm | grep -i mcp   # does LiteLLM itself also see the MCP serve
 ```
 
 > **Note:** Exact menu paths and behavior can differ slightly by Open WebUI version (a fast-moving area) — verify together after deploy that the tools are actually invoked in chat.
+
+### Vault-Bridge (Obsidian/Nextcloud as knowledge for the LLM)
+
+You can connect an **Obsidian vault hosted on Nextcloud** to the stack — not by "building AI into Obsidian," but the other way around: **every** client wired to LiteLLM (Open WebUI, and in future e.g. Claude) gets read access to your own knowledge through the MCP Gateway filesystem tool. For this, the stack ships a `vault-bridge` service — its own **web-configurable** bridge, no manual `.env` editing required.
+
+**Setup:**
+
+1. In Nextcloud, create an **app password** (Profile → Security → "Create new app password") — don't use your main account password.
+2. Open the Vault-Bridge UI: `http://<server-ip>:8700` (or via the "Vault-Bridge" tile on the dashboard).
+3. Enter the server URL, username, app password, the path to the vault inside Nextcloud (e.g. `Notes/ObsidianVault`), and a sync interval, then click **"Connect & sync"**.
+
+Once the first sync succeeds, the **MCP Gateway filesystem tool sees the vault automatically** — the bridge and MCP Gateway share the same Docker volume (`vault-data`), so `mcp` never needs to be restarted. No extra setup in Open WebUI is needed either: it's the same `mcp_gateway` tool server you already connected above (see "Enable the tools in Open WebUI").
+
+**How it works under the hood:** `vault-bridge` uses [`rclone`](https://rclone.org/) in **sync** mode, not mount mode — it pulls files over WebDAV on an interval instead of live-mounting the vault via FUSE. That avoids needing `/dev/fuse` access or extended container privileges, making it the safer option; for a knowledge base, periodic sync is plenty — millisecond-live updates aren't needed.
+
+> ⚠️ **Security note:** the Nextcloud app password is stored on the server (its own volume, `vault-bridge-data`) so the bridge can re-sync on its own. Before being written, it's **obscured** with `rclone obscure` — that is **not real encryption**, just protection against casual reading. Always use a dedicated app password (revocable independently of your main password at any time in Nextcloud), never your main password. The MCP Gateway filesystem tool also mounts the vault **read-only** (`:ro`) — even if a client tried to write, the Docker mount itself blocks it, not just the app logic.
+
+Configurable via `.env`: `PORT_VAULT_BRIDGE` (default `8700`), plus `MCP_SERVERS`/`MCP_FILESYSTEM_DIRS` on the `mcp` service if you want to add further MCP tools or directories.
 
 ### Register models with LiteLLM
 
