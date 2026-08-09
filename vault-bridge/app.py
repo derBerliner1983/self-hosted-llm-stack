@@ -37,6 +37,7 @@ import datetime
 import json
 import os
 import subprocess
+import tempfile
 import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -134,19 +135,23 @@ def _rclone_obscure(password):
     return result.stdout.strip()
 
 
-def _write_rclone_conf(url, username, obscured_password):
-    os.makedirs(DATA_DIR, exist_ok=True)
+def _write_rclone_conf_to(path, remote_name, url, username, obscured_password):
     conf = (
-        f"[{RCLONE_REMOTE}]\n"
+        f"[{remote_name}]\n"
         f"type = webdav\n"
         f"url = {url}\n"
         f"vendor = nextcloud\n"
         f"user = {username}\n"
         f"pass = {obscured_password}\n"
     )
-    with open(RCLONE_CONF, "w", encoding="utf-8") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         fh.write(conf)
-    os.chmod(RCLONE_CONF, 0o600)
+    os.chmod(path, 0o600)
+
+
+def _write_rclone_conf(url, username, obscured_password):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    _write_rclone_conf_to(RCLONE_CONF, RCLONE_REMOTE, url, username, obscured_password)
 
 
 def do_sync():
@@ -237,6 +242,68 @@ def connect(payload):
     return {"ok": True, "state": _get_state()}
 
 
+BROWSE_REMOTE = "browse"
+
+
+def browse(payload):
+    """Unterordner eines Nextcloud-Pfads auflisten (für den Ordner-Browser im UI).
+
+    Nutzt dieselben Zugangsdaten wie /api/connect, aber nur für diesen einen
+    Aufruf: Die rclone-Konfiguration landet in einer Temp-Datei, die direkt
+    danach wieder gelöscht wird — nichts davon wird dauerhaft gespeichert.
+    Das validiert nebenbei auch gleich Server-URL/Benutzername/App-Passwort,
+    schon bevor „Verbinden & synchronisieren" gedrückt wird.
+    """
+    url_in = str(payload.get("url") or "").strip()
+    username = str(payload.get("username") or "").strip()
+    app_password = str(payload.get("app_password") or "")
+    raw_path = str(payload.get("path") or "").strip().strip("/")
+
+    if not url_in or not username or not app_password:
+        return {"ok": False, "error": "Server-URL, Benutzername und App-Passwort werden benötigt."}
+
+    # ".." u.ä. rausfiltern statt nur zu verbieten - der Browser soll bei
+    # einem ungültigen/veralteten Pfad einfach auf gültige Segmente zurückfallen.
+    path = "/".join(seg for seg in raw_path.split("/") if seg and seg != "..")
+
+    os.makedirs(DATA_DIR, exist_ok=True)
+    fd, tmp_conf = tempfile.mkstemp(prefix="rclone-browse-", suffix=".conf", dir=DATA_DIR)
+    os.close(fd)
+    try:
+        webdav_url = build_webdav_url(url_in, username, "")  # Wurzel des Dateibereichs
+        obscured = _rclone_obscure(app_password)
+        _write_rclone_conf_to(tmp_conf, BROWSE_REMOTE, webdav_url, username, obscured)
+        result = subprocess.run(
+            [
+                "rclone", "lsjson", f"{BROWSE_REMOTE}:{path}",
+                "--config", tmp_conf,
+                "--dirs-only", "--no-modtime",
+            ],
+            capture_output=True, text=True, timeout=25,
+        )
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout or "Ordner konnte nicht geladen werden.").strip()
+            return {"ok": False, "error": err[-2000:]}
+        try:
+            items = json.loads(result.stdout or "[]")
+        except json.JSONDecodeError:
+            return {"ok": False, "error": "Unerwartete Antwort von rclone."}
+        entries = sorted(
+            (str(it.get("Name") or "") for it in items if it.get("Name")),
+            key=str.casefold,
+        )
+        return {"ok": True, "path": path, "entries": entries}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "Zeitüberschreitung beim Laden der Ordnerliste."}
+    except Exception as exc:  # noqa: BLE001 - jeden Fehler sichtbar melden statt crashen
+        return {"ok": False, "error": str(exc)}
+    finally:
+        try:
+            os.remove(tmp_conf)
+        except OSError:
+            pass
+
+
 def disconnect():
     _update_state(connected=False, last_status=None, last_error="")
     try:
@@ -294,6 +361,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/api/connect":
             result = connect(body)
+            self._send(200 if result.get("ok") else 400, json.dumps(result), "application/json")
+            return
+        if self.path == "/api/browse":
+            result = browse(body)
             self._send(200 if result.get("ok") else 400, json.dumps(result), "application/json")
             return
         if self.path == "/api/disconnect":

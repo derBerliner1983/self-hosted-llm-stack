@@ -95,6 +95,32 @@
   .msg { font-size: 12.5px; margin-top: 10px; }
   .msg.ok { color: var(--online); }
   .msg.err { color: var(--offline); }
+
+  .browse-trigger { margin-top: 8px; }
+  .browse-panel {
+    margin-top: 12px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 7px;
+    background: var(--bg);
+  }
+  .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; font-size: 12.5px; margin-bottom: 8px; }
+  .crumbs button {
+    padding: 2px 7px; font-size: 12px; font-weight: 500; border-radius: 5px; border-color: transparent;
+    background: transparent;
+  }
+  .crumbs button:hover:not(:disabled) { background: var(--icon-bg); border-color: var(--border); }
+  .crumbs span.sep { color: var(--text-muted); }
+  .folder-list {
+    max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface);
+  }
+  .folder-row {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 13px;
+    cursor: pointer; border-bottom: 1px solid var(--border);
+  }
+  .folder-row:last-child { border-bottom: none; }
+  .folder-row:hover { background: var(--icon-bg); }
+  .folder-row svg { width: 15px; height: 15px; flex: none; color: var(--text-muted); }
+  .folder-empty { padding: 14px; font-size: 12.5px; color: var(--text-muted); text-align: center; }
+  .browse-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -145,6 +171,17 @@
     <label for="vaultPath">Pfad zum Vault in Nextcloud</label>
     <input id="vaultPath" type="text" placeholder="Notizen/ObsidianVault" autocomplete="off">
     <p class="hint">Relativ zum Nextcloud-Dateibereich des Nutzers. Leer lassen, um den gesamten Dateibereich zu synchronisieren.</p>
+    <button id="browseBtn" type="button" class="browse-trigger">Ordner durchsuchen…</button>
+
+    <div id="browsePanel" class="browse-panel" style="display:none">
+      <div class="crumbs" id="browseCrumbs"></div>
+      <div class="folder-list" id="browseList"></div>
+      <div class="browse-actions">
+        <button id="browseUseBtn" type="button" class="primary">Diesen Ordner verwenden</button>
+        <button id="browseCancelBtn" type="button">Abbrechen</button>
+      </div>
+      <div id="browseMsg" class="msg"></div>
+    </div>
 
     <label for="interval">Sync-Intervall (Minuten)</label>
     <input id="interval" type="number" min="1" max="1440" value="60">
@@ -261,6 +298,7 @@
         msg.textContent = 'Verbunden — erster Sync läuft im Hintergrund.';
         msg.className = 'msg ok';
         $('appPassword').value = '';
+        $('browsePanel').style.display = 'none';
         loadStatus();
       } else {
         msg.textContent = result.error || 'Verbindung fehlgeschlagen.';
@@ -272,6 +310,108 @@
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // ── Ordner-Browser (statt Pfad frei eintippen) ─────────────────────────
+  let browsePath = '';
+  let browseCreds = null; // Snapshot der Zugangsdaten, solange das Panel offen ist
+
+  function credsFilled() {
+    return $('url').value.trim() && $('username').value.trim() && $('appPassword').value;
+  }
+
+  function renderCrumbs() {
+    const crumbs = $('browseCrumbs');
+    crumbs.innerHTML = '';
+    const makeCrumb = (label, path) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.disabled = (path === browsePath);
+      b.addEventListener('click', () => { browsePath = path; loadBrowse(path); });
+      return b;
+    };
+    crumbs.appendChild(makeCrumb('Wurzel', ''));
+    if (browsePath) {
+      const parts = browsePath.split('/');
+      let acc = '';
+      for (const part of parts) {
+        acc = acc ? acc + '/' + part : part;
+        const sep = document.createElement('span');
+        sep.className = 'sep';
+        sep.textContent = '/';
+        crumbs.appendChild(sep);
+        crumbs.appendChild(makeCrumb(part, acc));
+      }
+    }
+  }
+
+  async function loadBrowse(path) {
+    const list = $('browseList');
+    const msg = $('browseMsg');
+    msg.textContent = '';
+    msg.className = 'msg';
+    list.innerHTML = '<div class="folder-empty">Lade…</div>';
+    renderCrumbs();
+    try {
+      const res = await fetch('/api/browse', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({...browseCreds, path}),
+      });
+      const result = await res.json();
+      if (!result.ok) {
+        list.innerHTML = '';
+        msg.textContent = result.error || 'Ordner konnte nicht geladen werden.';
+        msg.className = 'msg err';
+        return;
+      }
+      list.innerHTML = '';
+      if (!result.entries.length) {
+        list.innerHTML = '<div class="folder-empty">Keine Unterordner</div>';
+        return;
+      }
+      for (const name of result.entries) {
+        const row = document.createElement('div');
+        row.className = 'folder-row';
+        row.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>';
+        const span = document.createElement('span');
+        span.textContent = name;
+        row.appendChild(span);
+        row.addEventListener('click', () => {
+          browsePath = path ? path + '/' + name : name;
+          loadBrowse(browsePath);
+        });
+        list.appendChild(row);
+      }
+    } catch (e) {
+      list.innerHTML = '';
+      msg.textContent = 'Bridge nicht erreichbar.';
+      msg.className = 'msg err';
+    }
+  }
+
+  $('browseBtn').addEventListener('click', () => {
+    if (!credsFilled()) {
+      alert('Bitte zuerst Server-URL, Benutzername und App-Passwort eintragen.');
+      return;
+    }
+    browseCreds = {
+      url: $('url').value.trim(),
+      username: $('username').value.trim(),
+      app_password: $('appPassword').value,
+    };
+    browsePath = $('vaultPath').value.trim().replace(/^\/+|\/+$/g, '');
+    $('browsePanel').style.display = 'block';
+    loadBrowse(browsePath);
+  });
+
+  $('browseCancelBtn').addEventListener('click', () => {
+    $('browsePanel').style.display = 'none';
+  });
+
+  $('browseUseBtn').addEventListener('click', () => {
+    $('vaultPath').value = browsePath;
+    $('browsePanel').style.display = 'none';
   });
 
   $('syncNowBtn').addEventListener('click', async () => {
