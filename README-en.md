@@ -169,7 +169,7 @@ You can connect an **Obsidian vault hosted on Nextcloud** to the stack — not b
 
 1. In Nextcloud, create an **app password** (Profile → Security → "Create new app password") — don't use your main account password.
 2. Open the Vault-Bridge UI: `http://<server-ip>:8700` (or via the "Vault-Bridge" tile on the dashboard).
-3. Enter the server URL, username, app password, the path to the vault inside Nextcloud (e.g. `Notes/ObsidianVault`), and a sync interval, then click **"Connect & sync"**.
+3. Enter the server URL, username, app password, and a sync interval. For the vault path, either type it directly (e.g. `Notes/ObsidianVault`) or click the folder-browse button to navigate your own Nextcloud folder structure instead of risking a typo. Then click **"Connect & sync"**.
 
 Once the first sync succeeds, the **MCP Gateway filesystem tool sees the vault automatically** — the bridge and MCP Gateway share the same Docker volume (`vault-data`), so `mcp` never needs to be restarted. No extra setup in Open WebUI is needed either: it's the same `mcp_gateway` tool server you already connected above (see "Enable the tools in Open WebUI").
 
