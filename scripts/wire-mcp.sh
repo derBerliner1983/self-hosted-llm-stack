@@ -43,6 +43,56 @@ for i in $(seq 1 40); do
   [ "$i" -eq 40 ] && die "MCP Gateway wurde nicht rechtzeitig bereit. Prüfe: docker logs mcp"
 done
 
+# ── Eigene/nicht automatisch registrierte MCP-Server nachtragen ────────────
+#
+# Bei manchen Installationen registriert hwdsl2/mcp-gateway "filesystem"
+# beim allerersten Start nicht automatisch, obwohl MCP_SERVERS es enthält
+# (siehe README, Abschnitt "Zwei-Wege-Sync" für Details/Reproduktion). Und
+# unser eigenes "time"-Werkzeug (mcp-tools/get_time.py) ist dem Image von
+# Haus aus gar nicht bekannt. Beides wird hier idempotent nachgetragen -
+# ändert nichts, falls schon vorhanden.
+info "Prüfe, ob 'filesystem' und 'time' bei mcp registriert sind…"
+PATCH_RESULT="$(docker exec mcp node -e '
+const fs = require("fs");
+const path = "/var/lib/mcp/mcp_settings.json";
+const data = JSON.parse(fs.readFileSync(path, "utf8"));
+data.mcpServers = data.mcpServers || {};
+let changed = false;
+if (!data.mcpServers.filesystem) {
+  const dirs = process.env.MCP_FILESYSTEM_DIRS || "/vault";
+  data.mcpServers.filesystem = {
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-filesystem", ...dirs.split(",")],
+  };
+  changed = true;
+}
+if (!data.mcpServers.time) {
+  data.mcpServers.time = {
+    command: "python3",
+    args: ["/opt/mcp-tools/get_time.py"],
+  };
+  changed = true;
+}
+if (changed) {
+  fs.writeFileSync(path, JSON.stringify(data, null, 2));
+  console.log("CHANGED");
+} else {
+  console.log("UNCHANGED");
+}
+')"
+
+if [ "$PATCH_RESULT" = "CHANGED" ]; then
+  ok "Fehlende Server nachgetragen, starte mcp neu…"
+  $DC -f "$COMPOSE_FILE" restart mcp >/dev/null
+  for i in $(seq 1 40); do
+    docker exec mcp mcp_manage --getkey >/dev/null 2>&1 && break
+    sleep 3
+    [ "$i" -eq 40 ] && die "mcp wurde nach dem Neustart nicht rechtzeitig bereit. Prüfe: docker logs mcp"
+  done
+else
+  ok "'filesystem' und 'time' waren schon registriert, kein Neustart nötig."
+fi
+
 MCP_KEY="$(docker exec mcp mcp_manage --getkey)"
 [ -n "$MCP_KEY" ] || die "Konnte keinen MCP-API-Key auslesen."
 
