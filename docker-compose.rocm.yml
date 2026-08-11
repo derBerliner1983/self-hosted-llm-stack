@@ -64,10 +64,16 @@ services:
       retries: 5
 
   # ── MCP Gateway (Werkzeuge: Dateisystem, Web-Fetch, GitHub, Suche, DB) ──────
-  # Das "filesystem"-Werkzeug zeigt auf vault-data (:ro) — dorthin synct
-  # vault-bridge den Nextcloud/Obsidian-Vault. Sobald vault-bridge erfolgreich
-  # verbunden hat, sieht dieses Werkzeug den Vault automatisch (gleiches
-  # Volume, kein Neustart von mcp nötig). Details: README, "Vault-Bridge".
+  # Das "filesystem"-Werkzeug zeigt auf vault-data — dorthin synct vault-bridge
+  # den Nextcloud/Obsidian-Vault. Sobald vault-bridge erfolgreich verbunden
+  # hat, sieht dieses Werkzeug den Vault automatisch (gleiches Volume, kein
+  # Neustart von mcp nötig). Details: README, "Vault-Bridge".
+  #
+  # MCP_VAULT_MOUNT_MODE steuert, ob die KI nur lesen (Standard "ro") oder
+  # auch schreiben/löschen kann ("rw"). Schreibzugriff ist NUR sinnvoll,
+  # wenn zusätzlich in der Vault-Bridge-Oberfläche "Zwei-Wege-Sync" aktiviert
+  # ist - sonst überschreibt der nächste automatische Einweg-Sync von
+  # Nextcloud alles, was die KI lokal geschrieben hat, kommentarlos wieder.
   mcp:
     image: hwdsl2/mcp-gateway
     container_name: mcp
@@ -80,7 +86,7 @@ services:
     volumes:
       - mcp-data:/var/lib/mcp
       - mcp-shared:/var/lib/mcp-shared
-      - vault-data:/vault:ro
+      - vault-data:/vault:${MCP_VAULT_MOUNT_MODE:-ro}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:3000/health"]
       interval: 15s

@@ -9,14 +9,29 @@ Obsidian selbst einzubauen ("Version 2": die KI greift auf das Gehirn zu,
 statt dass das Gehirn die KI enthält).
 
 Architektur:
-  Nextcloud (WebDAV) --rclone sync--> vault-data (Docker-Volume, hier :rw)
+  Nextcloud (WebDAV) <--rclone sync/bisync--> vault-data (Docker-Volume)
                                             |
-                                            +--:ro--> mcp-Container
-                                                       (MCP_FILESYSTEM_DIRS)
+                                            +--> mcp-Container
+                                                 (MCP_FILESYSTEM_DIRS)
 
 Diese Bridge selbst spricht kein MCP — sie hält nur eine lokale Kopie des
 Vaults aktuell. Sobald die Verbindung erfolgreich ist, sieht das MCP Gateway
 das Verzeichnis automatisch (gleiches Volume, kein Neustart nötig).
+
+Zwei Sync-Modi (per Umschalter im UI, Standard: Einweg):
+  - Einweg (rclone sync):    Nextcloud -> lokal. Sicher, aber die KI kann
+                              höchstens lesen (mcp mountet ohnehin nur :ro,
+                              siehe docker-compose.rocm.yml als Standard).
+  - Zwei-Wege (rclone bisync): Änderungen fließen in beide Richtungen,
+                              auch von der KI geschriebene/gelöschte Dateien
+                              gehen zurück nach Nextcloud. Erfordert einen
+                              einmaligen --resync-Lauf (wird automatisch beim
+                              ersten Sync in diesem Modus gemacht) und dass
+                              der mcp-Container das Volume :rw statt :ro
+                              mountet (siehe docker-compose.rocm.yml).
+                              Konflikte (Datei auf beiden Seiten geändert)
+                              löst rclone automatisch zugunsten der neueren
+                              Version (--conflict-resolve newer).
 
 Kein Framework, keine Zusatzabhängigkeiten außer dem rclone-Binary (im
 Dockerfile installiert) — bewusst im gleichen minimalistischen Stil wie
@@ -50,6 +65,7 @@ VAULT_DIR = os.environ.get("VAULT_BRIDGE_VAULT_DIR", "/vault")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 RCLONE_CONF = os.path.join(DATA_DIR, "rclone.conf")
 RCLONE_REMOTE = "nextcloud"
+BISYNC_WORKDIR = os.path.join(DATA_DIR, "bisync-workdir")
 
 _state_lock = threading.Lock()
 _wake_event = threading.Event()
@@ -64,6 +80,8 @@ _DEFAULT_STATE = {
     "last_status": None,   # "ok" | "error" | None (noch nie synchronisiert)
     "last_error": "",
     "syncing": False,
+    "bisync_enabled": False,     # Zwei-Wege-Sync (Schreibzugriff für die KI)
+    "bisync_initialized": False,  # ob der einmalige --resync schon lief
 }
 
 
@@ -154,11 +172,40 @@ def _write_rclone_conf(url, username, obscured_password):
     _write_rclone_conf_to(RCLONE_CONF, RCLONE_REMOTE, url, username, obscured_password)
 
 
-def do_sync():
-    """Einen rclone-Sync ausführen (Nextcloud -> lokales vault-data-Volume).
+def _sync_command(bisync_enabled, bisync_initialized):
+    """rclone-Kommandozeile für den aktuellen Sync-Modus zusammenbauen."""
+    if not bisync_enabled:
+        return [
+            "rclone", "sync", f"{RCLONE_REMOTE}:", VAULT_DIR,
+            "--config", RCLONE_CONF,
+            "--fast-list",
+            "--create-empty-src-dirs",
+        ]
+    os.makedirs(BISYNC_WORKDIR, exist_ok=True)
+    cmd = [
+        "rclone", "bisync", f"{RCLONE_REMOTE}:", VAULT_DIR,
+        "--config", RCLONE_CONF,
+        "--workdir", BISYNC_WORKDIR,
+        "--fast-list",
+        "--create-empty-src-dirs",
+    ]
+    if not bisync_initialized:
+        # Einmaliger Baseline-Lauf - danach NIE wieder --resync mitgeben,
+        # sonst würde jede Seite die andere blind überschreiben.
+        cmd.append("--resync")
+    else:
+        cmd += ["--resilient", "--recover", "--max-lock", "2m", "--conflict-resolve", "newer"]
+    return cmd
 
-    Read-only in eine Richtung gedacht: die Bridge schreibt, das MCP Gateway
-    mountet das Ziel-Volume separat als :ro. Läuft nur einmal gleichzeitig.
+
+def do_sync():
+    """Einen rclone-Sync ausführen (Nextcloud <-> lokales vault-data-Volume).
+
+    Standardmodus ist Einweg (Nextcloud -> lokal): die Bridge schreibt, das
+    MCP Gateway mountet das Ziel-Volume separat als :ro. Im Zwei-Wege-Modus
+    (bisync_enabled) fließen Änderungen in beide Richtungen - dafür muss der
+    mcp-Container das Volume :rw mounten (siehe docker-compose.rocm.yml).
+    Läuft nur einmal gleichzeitig.
     """
     with _state_lock:
         state = _load_state()
@@ -167,19 +214,20 @@ def do_sync():
         state["syncing"] = True
         _save_state(state)
 
+    bisync_enabled = state.get("bisync_enabled", False)
+    bisync_initialized = state.get("bisync_initialized", False)
+
     try:
         os.makedirs(VAULT_DIR, exist_ok=True)
         result = subprocess.run(
-            [
-                "rclone", "sync", f"{RCLONE_REMOTE}:", VAULT_DIR,
-                "--config", RCLONE_CONF,
-                "--fast-list",
-                "--create-empty-src-dirs",
-            ],
+            _sync_command(bisync_enabled, bisync_initialized),
             capture_output=True, text=True, timeout=3600,
         )
         if result.returncode == 0:
-            _update_state(last_sync=_now_iso(), last_status="ok", last_error="")
+            changes = {"last_sync": _now_iso(), "last_status": "ok", "last_error": ""}
+            if bisync_enabled and not bisync_initialized:
+                changes["bisync_initialized"] = True
+            _update_state(**changes)
         else:
             err = (result.stderr or result.stdout or "unbekannter Fehler").strip()
             _update_state(last_sync=_now_iso(), last_status="error", last_error=err[-2000:])
@@ -212,6 +260,7 @@ def connect(payload):
     username = str(payload.get("username") or "").strip()
     app_password = str(payload.get("app_password") or "")
     vault_path = str(payload.get("vault_path") or "").strip()
+    bisync_enabled = bool(payload.get("bisync_enabled"))
     try:
         interval_minutes = int(payload.get("interval_minutes") or 60)
     except (TypeError, ValueError):
@@ -228,12 +277,24 @@ def connect(payload):
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)}
 
+    previous = _get_state()
+    # Neue Baseline (--resync) erzwingen, wenn Zwei-Wege-Sync gerade erst
+    # angeschaltet wird oder sich Server/Pfad geändert haben - sonst würde
+    # rclone mit einem veralteten Stand vergleichen.
+    target_changed = (previous.get("url") != url_in or previous.get("vault_path") != vault_path)
+    bisync_turned_on = bisync_enabled and not previous.get("bisync_enabled")
+    bisync_initialized = previous.get("bisync_initialized", False)
+    if bisync_enabled and (bisync_turned_on or target_changed):
+        bisync_initialized = False
+
     _update_state(
         connected=True,
         url=url_in,
         username=username,
         vault_path=vault_path,
         interval_minutes=interval_minutes,
+        bisync_enabled=bisync_enabled,
+        bisync_initialized=bisync_initialized,
         last_status=None,
         last_error="",
     )

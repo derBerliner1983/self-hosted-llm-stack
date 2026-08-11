@@ -97,7 +97,7 @@ graph LR
     D["📄 Dokumente"] --> E["Embeddings<br/>(Text → Vektoren)"]
     DASH -.->|liest Status| SOCK[("Docker-Socket<br/>(nur lesend)")]
     VB["Vault-Bridge<br/>(Nextcloud/Obsidian, Port 8700)"] -->|rclone sync| VD[("vault-data<br/>(Volume)")]
-    VD -.->|read-only| M
+    VD -.->|read-only per default| M
 ```
 
 **Zugangsdaten anzeigen**
@@ -175,9 +175,30 @@ Sobald der erste Sync erfolgreich war, sieht das **MCP-Gateway-Dateisystem-Werkz
 
 **Wie es technisch funktioniert:** `vault-bridge` nutzt [`rclone`](https://rclone.org/) im **Sync-**, nicht im Mount-Modus — es holt die Dateien in Intervallen per WebDAV, statt den Vault live per FUSE einzuhängen. Das braucht keine `/dev/fuse`-Freigabe oder erweiterte Container-Rechte und ist damit die sicherere Variante; für ein Wissens-Repository reicht periodischer Sync völlig, Millisekunden-Aktualität ist nicht nötig.
 
-> ⚠️ **Sicherheitshinweis:** Das Nextcloud-App-Passwort wird auf dem Server gespeichert (eigenes Volume `vault-bridge-data`), damit die Bridge selbstständig neu synchronisieren kann. Es wird vor dem Schreiben mit `rclone obscure` **verschleiert** — das ist **keine echte Verschlüsselung**, nur Schutz vor zufälligem Mitlesen. Verwende deshalb zwingend ein dediziertes App-Passwort (in Nextcloud jederzeit unabhängig vom Hauptpasswort widerrufbar), niemals dein Hauptpasswort. Das MCP-Gateway-Dateisystem-Werkzeug mountet den Vault zusätzlich **read-only** (`:ro`) — selbst falls ein Client fehlerhaft schreiben wollte, verhindert das bereits der Docker-Mount, nicht erst die App-Logik.
+> ⚠️ **Sicherheitshinweis:** Das Nextcloud-App-Passwort wird auf dem Server gespeichert (eigenes Volume `vault-bridge-data`), damit die Bridge selbstständig neu synchronisieren kann. Es wird vor dem Schreiben mit `rclone obscure` **verschleiert** — das ist **keine echte Verschlüsselung**, nur Schutz vor zufälligem Mitlesen. Verwende deshalb zwingend ein dediziertes App-Passwort (in Nextcloud jederzeit unabhängig vom Hauptpasswort widerrufbar), niemals dein Hauptpasswort. Standardmäßig mountet das MCP-Gateway-Dateisystem-Werkzeug den Vault **read-only** (`:ro`) — selbst falls ein Client fehlerhaft schreiben wollte, verhindert das bereits der Docker-Mount, nicht erst die App-Logik.
 
-Konfigurierbar über `.env`: `PORT_VAULT_BRIDGE` (Standard `8700`) sowie `MCP_SERVERS`/`MCP_FILESYSTEM_DIRS` am `mcp`-Dienst, falls du weitere MCP-Werkzeuge oder -Verzeichnisse hinzufügen willst.
+#### Schreibzugriff für die KI (Zwei-Wege-Sync)
+
+Standardmäßig ist die Anbindung **nur lesend**: Nextcloud → lokal → MCP-Gateway. Willst du, dass die KI über das MCP-Dateisystem-Werkzeug auch Notizen anlegen/bearbeiten kann und diese Änderungen zurück nach Nextcloud fließen, brauchst du **zwei** Schalter gleichzeitig:
+
+1. In der Vault-Bridge-Oberfläche: **„Zwei-Wege-Sync aktivieren"** anhaken, dann erneut „Verbinden & synchronisieren". Intern wechselt das von `rclone sync` (Einweg) zu [`rclone bisync`](https://rclone.org/bisync/) (Zwei-Wege) — beim ersten Durchlauf in diesem Modus macht die Bridge automatisch den nötigen einmaligen `--resync`-Basislauf. Konflikte (Datei auf beiden Seiten geändert) löst rclone automatisch zugunsten der **neueren** Version, ohne Rückfrage.
+2. In der `.env`: `MCP_VAULT_MOUNT_MODE=rw` setzen, dann `docker compose -f docker-compose.rocm.yml up -d mcp` (Standard ist `ro`).
+
+> ⚠️ Nur **einen** der beiden Schalter zu setzen reicht nicht und kann zu stillem Datenverlust führen: Nur `rw` ohne Zwei-Wege-Sync heißt, die KI kann lokal schreiben, aber der nächste automatische Einweg-Sync von Nextcloud überschreibt/löscht das kommentarlos wieder. Nur Zwei-Wege-Sync ohne `rw` heißt, die KI kann trotzdem nicht schreiben (Docker blockiert es auf Mount-Ebene). Aktivier immer beide zusammen.
+
+**Bekannte Einschränkung des `mcp`-Gateway-Images:** Bei manchen Installationen registriert `hwdsl2/mcp-gateway` das `filesystem`-Werkzeug beim allerersten Start nicht automatisch, obwohl `MCP_SERVERS=fetch,filesystem` korrekt gesetzt ist (`docker logs mcp` zeigt dann nur eine „connected client for server: fetch"-Zeile, keine für `filesystem`). Prüfen mit `docker exec mcp cat /var/lib/mcp/mcp_settings.json` — fehlt dort der `filesystem`-Eintrag unter `mcpServers`, hilft ein manueller Nachtrag:
+```bash
+docker exec mcp node -e "
+const fs = require('fs');
+const path = '/var/lib/mcp/mcp_settings.json';
+const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+data.mcpServers.filesystem = { command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/vault'] };
+fs.writeFileSync(path, JSON.stringify(data, null, 2));
+"
+docker compose -f docker-compose.rocm.yml restart mcp mcpo
+```
+
+Konfigurierbar über `.env`: `PORT_VAULT_BRIDGE` (Standard `8700`), `MCP_VAULT_MOUNT_MODE` (`ro`/`rw`, Standard `ro`) sowie `MCP_SERVERS`/`MCP_FILESYSTEM_DIRS` am `mcp`-Dienst, falls du weitere MCP-Werkzeuge oder -Verzeichnisse hinzufügen willst.
 
 ### Modelle bei LiteLLM eintragen
 

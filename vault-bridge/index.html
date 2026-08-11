@@ -186,6 +186,19 @@
     <label for="interval">Sync-Intervall (Minuten)</label>
     <input id="interval" type="number" min="1" max="1440" value="60">
 
+    <label class="switch-row" style="display:flex; align-items:center; gap:10px; margin-top:16px;">
+      <input id="bisyncEnabled" type="checkbox" style="width:auto;">
+      <span>Zwei-Wege-Sync aktivieren (Schreibzugriff für die KI)</span>
+    </label>
+    <p class="hint">
+      Standardmäßig aus: Nextcloud → lokal, nur lesen. Aktiviert, fließen Änderungen in <strong>beide</strong> Richtungen —
+      auch von der KI über das MCP-Dateisystem-Werkzeug geschriebene oder gelöschte Dateien werden zurück nach Nextcloud
+      übertragen. Konflikte (Datei auf beiden Seiten geändert) löst rclone automatisch zugunsten der neueren Version.
+      Erfordert zusätzlich, dass der <code>mcp</code>-Dienst das Volume <code>:rw</code> statt <code>:ro</code> mountet
+      (<code>docker-compose.rocm.yml</code> anpassen und <code>mcp</code> neu starten) — sonst kann die KI zwar lesen,
+      aber nicht schreiben, egal was hier eingestellt ist.
+    </p>
+
     <div class="actions">
       <button id="connectBtn" type="button" class="primary">Verbinden &amp; synchronisieren</button>
     </div>
@@ -242,6 +255,9 @@
       rows.push(['Benutzer', s.username || '–']);
       rows.push(['Vault-Pfad', s.vault_path || '(gesamter Dateibereich)']);
       rows.push(['Intervall', (s.interval_minutes || 60) + ' min']);
+      rows.push(['Sync-Modus', s.bisync_enabled
+        ? ('Zwei-Wege' + (s.bisync_initialized ? '' : ' (Erst-Sync läuft…)'))
+        : 'Einweg (nur lesen)']);
       rows.push(['Letzter Sync', fmtTime(s.last_sync)]);
     }
     for (const [k, v] of rows) {
@@ -267,6 +283,7 @@
       $('username').value = s.username || '';
       $('vaultPath').value = s.vault_path || '';
       $('interval').value = s.interval_minutes || 60;
+      $('bisyncEnabled').checked = !!s.bisync_enabled;
     }
   }
 
@@ -279,6 +296,7 @@
       app_password: $('appPassword').value,
       vault_path: $('vaultPath').value.trim(),
       interval_minutes: parseInt($('interval').value, 10) || 60,
+      bisync_enabled: $('bisyncEnabled').checked,
     };
     if (!payload.url || !payload.username || !payload.app_password) {
       msg.textContent = 'Server-URL, Benutzername und App-Passwort werden benötigt.';
