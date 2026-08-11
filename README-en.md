@@ -216,7 +216,7 @@ If your vault is already synced by a **dedicated Nextcloud client** running on a
 
 **Setup:**
 
-1. Start/update the stack (`docker compose -f docker-compose.rocm.yml up -d syncthing`) — the web UI runs at `http://<server-ip>:8384`.
+1. Start/update the stack (`docker compose -f docker-compose.rocm.yml up -d syncthing`) — the web UI runs at `http://<server-ip>:8384` (or via the "Syncthing" tile on the dashboard).
 2. **Set a password immediately:** Settings → GUI → Authentication — the UI ships with **no** password by default.
 3. Install the [Syncthing client](https://syncthing.net/downloads/) on your other device (Windows/Mac/Linux) and open its web UI too.
 4. On both sides, copy the device ID under "This Device" and add it on the other device as a "Remote Device".
