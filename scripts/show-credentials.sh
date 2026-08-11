@@ -25,6 +25,7 @@ PORT_WEBUI="${PORT_WEBUI:-3001}"
 PORT_LITELLM="${PORT_LITELLM:-4000}"
 PORT_DASHBOARD="${PORT_DASHBOARD:-8600}"
 PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
+PORT_SYNCTHING_GUI="${PORT_SYNCTHING_GUI:-8384}"
 
 IP="$(ip -o -f inet addr show scope global 2>/dev/null | awk '{print $4}' | head -1 | cut -d/ -f1 || true)"
 IP="${IP:-<server-ip>}"
@@ -40,6 +41,7 @@ printf '  Dashboard      http://%s:%s\n' "$IP" "$PORT_DASHBOARD"
 printf '  Chat (WebUI)   http://%s:%s\n' "$IP" "$PORT_WEBUI"
 printf '  LiteLLM-UI     http://%s:%s/ui\n' "$IP" "$PORT_LITELLM"
 printf '  Vault-Bridge   http://%s:%s\n' "$IP" "$PORT_VAULT_BRIDGE"
+printf '  Syncthing      http://%s:%s\n' "$IP" "$PORT_SYNCTHING_GUI"
 echo
 
 printf '%sLiteLLM%s\n' "$c_bold" "$c_reset"
