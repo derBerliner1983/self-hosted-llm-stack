@@ -88,7 +88,7 @@ graph LR
     W -->|OpenAI-API| L["LiteLLM<br/>(AI-Gateway, Port 4000)"]
     W -->|OpenAPI-Werkzeuge| MO["mcpo<br/>(MCP → OpenAPI)"]
     L -->|routet zu| O["Ollama<br/>(ROCm, AMD-iGPU)"]
-    L -->|Werkzeuge| M["MCP Gateway<br/>(Dateisystem, Web, GitHub)"]
+    L -->|Werkzeuge| M["MCP Gateway<br/>(Dateisystem, Web, Zeit, GitHub)"]
     L -->|Werkzeuge| S["Code-Sandbox<br/>(run_python/run_shell)"]
     MO --> M
     MO --> S
@@ -123,7 +123,7 @@ Aktualisiert sich alle 3 Sekunden, solange das Popup offen ist.
 
 ### MCP Gateway (Werkzeuge fürs LLM)
 
-Der Stack bringt **MCP Gateway** mit — stellt Werkzeuge wie Dateisystem, Web-Fetch, GitHub, Suche und Datenbankzugriff bereit. Der Installer verdrahtet ihn automatisch mit LiteLLM (Schritt 7/8); der API-Key wird dabei automatisch erzeugt und in die `.env` geschrieben.
+Der Stack bringt **MCP Gateway** mit — stellt Werkzeuge wie Dateisystem, Web-Fetch, Zeit (Zeitzonen korrekt inkl. Sommerzeit, keine Modell-Kopfrechnung), GitHub, Suche und Datenbankzugriff bereit. Der Installer verdrahtet ihn automatisch mit LiteLLM (Schritt 7/8); der API-Key wird dabei automatisch erzeugt und in die `.env` geschrieben.
 
 ```bash
 ./scripts/wire-mcp.sh   # erneut ausführen, falls der mcp-Container neu erzeugt wurde (neuer Key)
@@ -149,7 +149,7 @@ Konfigurierbar über `.env`: `SANDBOX_IMAGE` (Basis-Image der Sandbox, Standard 
 So bindest du die Werkzeuge in Open WebUI ein:
 
 1. **Admin-Panel** (Zahnrad-Icon, dann **Einstellungen** → **Werkzeuge**, bzw. je nach Version **Workspace → Werkzeuge → Externe Werkzeug-Server**)
-2. Neuen Werkzeug-Server hinzufügen, URL: **`http://mcpo:8000/mcp_gateway`** (Dateisystem, Web, GitHub, Suche, DB)
+2. Neuen Werkzeug-Server hinzufügen, URL: **`http://mcpo:8000/mcp_gateway`** (Dateisystem, Web, Zeit, GitHub, Suche, DB)
 3. Einen zweiten hinzufügen, URL: **`http://mcpo:8000/code_sandbox`** (`run_python`, `run_shell`)
 4. Im Chat: Werkzeug-Icon unten im Eingabefeld → die gewünschten Werkzeuge für die Unterhaltung aktivieren
 
@@ -160,6 +160,16 @@ docker logs litellm | grep -i mcp   # Sieht (zusätzlich) LiteLLM selbst die MCP
 ```
 
 > **Hinweis:** Menüpfade und genaues Verhalten können sich je nach Open-WebUI-Version leicht unterscheiden (schnelllebiges Feld) — nach dem Deploy gemeinsam verifizieren, ob die Werkzeuge im Chat tatsächlich aufgerufen werden.
+
+> ⚠️ **Bekannte Einschränkung (reproduziert, Stand dieser Doku):** Bei Modellen, die über eine **LiteLLM**-Verbindung laufen, formuliert Open WebUI zwar korrekt einen Werkzeugaufruf, führt ihn aber teils nie tatsächlich aus — das rohe Aufruf-JSON landet stattdessen unverändert als sichtbarer Text in der Antwort. Über eine **direkte Ollama-Verbindung** (Admin → Einstellungen → Verbindungen → „Ollama-API") lief derselbe Aufruf im Test hingegen zuverlässig durch und wurde wirklich ausgeführt. Falls Werkzeuge bei dir nur Text statt echter Ergebnisse liefern: kurz auf eine direkte Ollama-Verbindung umschalten, um zu prüfen, ob das der Unterschied ist.
+
+#### Zeit-Werkzeug (Zeitzonen ohne Modell-Kopfrechnung)
+
+Sprachmodelle sind bei Zeitzonen-Umrechnungen erfahrungsgemäß unzuverlässig — Sommerzeit wird vergessen, die Kopfrechnung geht schief, oder es wird ganz ohne Werkzeugaufruf eine plausibel klingende, aber falsche Zeit erfunden. Deshalb bringt der Stack ein eigenes, kleines Werkzeug mit (`mcp-tools/get_time.py`, Teil des `mcp_gateway`-Servers, kein zusätzlicher Eintrag in Open WebUI nötig): Es rechnet mit Pythons `zoneinfo` (Standardbibliothek, kennt Sommer-/Winterzeit korrekt) statt das Modell raten zu lassen. Nimmt eine Liste von IANA-Zeitzonen entgegen (z. B. `Asia/Bangkok`, `Europe/Berlin`, `America/Vancouver`), damit auch Mehrfach-Anfragen („wie spät ist es in X und Y?") in einem einzigen Aufruf zuverlässig beantwortet werden können.
+
+Beispiel-Prompt: *„Nutze das Zeit-Werkzeug für Asia/Bangkok und Europe/Berlin."* Wie beim Fetch-Werkzeug hilft ein passender System-Prompt am Modell dabei, das Werkzeug auch ungefragt zu nutzen, wenn nach der Uhrzeit gefragt wird.
+
+`scripts/wire-mcp.sh` trägt `filesystem` und `time` idempotent in `mcp_settings.json` nach, falls das Image sie beim ersten Start nicht selbst registriert hat (bekannte Lücke, siehe Commit-Historie) — einfach erneut ausführen, falls `docker exec mcp cat /var/lib/mcp/mcp_settings.json` einen der beiden Einträge vermissen lässt.
 
 ### Vault-Bridge (Obsidian/Nextcloud als Wissen fürs LLM)
 

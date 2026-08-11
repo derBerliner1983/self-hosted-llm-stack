@@ -88,7 +88,7 @@ graph LR
     W -->|OpenAI API| L["LiteLLM<br/>(AI gateway, port 4000)"]
     W -->|OpenAPI tools| MO["mcpo<br/>(MCP → OpenAPI)"]
     L -->|routes to| O["Ollama<br/>(ROCm, AMD iGPU)"]
-    L -->|tools| M["MCP Gateway<br/>(filesystem, web, GitHub)"]
+    L -->|tools| M["MCP Gateway<br/>(filesystem, web, time, GitHub)"]
     L -->|tools| S["Code sandbox<br/>(run_python/run_shell)"]
     MO --> M
     MO --> S
@@ -123,7 +123,7 @@ Refreshes every 3 seconds while the popup is open.
 
 ### MCP Gateway (tools for the LLM)
 
-The stack ships **MCP Gateway** — gives you tools like filesystem, web fetch, GitHub, search, and database access. The installer wires it up with LiteLLM automatically (step 7/8); the API key is generated and written to `.env` for you.
+The stack ships **MCP Gateway** — gives you tools like filesystem, web fetch, time (timezone-correct incl. DST, no model mental math), GitHub, search, and database access. The installer wires it up with LiteLLM automatically (step 7/8); the API key is generated and written to `.env` for you.
 
 ```bash
 ./scripts/wire-mcp.sh   # re-run if the mcp container was recreated (new key)
@@ -149,7 +149,7 @@ Configurable via `.env`: `SANDBOX_IMAGE` (the sandbox's base image, default `pyt
 How to connect the tools in Open WebUI:
 
 1. **Admin panel** (gear icon, then **Settings → Tools**, or on some versions **Workspace → Tools → External Tool Servers**)
-2. Add a new tool server, URL: **`http://mcpo:8000/mcp_gateway`** (filesystem, web, GitHub, search, DB)
+2. Add a new tool server, URL: **`http://mcpo:8000/mcp_gateway`** (filesystem, web, time, GitHub, search, DB)
 3. Add a second one, URL: **`http://mcpo:8000/code_sandbox`** (`run_python`, `run_shell`)
 4. In chat: use the tool icon below the input box to enable the tools you want for that conversation
 
@@ -160,6 +160,16 @@ docker logs litellm | grep -i mcp   # does LiteLLM itself also see the MCP serve
 ```
 
 > **Note:** Exact menu paths and behavior can differ slightly by Open WebUI version (a fast-moving area) — verify together after deploy that the tools are actually invoked in chat.
+
+> ⚠️ **Known limitation (reproduced, as of this doc):** For models routed through a **LiteLLM** connection, Open WebUI correctly formulates a tool call but sometimes never actually dispatches it — the raw call JSON shows up verbatim as visible text in the reply instead. Over a **direct Ollama connection** (Admin → Settings → Connections → "Ollama API") the same call ran reliably and was actually executed in testing. If tools only ever return text instead of real results for you: try switching to a direct Ollama connection to check if that's the difference.
+
+#### Time tool (timezones without model mental math)
+
+Language models are, in practice, unreliable at timezone conversion — they forget daylight saving time, miscalculate, or invent a plausible-sounding but wrong time without ever calling a tool at all. So the stack ships its own small tool (`mcp-tools/get_time.py`, part of the `mcp_gateway` server, no extra entry needed in Open WebUI): it computes with Python's `zoneinfo` (standard library, correctly DST-aware) instead of letting the model guess. It accepts a list of IANA timezones (e.g. `Asia/Bangkok`, `Europe/Berlin`, `America/Vancouver`) so multi-part questions ("what time is it in X and Y?") can be answered reliably in a single call.
+
+Example prompt: *"Use the time tool for Asia/Bangkok and Europe/Berlin."* As with the fetch tool, a matching system prompt helps nudge the model to use it unprompted whenever asked about the time.
+
+`scripts/wire-mcp.sh` idempotently adds `filesystem` and `time` to `mcp_settings.json` if the image didn't register them on first start (a known gap, see commit history) — just re-run it if `docker exec mcp cat /var/lib/mcp/mcp_settings.json` is missing either entry.
 
 ### Vault-Bridge (Obsidian/Nextcloud as knowledge for the LLM)
 

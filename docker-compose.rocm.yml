@@ -63,7 +63,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── MCP Gateway (Werkzeuge: Dateisystem, Web-Fetch, GitHub, Suche, DB) ──────
+  # ── MCP Gateway (Werkzeuge: Dateisystem, Web-Fetch, Zeit, GitHub, Suche, DB) ─
   # Das "filesystem"-Werkzeug zeigt auf vault-data — dorthin synct vault-bridge
   # den Nextcloud/Obsidian-Vault. Sobald vault-bridge erfolgreich verbunden
   # hat, sieht dieses Werkzeug den Vault automatisch (gleiches Volume, kein
@@ -74,6 +74,11 @@ services:
   # wenn zusätzlich in der Vault-Bridge-Oberfläche "Zwei-Wege-Sync" aktiviert
   # ist - sonst überschreibt der nächste automatische Einweg-Sync von
   # Nextcloud alles, was die KI lokal geschrieben hat, kommentarlos wieder.
+  #
+  # ./mcp-tools:/opt/mcp-tools:ro bindet unser eigenes "time"-Werkzeug ein
+  # (mcp-tools/get_time.py) - siehe README, Abschnitt "Zeit-Werkzeug". Das
+  # Image selbst registriert weder "filesystem" noch "time" zuverlässig
+  # automatisch (siehe scripts/wire-mcp.sh) - beides wird dort nachgetragen.
   mcp:
     image: hwdsl2/mcp-gateway
     container_name: mcp
@@ -87,6 +92,7 @@ services:
       - mcp-data:/var/lib/mcp
       - mcp-shared:/var/lib/mcp-shared
       - vault-data:/vault:${MCP_VAULT_MOUNT_MODE:-ro}
+      - ./mcp-tools:/opt/mcp-tools:ro
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:3000/health"]
       interval: 15s
