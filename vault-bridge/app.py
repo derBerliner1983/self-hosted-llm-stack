@@ -30,8 +30,11 @@ Zwei Sync-Modi (per Umschalter im UI, Standard: Einweg):
                               der mcp-Container das Volume :rw statt :ro
                               mountet (siehe docker-compose.rocm.yml).
                               Konflikte (Datei auf beiden Seiten geändert)
-                              löst rclone automatisch zugunsten der neueren
-                              Version (--conflict-resolve newer).
+                              behandelt rclone in dieser (älteren, per apt
+                              installierten) Version über sein Standard-
+                              verhalten: beide Versionen bleiben erhalten,
+                              umbenannt mit .path1/.path2-Suffix - nichts
+                              wird kommentarlos überschrieben.
 
 Kein Framework, keine Zusatzabhängigkeiten außer dem rclone-Binary (im
 Dockerfile installiert) — bewusst im gleichen minimalistischen Stil wie
@@ -173,7 +176,19 @@ def _write_rclone_conf(url, username, obscured_password):
 
 
 def _sync_command(bisync_enabled, bisync_initialized):
-    """rclone-Kommandozeile für den aktuellen Sync-Modus zusammenbauen."""
+    """rclone-Kommandozeile für den aktuellen Sync-Modus zusammenbauen.
+
+    Wichtig: Das apt-Paket "rclone" (Dockerfile) ist oft älter als die
+    aktuelle rclone-Doku im Netz. `rclone bisync --help` in diesem Image
+    kennt NUR: --check-access, --check-filename, --check-sync,
+    --filters-file, --force, --localtime, --no-cleanup, --remove-empty-dirs,
+    --resync, --workdir. Neuere Flags wie --fast-list, --conflict-resolve,
+    --resilient, --recover, --max-lock existieren hier nicht und lassen
+    rclone sofort mit "unknown flag" abbrechen - deshalb bewusst nicht
+    verwendet. Konfliktbehandlung läuft in dieser Version über das
+    eingebaute Standardverhalten (beide Versionen werden umbenannt statt
+    etwas kommentarlos zu überschreiben), nicht über --conflict-resolve.
+    """
     if not bisync_enabled:
         return [
             "rclone", "sync", f"{RCLONE_REMOTE}:", VAULT_DIR,
@@ -186,15 +201,11 @@ def _sync_command(bisync_enabled, bisync_initialized):
         "rclone", "bisync", f"{RCLONE_REMOTE}:", VAULT_DIR,
         "--config", RCLONE_CONF,
         "--workdir", BISYNC_WORKDIR,
-        "--fast-list",
-        "--create-empty-src-dirs",
     ]
     if not bisync_initialized:
         # Einmaliger Baseline-Lauf - danach NIE wieder --resync mitgeben,
         # sonst würde jede Seite die andere blind überschreiben.
         cmd.append("--resync")
-    else:
-        cmd += ["--resilient", "--recover", "--max-lock", "2m", "--conflict-resolve", "newer"]
     return cmd
 
 
