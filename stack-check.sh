@@ -61,6 +61,9 @@ pass() { echo -e "  ${GREEN}✓${NC} $1"; PASS=$((PASS + 1)); }
 fail() { echo -e "  ${RED}✗${NC} $1"; FAIL=$((FAIL + 1)); }
 warn() { echo -e "  ${YELLOW}!${NC} $1"; WARN=$((WARN + 1)); }
 info() { echo -e "${CYAN}▶${NC} $1"; }
+# Informational, non-counted note — for things that are expected/by-design
+# on a given image variant rather than an actual problem to fix.
+note() { echo -e "  ${CYAN}·${NC} $1"; }
 
 # Detect running containers by image name (works even with custom container names).
 container_for_image() {
@@ -124,6 +127,33 @@ service_key() {
   printf '%s' "$key"
 }
 
+# List Ollama model names, one per line. Supports both the hwdsl2/ollama-server
+# wrapper image (ollama_manage --listmodels) used by docker-compose.yml and the
+# vanilla ollama/ollama image (plain 'ollama list') used by
+# docker-compose.rocm.yml — whichever command actually exists wins.
+ollama_models() {
+  local container="$1"
+  local out
+  out=$("$ENGINE" exec "$container" ollama_manage --listmodels 2>/dev/null \
+    | awk 'NF >= 4 && $2 ~ /^[a-f0-9]+$/ { print $1 }') || out=""
+  if [ -z "$out" ]; then
+    out=$("$ENGINE" exec "$container" ollama list 2>/dev/null | tail -n +2 | awk 'NF { print $1 }') || out=""
+  fi
+  printf '%s' "$out"
+}
+
+# Source .env (if present) so checks can fall back to the configured
+# secrets directly when a service image has no in-container 'show key'
+# command (e.g. the vanilla ollama/litellm/postgres images used by
+# docker-compose.rocm.yml, as opposed to the hwdsl2/*-server wrapper images).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$SCRIPT_DIR/.env"
+  set +a
+fi
+
 echo ""
 echo "Self-Hosted AI Stack — Health Check"
 echo "==============================="
@@ -138,19 +168,23 @@ if [ -n "$OLLAMA" ]; then
   pass "Container running"
 
   # Check if at least one model is pulled
-  MODEL_COUNT=$("$ENGINE" exec "$OLLAMA" ollama_manage --listmodels | awk 'NF >= 4 && $2 ~ /^[a-f0-9]+$/ { print $1 }' | wc -l | tr -d ' ') || MODEL_COUNT=0
+  MODEL_LIST=$(ollama_models "$OLLAMA")
+  MODEL_COUNT=$(printf '%s\n' "$MODEL_LIST" | grep -c . 2>/dev/null) || MODEL_COUNT=0
   if [ "$MODEL_COUNT" -gt 0 ]; then
-    MODELS=$("$ENGINE" exec "$OLLAMA" ollama_manage --listmodels | awk 'NF >= 4 && $2 ~ /^[a-f0-9]+$/ { print $1 }' | paste -sd',' - | sed 's/,/, /g')
+    MODELS=$(printf '%s\n' "$MODEL_LIST" | paste -sd',' - | sed 's/,/, /g')
     pass "Models available ($MODEL_COUNT): $MODELS"
   else
-    fail "No models pulled — run: $ENGINE exec $OLLAMA ollama_manage --pull llama3.2:3b"
+    fail "No models pulled — run: $ENGINE exec $OLLAMA ollama pull llama3.2:3b"
   fi
 
-  # Check API key exists
+  # Check API key exists (hwdsl2/ollama-server only — the vanilla
+  # ollama/ollama image used by docker-compose.rocm.yml has no built-in
+  # auth at all; access is controlled at the network layer / via LiteLLM
+  # in front of it, not a per-service key).
   if "$ENGINE" exec "$OLLAMA" test -f /var/lib/ollama/.api_key 2>/dev/null; then
     pass "API key generated"
   else
-    warn "API key file not found"
+    note "No built-in Ollama API key (expected for the vanilla ollama/ollama image)"
   fi
 else
   info "Ollama — not running (skipped)"
@@ -185,8 +219,16 @@ if [ -n "$DB" ]; then
     else
       fail "Database password secret is empty"
     fi
+  elif [ -n "${POSTGRES_PASSWORD:-}" ]; then
+    # pgvector/pgvector (docker-compose.rocm.yml / docker-compose.yml) takes
+    # its password from POSTGRES_PASSWORD in .env, not a mounted secret file.
+    if [ "$POSTGRES_PASSWORD" = "litellm" ]; then
+      warn "Database uses the insecure default password 'litellm' — set POSTGRES_PASSWORD in .env"
+    else
+      pass "Database password configured (.env)"
+    fi
   else
-    warn "Database password secret not mounted (older stack or custom database configuration)"
+    warn "No database password found (neither a mounted secret file nor POSTGRES_PASSWORD in .env)"
   fi
 else
   info "PostgreSQL — not running (skipped)"
@@ -209,24 +251,41 @@ if [ -n "$LITELLM" ]; then
     fail "Health endpoint not responding at http://localhost:4000/health/liveliness"
   fi
 
-  # Check API key exists
+  # Check API key exists. hwdsl2/litellm-server writes it to a file; the
+  # vanilla ghcr.io/berriai/litellm image (docker-compose.rocm.yml) has no
+  # such file — the key only lives in .env as LITELLM_MASTER_KEY.
   if "$ENGINE" exec "$LITELLM" test -f /etc/litellm/.master_key 2>/dev/null; then
     pass "API key generated"
+  elif [ -n "${LITELLM_MASTER_KEY:-}" ]; then
+    pass "Master key configured (.env)"
   else
-    warn "API key file not found"
+    warn "No LITELLM_MASTER_KEY found (neither /etc/litellm/.master_key nor .env)"
   fi
 
+  # Check database integration. hwdsl2/litellm-server drops a marker file;
+  # the vanilla image reports it live via GET /health/readiness instead
+  # (db_initialized: true/false).
   if "$ENGINE" exec "$LITELLM" test -f /etc/litellm/.db_configured 2>/dev/null; then
     pass "Database integration configured"
   else
-    warn "Database integration marker not found — run 'docker compose pull litellm && docker compose up -d litellm' if you recently updated the stack"
+    READINESS=$(curl -sf --max-time 10 "http://localhost:4000/health/readiness" 2>/dev/null) || READINESS=""
+    if printf '%s' "$READINESS" | grep -q '"db_initialized"[[:space:]]*:[[:space:]]*true'; then
+      pass "Database integration configured (db_initialized)"
+    elif [ -n "$READINESS" ]; then
+      warn "Database not initialized according to /health/readiness — check DATABASE_URL / Postgres"
+    else
+      warn "Could not query /health/readiness — run 'docker compose pull litellm && docker compose up -d litellm' if you recently updated the stack"
+    fi
   fi
 
   # If Ollama is running and has models, test a routing check
   if [ -n "$OLLAMA" ] && [ "$MODEL_COUNT" -gt 0 ]; then
     LITELLM_KEY=$("$ENGINE" exec "$LITELLM" litellm_manage --showkey 2>/dev/null | sed 's/^ //' | grep '^sk-' | head -1) || LITELLM_KEY=""
+    if [ -z "$LITELLM_KEY" ]; then
+      LITELLM_KEY="${LITELLM_MASTER_KEY:-}"
+    fi
     if [ -n "$LITELLM_KEY" ]; then
-      FIRST_MODEL=$("$ENGINE" exec "$OLLAMA" ollama_manage --listmodels | awk 'NF >= 4 && $2 ~ /^[a-f0-9]+$/ { print $1 }' | head -1)
+      FIRST_MODEL=$(printf '%s\n' "$MODEL_LIST" | head -1)
       echo -e "  ${CYAN}…${NC} Testing LLM routing (please wait)..."
       if http_post_ok "http://localhost:4000/v1/chat/completions" \
         -H "Authorization: Bearer $LITELLM_KEY" \
@@ -292,17 +351,29 @@ if [ -n "$WHISPER" ]; then
     warn "API key not configured (existing no-auth install or explicit disable)"
   fi
 
-  # Check if the transcription endpoint is reachable (GET or OPTIONS)
+  # onerahmet/openai-whisper-asr-webservice (docker-compose.rocm.yml) has no
+  # /health or /v1/models routes at all — it serves /asr, /detect-language,
+  # /get-srt, /get-vtt, and Swagger docs at /docs ('/' 307-redirects there).
+  # Check /docs as a fallback so this still passes on that image while
+  # staying accurate for hwdsl2/whisper-server, which does have /health
+  # and /v1/models.
+  WHISPER_DOCS_OK=0
+  http_ok "http://localhost:9000/docs" && WHISPER_DOCS_OK=1
+
   if http_ok "http://localhost:9000/health" || http_ok "http://localhost:9000/"; then
     pass "Service responds"
+  elif [ "$WHISPER_DOCS_OK" -eq 1 ]; then
+    pass "Service responds (no /health route on this image — verified via /docs)"
   else
     warn "Could not verify health endpoint (service may still work)"
   fi
 
   if http_ok "http://localhost:9000/v1/models" "${WHISPER_CURL_ARGS[@]}"; then
     pass "Models endpoint responds"
+  elif [ "$WHISPER_DOCS_OK" -eq 1 ]; then
+    note "No OpenAI-style /v1/models on this image — it exposes /asr, /detect-language, /get-srt, /get-vtt instead"
   else
-    fail "Models endpoint not responding at http://localhost:9000/v1/models"
+    fail "Neither /v1/models nor /docs responded — Whisper looks unreachable at http://localhost:9000"
   fi
 else
   info "Whisper STT — not running (skipped)"
