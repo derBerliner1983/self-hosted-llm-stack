@@ -210,6 +210,22 @@ docker compose -f docker-compose.rocm.yml restart mcp mcpo
 
 Configurable via `.env`: `PORT_VAULT_BRIDGE` (default `8700`), `MCP_VAULT_MOUNT_MODE` (`ro`/`rw`, default `ro`), plus `MCP_SERVERS`/`MCP_FILESYSTEM_DIRS` on the `mcp` service if you want to add further MCP tools or directories.
 
+### Syncthing (alternative to Vault-Bridge)
+
+If your vault is already synced by a **dedicated Nextcloud client** running on another device (e.g. the official Windows desktop client), that client and Vault-Bridge can get in each other's way — two independent two-way sync engines operating on the same files lead to locks, conflicts, and aborted sync runs. [Syncthing](https://syncthing.net/) sidesteps this by syncing **directly** between your devices, with no Nextcloud detour at all — and it handles conflicts safely: for a file changed on both sides, it **never** silently overwrites, but instead creates a second file named `.sync-conflict-<timestamp>-<device>`.
+
+**Setup:**
+
+1. Start/update the stack (`docker compose -f docker-compose.rocm.yml up -d syncthing`) — the web UI runs at `http://<server-ip>:8384`.
+2. **Set a password immediately:** Settings → GUI → Authentication — the UI ships with **no** password by default.
+3. Install the [Syncthing client](https://syncthing.net/downloads/) on your other device (Windows/Mac/Linux) and open its web UI too.
+4. On both sides, copy the device ID under "This Device" and add it on the other device as a "Remote Device".
+5. On the server, share a new folder pointing at `/var/syncthing/vault` (the same `vault-data` volume the MCP Gateway filesystem tool also sees) — accept it on the other device and pick the local target folder there (e.g. your existing Obsidian vault folder).
+
+> ⚠️ Use **only one** of the two (Vault-Bridge **or** Syncthing) for the same folder — never both at once, for the same reason a Nextcloud client + Vault-Bridge got in each other's way. If you switch to Syncthing: click "Disconnect" in the Vault-Bridge UI so it stops touching the same folder.
+
+Configurable via `.env`: `PORT_SYNCTHING_GUI` (default `8384`). The sync/discovery ports (22000 tcp+udp, 21027/udp) are fixed and are opened by `install.sh` for the LAN only regardless of firewall mode (no reason to expose them publicly).
+
 ### Register models with LiteLLM
 
 New models get registered with LiteLLM **automatically** — whether you pull them via the [dashboard's model manager](#dashboard) or directly with `docker exec ollama ollama pull …`. The dashboard reconciles in the background roughly every 60 seconds, registering any installed Ollama model LiteLLM doesn't know yet under `ollama/<model>` (idempotent — already-registered ones are skipped), and triggers an immediate sync right after a dashboard-initiated download instead of waiting for the next interval. Status ("✓ auto-synced with LiteLLM …") is shown in the dashboard's "Load models" popup.

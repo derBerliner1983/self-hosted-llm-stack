@@ -35,6 +35,7 @@ PORT_WEBUI="${PORT_WEBUI:-3001}"
 PORT_LITELLM="${PORT_LITELLM:-4000}"
 PORT_DASHBOARD="${PORT_DASHBOARD:-8600}"
 PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
+PORT_SYNCTHING_GUI="${PORT_SYNCTHING_GUI:-8384}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
@@ -412,16 +413,28 @@ else
     fi
     # Zusätzlich, falls vorhanden, die Konfigdatei absichern (harmlos, wenn sie fehlt).
     [ -f /etc/default/ufw ] && $SUDO sed -i 's/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw 2>/dev/null || true
+    # Syncthing braucht zusätzlich zur GUI (tcp, wie die anderen Web-Oberflächen
+    # unten) den Sync-Port 22000 (tcp+udp) und die lokale Geräte-Erkennung
+    # 21027/udp - beides muss deine anderen Geräte (Windows/Mac/Handy) im LAN
+    # erreichen können, sonst pairt Syncthing nicht. Immer LAN-only, auch im
+    # "open"-Modus - dafür gibt's keinen sinnvollen Grund, das öffentlich zu
+    # exponieren.
+    for p in 22000; do
+      $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto tcp >/dev/null 2>&1 || true
+      $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto udp >/dev/null 2>&1 || true
+    done
+    $SUDO ufw allow from "$LAN_SUBNET" to any port 21027 proto udp >/dev/null 2>&1 || true
+
     if [ "$FIREWALL_MODE" = "lan" ]; then
-      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE"; do
+      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI"; do
         $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto tcp >/dev/null 2>&1 || true
       done
-      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE} nur aus ${LAN_SUBNET}."
+      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI} nur aus ${LAN_SUBNET} (Syncthing-Sync/-Erkennung immer nur LAN)."
     else
-      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE"; do
+      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI"; do
         $SUDO ufw allow "$p"/tcp >/dev/null 2>&1 || true
       done
-      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE} für ALLE offen (nur mit HTTPS davor empfohlen)."
+      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI} für ALLE offen (nur mit HTTPS davor empfohlen). Syncthing-Sync/-Erkennung bleibt LAN-only."
     fi
     $SUDO ufw --force enable >/dev/null 2>&1 || true
   else
@@ -490,6 +503,7 @@ PORT_OLLAMA=11434
 PORT_WHISPER=9000
 PORT_EMBEDDINGS=8000
 PORT_VAULT_BRIDGE=8700
+PORT_SYNCTHING_GUI=8384
 
 # Code-Sandbox (run_python/run_shell fürs LLM; Wegwerf-Container pro Aufruf,
 # siehe README "Code-Sandbox"). SANDBOX_NETWORK=none = kein Internetzugriff
@@ -508,6 +522,11 @@ SANDBOX_NETWORK=none
 # Gateway-Werkzeuge aktiv sind und welche Verzeichnisse sie sehen.
 MCP_SERVERS=fetch,filesystem
 MCP_FILESYSTEM_DIRS=/vault
+
+# Syncthing (Alternative zur Vault-Bridge für den Obsidian-Vault-Sync, siehe
+# README "Syncthing") - läuft direkt zwischen deinen Geräten, ohne Nextcloud
+# als Umweg. Nutze nur EINEN der beiden (Vault-Bridge ODER Syncthing) für
+# denselben Ordner gleichzeitig, sonst geraten sich beide in die Quere.
 
 # Secrets
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

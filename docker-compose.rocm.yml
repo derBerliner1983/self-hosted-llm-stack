@@ -127,6 +127,45 @@ services:
       start_period: 20s
       retries: 3
 
+  # ── Syncthing (Obsidian-Vault direkt Windows/Mac/Linux <-> MCP-Dateisystem) ──
+  # Alternative zur Vault-Bridge (Nextcloud+rclone bisync) für den Vault-Sync:
+  # Läuft direkt zwischen deinen Geräten, ohne Nextcloud als Umweg - kein
+  # Konflikt mehr mit einem parallel laufenden Nextcloud-Client auf demselben
+  # Ordner. Teilt sich dasselbe vault-data-Volume wie die Vault-Bridge, damit
+  # das MCP-Gateway-Dateisystem-Werkzeug ohne Änderung weiter funktioniert -
+  # nutze nur eins von beiden gleichzeitig für denselben Ordner (siehe README,
+  # Abschnitt "Syncthing").
+  #
+  # ⚠️  Web-Oberfläche (PORT_SYNCTHING_GUI) hat standardmäßig KEIN Passwort -
+  #     nach dem ersten Start sofort unter Einstellungen -> GUI eins setzen.
+  #     22000 (Sync) und 21027/udp (lokale Geräte-Erkennung im LAN) müssen für
+  #     deine anderen Geräte erreichbar sein - install.sh öffnet das mit.
+  syncthing:
+    image: syncthing/syncthing
+    container_name: syncthing
+    restart: always
+    hostname: ai-server
+    environment:
+      # root, damit Syncthing dieselben (root-eigenen) Dateien in vault-data
+      # lesen/schreiben kann wie mcp/vault-bridge - Standard des Images wäre
+      # UID/GID 1000, das hier keine Rechte auf dem geteilten Volume hätte.
+      - PUID=0
+      - PGID=0
+    volumes:
+      - syncthing-config:/var/syncthing/config
+      - vault-data:/var/syncthing/vault
+    ports:
+      - "${PORT_SYNCTHING_GUI:-8384}:8384/tcp"
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+      - "21027:21027/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fkLsS -m 2 127.0.0.1:8384/rest/noauth/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
   # ── Code-Sandbox (MCP-Werkzeuge: run_python/run_shell in Wegwerf-Containern) ─
   # ⚠️  Braucht Zugriff auf den Docker-Socket, um pro Ausführung einen frischen,
   #     isolierten Container zu starten und danach zu löschen (kein Netzwerk,
@@ -325,3 +364,5 @@ volumes:
     name: vault-data
   vault-bridge-data:
     name: vault-bridge-data
+  syncthing-config:
+    name: syncthing-config

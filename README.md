@@ -210,6 +210,22 @@ docker compose -f docker-compose.rocm.yml restart mcp mcpo
 
 Konfigurierbar über `.env`: `PORT_VAULT_BRIDGE` (Standard `8700`), `MCP_VAULT_MOUNT_MODE` (`ro`/`rw`, Standard `ro`) sowie `MCP_SERVERS`/`MCP_FILESYSTEM_DIRS` am `mcp`-Dienst, falls du weitere MCP-Werkzeuge oder -Verzeichnisse hinzufügen willst.
 
+### Syncthing (Alternative zur Vault-Bridge)
+
+Läuft dein Vault schon über einen **eigenen Nextcloud-Client** auf einem anderen Gerät (z. B. dem offiziellen Windows-Desktop-Client), können sich der und die Vault-Bridge gegenseitig in die Quere kommen — zwei unabhängige Zwei-Wege-Sync-Systeme auf denselben Dateien führen zu Sperren, Konflikten und abgebrochenen Sync-Läufen. [Syncthing](https://syncthing.net/) löst das, indem es **direkt** zwischen deinen Geräten synct, ganz ohne Nextcloud als Umweg — und behandelt Konflikte sicher: Bei einer Datei, die auf beiden Seiten geändert wurde, wird **nie** stillschweigend überschrieben, sondern eine zweite Datei mit `.sync-conflict-<Zeitstempel>-<Gerät>` im Namen angelegt.
+
+**Einrichten:**
+
+1. Stack starten/aktualisieren (`docker compose -f docker-compose.rocm.yml up -d syncthing`) — die Web-Oberfläche läuft unter `http://<server-ip>:8384`.
+2. **Sofort ein Passwort setzen:** Einstellungen → GUI → Authentifizierung — die Oberfläche hat standardmäßig **kein** Passwort.
+3. [Syncthing-Client](https://syncthing.net/downloads/) auf deinem anderen Gerät (Windows/Mac/Linux) installieren, dort ebenfalls die Web-Oberfläche öffnen.
+4. Auf beiden Seiten unter „Diese Gerät" die Geräte-ID kopieren und beim jeweils anderen Gerät als „Remote-Gerät hinzufügen" eintragen.
+5. Auf dem Server einen neuen Ordner freigeben, der auf `/var/syncthing/vault` zeigt (dasselbe `vault-data`-Volume, das auch das MCP-Gateway-Dateisystem-Werkzeug sieht) — beim anderen Gerät annehmen und dabei den lokalen Zielordner auswählen (z. B. deinen bestehenden Obsidian-Vault-Ordner).
+
+> ⚠️ Nutze **immer nur eins** von beiden (Vault-Bridge **oder** Syncthing) für denselben Ordner — niemals gleichzeitig, aus demselben Grund, aus dem Nextcloud-Client + Vault-Bridge sich in die Quere kamen. Falls du auf Syncthing wechselst: in der Vault-Bridge-Oberfläche „Trennen" klicken, damit sie aufhört, denselben Ordner anzufassen.
+
+Konfigurierbar über `.env`: `PORT_SYNCTHING_GUI` (Standard `8384`). Die Sync-/Erkennungs-Ports (22000 tcp+udp, 21027/udp) sind fest und werden von `install.sh` unabhängig vom Firewall-Modus nur fürs LAN geöffnet (kein Grund, sie öffentlich zu exponieren).
+
 ### Modelle bei LiteLLM eintragen
 
 Neue Modelle werden **automatisch** bei LiteLLM registriert — egal ob du sie über die [Dashboard-Modellverwaltung](#dashboard) lädst oder direkt per `docker exec ollama ollama pull …`. Das Dashboard gleicht dafür im Hintergrund alle ~60 Sekunden ab, welche installierten Ollama-Modelle LiteLLM noch nicht kennt, trägt sie unter `ollama/<modell>` ein (idempotent — bereits vorhandene werden übersprungen) und stößt nach einem über die Dashboard-Oberfläche gestarteten Download zusätzlich sofort einen Abgleich an, statt auf das nächste Intervall zu warten. Der Status („✓ Automatisch mit LiteLLM synchronisiert …") steht im „Modelle laden"-Popup des Dashboards.
