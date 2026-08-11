@@ -330,6 +330,7 @@ services:
       - PORT_EMBEDDINGS=${PORT_EMBEDDINGS:-8000}
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
       - PORT_VAULT_BRIDGE=${PORT_VAULT_BRIDGE:-8700}
+      - PORT_SYNCTHING_GUI=${PORT_SYNCTHING_GUI:-8384}
     volumes:
       - ./dashboard:/app:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
