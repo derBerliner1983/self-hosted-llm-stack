@@ -121,6 +121,14 @@ SERVICES = [
         "port": int(os.environ.get("PORT_VAULT_BRIDGE", "8700")),
         "path": "/",
     },
+    {
+        "container": "syncthing",
+        "label": "Syncthing",
+        "desc": "Zwei-Wege-Sync · Alternative zur Vault-Bridge",
+        "icon": "🔄",
+        "port": int(os.environ.get("PORT_SYNCTHING_GUI", "8384")),
+        "path": "/",
+    },
 ]
 
 
