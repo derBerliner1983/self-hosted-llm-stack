@@ -36,6 +36,7 @@ PORT_LITELLM="${PORT_LITELLM:-4000}"
 PORT_DASHBOARD="${PORT_DASHBOARD:-8600}"
 PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
 PORT_SYNCTHING_GUI="${PORT_SYNCTHING_GUI:-8384}"
+PORT_MCPO="${PORT_MCPO:-8800}"
 MCP_VAULT_MOUNT_MODE="${MCP_VAULT_MOUNT_MODE:-ro}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -426,16 +427,23 @@ else
     done
     $SUDO ufw allow from "$LAN_SUBNET" to any port 21027 proto udp >/dev/null 2>&1 || true
 
+    # mcpo (Werkzeug-Übersicht/Swagger) IMMER nur fürs LAN, unabhängig vom
+    # Firewall-Modus: mcpo läuft ohne Authentifizierung, und über seine
+    # Werkzeuge (filesystem-write_file & Co.) käme man an den Vault. Es gibt
+    # keinen Grund, das öffentlich zu exponieren - Open WebUI erreicht mcpo
+    # ohnehin containerintern, ganz ohne veröffentlichten Port.
+    $SUDO ufw allow from "$LAN_SUBNET" to any port "$PORT_MCPO" proto tcp >/dev/null 2>&1 || true
+
     if [ "$FIREWALL_MODE" = "lan" ]; then
       for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI"; do
         $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto tcp >/dev/null 2>&1 || true
       done
-      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI} nur aus ${LAN_SUBNET} (Syncthing-Sync/-Erkennung immer nur LAN)."
+      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI} nur aus ${LAN_SUBNET} (Syncthing-Sync/-Erkennung und mcpo immer nur LAN)."
     else
       for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI"; do
         $SUDO ufw allow "$p"/tcp >/dev/null 2>&1 || true
       done
-      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI} für ALLE offen (nur mit HTTPS davor empfohlen). Syncthing-Sync/-Erkennung bleibt LAN-only."
+      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI} für ALLE offen (nur mit HTTPS davor empfohlen). Syncthing-Sync/-Erkennung und mcpo bleiben LAN-only."
     fi
     $SUDO ufw --force enable >/dev/null 2>&1 || true
   else
@@ -505,6 +513,10 @@ PORT_WHISPER=9000
 PORT_EMBEDDINGS=8000
 PORT_VAULT_BRIDGE=8700
 PORT_SYNCTHING_GUI=8384
+# mcpo-Weboberfläche: zeigt unter /mcp_gateway/docs alle Werkzeuge, die den
+# Modellen zur Verfügung stehen. Wird nur fürs LAN freigegeben (mcpo hat keine
+# eigene Authentifizierung), Open WebUI erreicht mcpo containerintern.
+PORT_MCPO=${PORT_MCPO}
 
 # Code-Sandbox (run_python/run_shell fürs LLM; Wegwerf-Container pro Aufruf,
 # siehe README "Code-Sandbox"). SANDBOX_NETWORK=none = kein Internetzugriff
