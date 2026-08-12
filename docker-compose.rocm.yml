@@ -207,6 +207,14 @@ services:
     restart: always
     volumes:
       - ./mcpo/config.json:/config.json:ro
+    # Port veröffentlicht, damit die mitgelieferte Swagger-Oberfläche
+    # (/mcp_gateway/docs) im Browser erreichbar ist: dort siehst du alle
+    # Werkzeuge, die den Modellen tatsächlich zur Verfügung stehen, mit
+    # Parametern - und kannst sie direkt ausprobieren, ohne ein Modell
+    # dazwischen. Nützlich, wenn ein Modell behauptet, ein Werkzeug gebe es
+    # nicht. install.sh gibt den Port nur fürs LAN frei.
+    ports:
+      - "${PORT_MCPO:-8800}:8000/tcp"
     command: ["--config", "/config.json", "--host", "0.0.0.0", "--port", "8000"]
     depends_on:
       mcp:
@@ -331,6 +339,7 @@ services:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
       - PORT_VAULT_BRIDGE=${PORT_VAULT_BRIDGE:-8700}
       - PORT_SYNCTHING_GUI=${PORT_SYNCTHING_GUI:-8384}
+      - PORT_MCPO=${PORT_MCPO:-8800}
     volumes:
       - ./dashboard:/app:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

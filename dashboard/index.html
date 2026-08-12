@@ -210,6 +210,15 @@
     cursor: pointer; flex: none; transition: border-color .15s ease, background .15s ease;
   }
   .delete-btn:hover { border-color: var(--offline); background: color-mix(in srgb, var(--offline) 10%, transparent); }
+  /* Entladen ist harmlos/umkehrbar (Modell bleibt installiert) — deshalb
+     neutral statt in der Warnfarbe des Löschen-Knopfs. */
+  .unload-btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
+    font: inherit; font-size: 11.5px; border-radius: 6px; padding: 3px 9px;
+    cursor: pointer; flex: none; transition: border-color .15s ease, color .15s ease;
+  }
+  .unload-btn:hover { border-color: var(--text-muted); color: var(--text); }
+  .unload-btn[disabled] { opacity: .5; cursor: default; }
 
   .model-meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12.5px; }
   .model-meta dt { color: var(--text-muted); }
@@ -402,7 +411,10 @@
         ? `zuletzt aktiv vor ${m.seconds_since_activity} Sek`
         : 'keine Aktivität erfasst';
     return `<div class="model-row">
-      <div class="model-name">${esc(m.name)}</div>
+      <div class="model-row-top">
+        <span class="model-name">${esc(m.name)}</span>
+        <button class="unload-btn" data-model="${esc(m.name)}">Jetzt entladen</button>
+      </div>
       <dl class="model-meta">
         <dt>Größe</dt><dd>${esc(m.size)}</dd>
         <dt>Im GPU-Speicher</dt><dd>${vram}</dd>
@@ -510,6 +522,23 @@
       .then(r => r.json())
       .then(res => { if (!res.ok) alert(`Löschen fehlgeschlagen: ${res.error}`); pollOllama(); })
       .catch(() => alert('Löschen fehlgeschlagen (Netzwerkfehler).'));
+  });
+
+  ollamaLoaded.addEventListener('click', (e) => {
+    const btn = e.target.closest('.unload-btn');
+    if (!btn) return;
+    const name = btn.dataset.model;
+    // Kein confirm(): Entladen ist ungefährlich — das Modell bleibt installiert
+    // und wird beim nächsten Aufruf einfach neu in den Speicher geladen.
+    btn.disabled = true;
+    btn.textContent = 'Entlade …';
+    fetch('/api/ollama/unload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: name }),
+    })
+      .then(r => r.json())
+      .then(res => { if (!res.ok) alert(`Entladen fehlgeschlagen: ${res.error}`); pollOllama(); })
+      .catch(() => { alert('Entladen fehlgeschlagen (Netzwerkfehler).'); pollOllama(); });
   });
 
   function openOllamaModal() {

@@ -100,10 +100,12 @@ SERVICES = [
     {
         "container": "mcpo",
         "label": "mcpo",
-        "desc": "MCP → OpenAPI, für Open WebUI",
+        "desc": "MCP → OpenAPI · Werkzeug-Übersicht",
         "icon": "🔌",
-        "port": None,
-        "path": None,
+        "port": int(os.environ.get("PORT_MCPO", "8800")),
+        # Direkt auf die Werkzeugliste des MCP Gateway statt auf die
+        # Startseite: das ist die Ansicht, die man tatsächlich sehen will.
+        "path": "/mcp_gateway/docs",
     },
     {
         "container": "litellm-db",
@@ -410,6 +412,32 @@ def delete_ollama_model(name):
         return {"ok": False, "error": str(exc)}
 
 
+def unload_ollama_model(name):
+    """Modell sofort aus dem (V)RAM werfen, ohne auf den Ablauf-Timer zu warten.
+
+    Ollama entlädt ein Modell, wenn man einen leeren Generierungs-Request mit
+    keep_alive=0 schickt — es gibt dafür keinen eigenen "unload"-Endpunkt.
+    """
+    try:
+        payload = json.dumps({"model": name, "keep_alive": 0}).encode()
+        req = urllib.request.Request(
+            f"{OLLAMA_INTERNAL_URL}/api/generate", data=payload,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30):
+            # Beim Entladen fällt der Ablauf-Timer weg; den gemerkten Stand
+            # mit aufräumen, damit die nächste /api/ps-Runde nicht fälschlich
+            # "gerade aktiv" meldet, wenn das Modell später neu geladen wird.
+            _last_expires_at.pop(name, None)
+            _last_activity_ts.pop(name, None)
+            return {"ok": True}
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        return {"ok": False, "error": f"{exc.code}: {body or exc.reason}"}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+
 # ── Automatische LiteLLM-Registrierung (WebUI/Claude/... "verdrahten") ─────
 #
 # Damit jedes bei Ollama installierte Modell automatisch bei LiteLLM auftaucht
@@ -577,6 +605,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(400, json.dumps({"ok": False, "error": "Kein Modellname angegeben."}), "application/json")
                 return
             result = delete_ollama_model(name)
+            self._send(200 if result["ok"] else 400, json.dumps(result), "application/json")
+            return
+
+        if self.path == "/api/ollama/unload":
+            if not name:
+                self._send(400, json.dumps({"ok": False, "error": "Kein Modellname angegeben."}), "application/json")
+                return
+            result = unload_ollama_model(name)
             self._send(200 if result["ok"] else 400, json.dumps(result), "application/json")
             return
 

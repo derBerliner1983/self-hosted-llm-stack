@@ -115,7 +115,8 @@ The stack ships a small, self-contained **modern status dashboard** (`dashboard/
 **Ollama details & model management:** the Ollama tile is twice as wide as the others and has a **"Details"** button opening a popup with:
 
 - **Load models:** a text field for an Ollama library name (`llama3.1:8b`) or a Hugging Face reference (`hf.co/user/repo:tag`) — Ollama accepts both through the same mechanism. **Multiple downloads at once** are supported, each with its own live progress bar.
-- **Installed models:** a list of every downloaded model with its size, a "Delete" button (with a confirmation prompt), and — if currently loaded in RAM — an activity indicator and time remaining until auto-unload (Ollama has no direct "is a request running right now" API; the dashboard approximates this by detecting when a model's keep-alive time gets extended by a fresh request).
+- **Currently in memory:** the models loaded right now with their (V)RAM footprint, an activity indicator and the time remaining until auto-unload (Ollama has no direct "is a request running right now" API; the dashboard approximates this by detecting when a model's keep-alive time gets extended by a fresh request). Each one has an **"Unload now"** button that frees the memory immediately instead of waiting for the expiry timer — handy when a model is stuck or you need the VRAM for another one. The model stays installed and is simply reloaded on the next call (hence no confirmation prompt).
+- **Installed models:** a list of every downloaded model with its size and a "Delete" button (with a confirmation prompt).
 
 Refreshes every 3 seconds while the popup is open.
 
@@ -162,6 +163,59 @@ docker logs litellm | grep -i mcp   # does LiteLLM itself also see the MCP serve
 > **Note:** Exact menu paths and behavior can differ slightly by Open WebUI version (a fast-moving area) — verify together after deploy that the tools are actually invoked in chat.
 
 > ⚠️ **Known limitation (reproduced, as of this doc):** For models routed through a **LiteLLM** connection, Open WebUI correctly formulates a tool call but sometimes never actually dispatches it — the raw call JSON shows up verbatim as visible text in the reply instead. Over a **direct Ollama connection** (Admin → Settings → Connections → "Ollama API") the same call ran reliably and was actually executed in testing. If tools only ever return text instead of real results for you: try switching to a direct Ollama connection to check if that's the difference.
+
+#### Checklist: enabling tools per model
+
+Tool settings in Open WebUI apply **per model**, not globally — so a newly pulled model always starts without tools, even if another model has been working for ages. Work through these five points under **Workspace → Models → `<model>` → Edit**:
+
+| # | Setting | Value | Why |
+|---|---|---|---|
+| 1 | **Tools** | "MCP Gateway" ✓ (+ "Code Sandbox") | Without the checkbox the model doesn't know the tools exist at all |
+| 2 | **Capabilities → Built-in Tools** | **off** | Otherwise the model gets Open WebUI's own note/calendar tools instead and ignores the MCP ones |
+| 3 | **Advanced Params → Function Calling** | **Default** (not "Native") | "Native" assumes reliable tool-calling in the model; smaller local models often fail at it silently |
+| 4 | **Advanced Params → `num_ctx` (Ollama)** | **at least `16384`** | Ollama's small default context window truncates the tool list — the model then sees only the first few tools and treats the rest as non-existent |
+| 5 | **System prompt** | Instruction to use tools (example below) | Stops the model from prematurely answering "I don't have access to that" instead of trying |
+
+Example for point 5:
+
+```
+You have access to external tools. Before saying you can't do something,
+don't know something, or have no access, ALWAYS check first whether one of
+your available tools could solve the task — and then call it. Questions about
+files/notes/knowledge base → filesystem tools; current information/web pages
+→ web tools; date/time/timezones → time tool (never compute it yourself);
+testing code → sandbox tools. If you don't know the path or parameters, work
+your way there in several steps (list/search first, then read) instead of
+giving up. Never claim to be an isolated AI without access — that is false
+here. If a tool call fails, state the actual error message.
+```
+
+> **Note:** A model claiming a tool doesn't exist is **not** reliable evidence. Such self-reports are routinely fabricated — when in doubt, check the tool overview (below) for what's actually there.
+
+#### Tool overview in the browser (mcpo)
+
+mcpo ships a Swagger UI that **authoritatively** shows which tools are available to the models — including parameters, and directly testable without a model in the loop:
+
+```
+http://<server-ip>:8800/mcp_gateway/docs     # filesystem, web fetch, time, …
+http://<server-ip>:8800/code_sandbox/docs    # run_python, run_shell
+```
+
+(Also available as the "mcpo" dashboard tile.) The same list on the command line:
+
+```bash
+docker exec mcp curl -s http://mcpo:8000/mcp_gateway/openapi.json \
+  | grep -oE '"/[a-zA-Z0-9_-]+"' | sort -u
+```
+
+And testing a single tool directly, with no model involved — the fastest way to answer "is it the backend or the model?":
+
+```bash
+docker exec mcp curl -s -X POST http://mcpo:8000/mcp_gateway/filesystem-list_directory \
+  -H "Content-Type: application/json" -d '{"path":"/vault"}'
+```
+
+Configurable via `.env`: `PORT_MCPO` (default `8800`). `install.sh` opens the port **for the LAN only, regardless of firewall mode**: mcpo has no authentication of its own, and its tools (`filesystem-write_file` and friends) would give access to the vault. Open WebUI reaches mcpo container-internally anyway and doesn't need the published port.
 
 #### Time tool (timezones without model mental math)
 

@@ -115,7 +115,8 @@ Der Stack bringt ein eigenes, schlankes **modernes Status-Dashboard** mit (`dash
 **Ollama-Details & Modellverwaltung:** Die Ollama-Kachel ist doppelt so breit wie die anderen und hat einen **„Details"**-Knopf, der ein Popup öffnet mit:
 
 - **Modelle laden:** Eingabefeld für einen Ollama-Bibliotheksnamen (`llama3.1:8b`) oder eine Hugging-Face-Referenz (`hf.co/user/repo:tag`) — Ollama akzeptiert beides über denselben Mechanismus. **Mehrere Downloads gleichzeitig** sind möglich, jeder mit eigenem Live-Fortschrittsbalken.
-- **Installierte Modelle:** Liste aller heruntergeladenen Modelle mit Größe, „Löschen"-Knopf (mit Sicherheitsabfrage) und — falls gerade im RAM geladen — Aktivitäts-Indikator und verbleibende Zeit bis zum automatischen Entladen (Ollama hat keine direkte „läuft gerade eine Anfrage"-API; das Dashboard nähert das an, indem es erkennt, wenn sich die Keep-Alive-Zeit eines Modells durch eine neue Anfrage verlängert).
+- **Aktuell im Speicher:** die gerade geladenen Modelle mit belegtem (V)RAM, Aktivitäts-Indikator und verbleibender Zeit bis zum automatischen Entladen (Ollama hat keine direkte „läuft gerade eine Anfrage"-API; das Dashboard nähert das an, indem es erkennt, wenn sich die Keep-Alive-Zeit eines Modells durch eine neue Anfrage verlängert). Jedes davon hat einen **„Jetzt entladen"**-Knopf, der den Speicher sofort freigibt, statt auf den Ablauf-Timer zu warten — praktisch, wenn ein Modell klemmt oder du den VRAM für ein anderes brauchst. Das Modell bleibt dabei installiert und wird beim nächsten Aufruf einfach neu geladen (deshalb ohne Sicherheitsabfrage).
+- **Installierte Modelle:** Liste aller heruntergeladenen Modelle mit Größe und „Löschen"-Knopf (mit Sicherheitsabfrage).
 
 Aktualisiert sich alle 3 Sekunden, solange das Popup offen ist.
 
@@ -162,6 +163,60 @@ docker logs litellm | grep -i mcp   # Sieht (zusätzlich) LiteLLM selbst die MCP
 > **Hinweis:** Menüpfade und genaues Verhalten können sich je nach Open-WebUI-Version leicht unterscheiden (schnelllebiges Feld) — nach dem Deploy gemeinsam verifizieren, ob die Werkzeuge im Chat tatsächlich aufgerufen werden.
 
 > ⚠️ **Bekannte Einschränkung (reproduziert, Stand dieser Doku):** Bei Modellen, die über eine **LiteLLM**-Verbindung laufen, formuliert Open WebUI zwar korrekt einen Werkzeugaufruf, führt ihn aber teils nie tatsächlich aus — das rohe Aufruf-JSON landet stattdessen unverändert als sichtbarer Text in der Antwort. Über eine **direkte Ollama-Verbindung** (Admin → Einstellungen → Verbindungen → „Ollama-API") lief derselbe Aufruf im Test hingegen zuverlässig durch und wurde wirklich ausgeführt. Falls Werkzeuge bei dir nur Text statt echter Ergebnisse liefern: kurz auf eine direkte Ollama-Verbindung umschalten, um zu prüfen, ob das der Unterschied ist.
+
+#### Checkliste: Werkzeuge pro Modell freischalten
+
+Werkzeug-Einstellungen gelten in Open WebUI **pro Modell**, nicht global — ein neu geladenes Modell startet also immer wieder ohne Werkzeuge, auch wenn ein anderes Modell längst funktioniert. Diese fünf Punkte unter **Workspace → Modelle → `<modell>` → Bearbeiten** abarbeiten:
+
+| # | Einstellung | Wert | Warum |
+|---|---|---|---|
+| 1 | **Werkzeuge** | „MCP Gateway" ✓ (+ „Code Sandbox") | Ohne Häkchen kennt das Modell die Werkzeuge gar nicht |
+| 2 | **Fähigkeiten → Eingebaute Werkzeuge** | **aus** | Sonst bekommt das Modell stattdessen Open WebUIs eigene Notiz-/Kalender-Werkzeuge und ignoriert die MCP-Werkzeuge |
+| 3 | **Erweiterte Parameter → Funktionsaufruf** | **Standard** (nicht „Nativ") | „Nativ" setzt zuverlässiges Tool-Calling im Modell voraus; kleinere lokale Modelle scheitern daran oft stillschweigend |
+| 4 | **Erweiterte Parameter → `num_ctx` (Ollama)** | **mind. `16384`** | Ollamas kleines Standard-Kontextfenster schneidet die Werkzeugliste ab — das Modell sieht dann nur die ersten paar Werkzeuge und hält den Rest für nicht existent |
+| 5 | **System-Prompt** | Anweisung zur Werkzeugnutzung (Beispiel unten) | Verhindert, dass das Modell vorschnell „darauf habe ich keinen Zugriff" antwortet, statt es zu versuchen |
+
+Beispiel für Punkt 5:
+
+```
+Du hast Zugriff auf externe Werkzeuge (Tools). Bevor du sagst, dass du etwas
+nicht kannst, nicht weißt oder keinen Zugriff hast, prüfe IMMER zuerst, ob
+eines deiner verfügbaren Werkzeuge die Aufgabe lösen könnte — und rufe es
+dann auf. Fragen zu Dateien/Notizen/Wissensdatenbank → Dateisystem-Werkzeuge;
+aktuelle Informationen/Webseiten → Web-Werkzeuge; Datum/Uhrzeit/Zeitzonen →
+Zeit-Werkzeug (niemals selbst rechnen); Code testen → Sandbox-Werkzeuge.
+Wenn du Pfad oder Parameter nicht kennst, arbeite dich in mehreren Schritten
+vor (erst auflisten/suchen, dann lesen), statt aufzugeben. Behaupte niemals,
+du seist eine isolierte KI ohne Zugriff — das ist hier falsch. Wenn ein
+Werkzeugaufruf fehlschlägt, nenne die konkrete Fehlermeldung.
+```
+
+> **Merke:** Ein Modell, das behauptet, ein Werkzeug existiere nicht, ist **kein** verlässlicher Beleg dafür. Diese Selbstauskünfte sind erfahrungsgemäß frei erfunden — prüf im Zweifel in der Werkzeug-Übersicht (siehe unten), was tatsächlich da ist.
+
+#### Werkzeug-Übersicht im Browser (mcpo)
+
+mcpo bringt eine Swagger-Oberfläche mit, die **verbindlich** zeigt, welche Werkzeuge den Modellen zur Verfügung stehen — inklusive Parameter, und direkt ausprobierbar ohne Modell dazwischen:
+
+```
+http://<server-ip>:8800/mcp_gateway/docs     # Dateisystem, Web-Fetch, Zeit, …
+http://<server-ip>:8800/code_sandbox/docs    # run_python, run_shell
+```
+
+(Auch als Dashboard-Kachel „mcpo".) Dieselbe Liste auf der Kommandozeile:
+
+```bash
+docker exec mcp curl -s http://mcpo:8000/mcp_gateway/openapi.json \
+  | grep -oE '"/[a-zA-Z0-9_-]+"' | sort -u
+```
+
+Und ein einzelnes Werkzeug direkt testen, komplett ohne Modell — der schnellste Weg, „liegt's am Backend oder am Modell?" zu beantworten:
+
+```bash
+docker exec mcp curl -s -X POST http://mcpo:8000/mcp_gateway/filesystem-list_directory \
+  -H "Content-Type: application/json" -d '{"path":"/vault"}'
+```
+
+Konfigurierbar über `.env`: `PORT_MCPO` (Standard `8800`). Der Port wird von `install.sh` **unabhängig vom Firewall-Modus nur fürs LAN** geöffnet: mcpo hat keine eigene Authentifizierung, und über seine Werkzeuge (`filesystem-write_file` & Co.) käme man an den Vault. Open WebUI erreicht mcpo ohnehin containerintern und braucht den veröffentlichten Port nicht.
 
 #### Zeit-Werkzeug (Zeitzonen ohne Modell-Kopfrechnung)
 
