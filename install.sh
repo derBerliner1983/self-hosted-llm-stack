@@ -36,6 +36,7 @@ PORT_LITELLM="${PORT_LITELLM:-4000}"
 PORT_DASHBOARD="${PORT_DASHBOARD:-8600}"
 PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
 PORT_SYNCTHING_GUI="${PORT_SYNCTHING_GUI:-8384}"
+MCP_VAULT_MOUNT_MODE="${MCP_VAULT_MOUNT_MODE:-ro}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
@@ -522,6 +523,13 @@ SANDBOX_NETWORK=none
 # Gateway-Werkzeuge aktiv sind und welche Verzeichnisse sie sehen.
 MCP_SERVERS=fetch,filesystem
 MCP_FILESYSTEM_DIRS=/vault
+# ro = KI kann den Vault nur lesen (Standard). rw = KI kann auch schreiben —
+# nur zusammen mit Zwei-Wege-Sync (Vault-Bridge) bzw. einem "Senden & Empfangen"-
+# Ordner (Syncthing) sinnvoll, sonst überschreibt der nächste Sync-Lauf
+# kommentarlos wieder, was die KI geschrieben hat. Nach Ändern: sowohl mcp
+# ALS AUCH mcpo neu erstellen ("docker compose up -d mcp mcpo"), sonst bleibt
+# der alte Mount-Modus aktiv bzw. mcpo verliert die Session zu mcp.
+MCP_VAULT_MOUNT_MODE=${MCP_VAULT_MOUNT_MODE}
 
 # Syncthing (Alternative zur Vault-Bridge für den Obsidian-Vault-Sync, siehe
 # README "Syncthing") - läuft direkt zwischen deinen Geräten, ohne Nextcloud
