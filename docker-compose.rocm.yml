@@ -86,8 +86,15 @@ services:
     environment:
       - MCP_SERVERS=${MCP_SERVERS:-fetch,filesystem}
       - MCP_FILESYSTEM_DIRS=${MCP_FILESYSTEM_DIRS:-/vault}
-    # ports:
-    #   - "127.0.0.1:${PORT_MCP:-3000}:3000/tcp"  # nur für direkte MCP-Clients (Claude Desktop, Cursor)
+    # Port 3000 bedient zweierlei:
+    #   1. die MCPHub-Weboberfläche - dort lassen sich MCP-Server ansehen,
+    #      ein-/ausschalten und neue hinzufügen (Hot-Reload, kein Neustart
+    #      nötig); Login mit dem 'admin'-Benutzer aus mcp_settings.json
+    #   2. den MCP-Endpunkt /mcp für direkte MCP-Clients (Claude Desktop,
+    #      Cursor, ...), abgesichert über den Bearer-Key aus der .env
+    # install.sh gibt den Port nur fürs LAN frei.
+    ports:
+      - "${PORT_MCP:-3000}:3000/tcp"
     volumes:
       - mcp-data:/var/lib/mcp
       - mcp-shared:/var/lib/mcp-shared
@@ -186,6 +193,7 @@ services:
       - SANDBOX_DEFAULT_TIMEOUT=${SANDBOX_DEFAULT_TIMEOUT:-15}
       - SANDBOX_MAX_TIMEOUT=${SANDBOX_MAX_TIMEOUT:-60}
       - SANDBOX_MEM_LIMIT=${SANDBOX_MEM_LIMIT:-256m}
+      - SANDBOX_TMPFS_SIZE=${SANDBOX_TMPFS_SIZE:-64m}
       - SANDBOX_NETWORK=${SANDBOX_NETWORK:-none}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -340,6 +348,7 @@ services:
       - PORT_VAULT_BRIDGE=${PORT_VAULT_BRIDGE:-8700}
       - PORT_SYNCTHING_GUI=${PORT_SYNCTHING_GUI:-8384}
       - PORT_MCPO=${PORT_MCPO:-8800}
+      - PORT_MCP=${PORT_MCP:-3000}
     volumes:
       - ./dashboard:/app:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -27,6 +27,7 @@ PORT_DASHBOARD="${PORT_DASHBOARD:-8600}"
 PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
 PORT_SYNCTHING_GUI="${PORT_SYNCTHING_GUI:-8384}"
 PORT_MCPO="${PORT_MCPO:-8800}"
+PORT_MCP="${PORT_MCP:-3000}"
 
 IP="$(ip -o -f inet addr show scope global 2>/dev/null | awk '{print $4}' | head -1 | cut -d/ -f1 || true)"
 IP="${IP:-<server-ip>}"
@@ -44,6 +45,7 @@ printf '  LiteLLM-UI     http://%s:%s/ui\n' "$IP" "$PORT_LITELLM"
 printf '  Vault-Bridge   http://%s:%s\n' "$IP" "$PORT_VAULT_BRIDGE"
 printf '  Syncthing      http://%s:%s\n' "$IP" "$PORT_SYNCTHING_GUI"
 printf '  Werkzeuge      http://%s:%s/mcp_gateway/docs\n' "$IP" "$PORT_MCPO"
+printf '  MCP-Verwaltung http://%s:%s\n' "$IP" "$PORT_MCP"
 echo
 
 printf '%sLiteLLM%s\n' "$c_bold" "$c_reset"
