@@ -84,10 +84,10 @@ SERVICES = [
     {
         "container": "mcp",
         "label": "MCP Gateway",
-        "desc": "Werkzeuge · Dateisystem, Web, GitHub",
+        "desc": "Werkzeuge · Server verwalten (MCPHub)",
         "icon": "🛠️",
-        "port": None,
-        "path": None,
+        "port": int(os.environ.get("PORT_MCP", "3000")),
+        "path": "/",
     },
     {
         "container": "sandbox-mcp",

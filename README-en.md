@@ -120,7 +120,23 @@ The stack ships a small, self-contained **modern status dashboard** (`dashboard/
 
 Refreshes every 3 seconds while the popup is open.
 
-> ⚠️ **Security note:** this makes the dashboard **write-capable** for the first time (loading/deleting models), not just read-only. Since it's still LAN-only and has no login of its own, anyone on the same network can trigger downloads or delete models. For a single-user home network this is a reasonable tradeoff — if that's not acceptable, put the dashboard behind its own login/reverse proxy, or drop the `dashboard` service entirely.
+> ⚠️ **Security note:** this makes the dashboard **write-capable** for the first time (loading/deleting models), not just read-only. Since it's still LAN-only and has no login of its own, anyone on the same network can trigger downloads or delete models. For a single-user home network this is a reasonable tradeoff — if that's not acceptable, put the dashboard behind its own login/reverse proxy (see below), or drop the `dashboard` service entirely.
+
+#### Protecting the dashboard with login/MFA
+
+The dashboard **deliberately has no user management of its own**. Implementing multi-user login, MFA, sessions and device recognition yourself is exactly the kind of code where mistakes turn into real security holes — that calls for a dedicated authentication proxy in front, not a hand-rolled login inside a status script.
+
+The proven route with [Pangolin](https://docs.pangolin.net/) (or equally Authelia/Authentik/Cloudflare Access):
+
+1. Create an **HTTP resource** in the reverse proxy, target `http://<server-ip>:8600` (i.e. `PORT_DASHBOARD`).
+2. Set up an **identity provider** or create local users — that's where the individual accounts live.
+3. Enable **MFA per user**; sessions and recognition of known devices are handled by the proxy (unknown device → login + MFA, valid session → straight through).
+4. Use **access control** to define who may see the resource.
+5. Then close off the direct port so nobody can bypass the proxy: `FIREWALL_MODE=lan` in `.env` (or drop the port from the firewall rules).
+
+The same approach fits every other UI without its own login — in particular the Vault-Bridge, the mcpo tool overview, and Syncthing's web UI.
+
+> The inverse also holds: anything that accepts **API calls** (the LiteLLM API, the MCP endpoint) cannot sit behind a browser-based login portal — the sign-in flow blocks those calls. Those services carry their own bearer-key protection; for remote access to them, prefer a client-based/private resource model (VPN/tunnel) over a login portal.
 
 ### MCP Gateway (tools for the LLM)
 
@@ -129,6 +145,20 @@ The stack ships **MCP Gateway** — gives you tools like filesystem, web fetch, 
 ```bash
 ./scripts/wire-mcp.sh   # re-run if the mcp container was recreated (new key)
 ```
+
+#### Managing MCP servers (MCPHub UI)
+
+The `mcp` container runs [MCPHub](https://github.com/samanhappy/mcphub), which ships its own web UI for managing MCP servers — reachable at `http://<server-ip>:3000` (or via the "MCP Gateway" dashboard tile):
+
+- **Inspect servers:** which MCP servers are running, which tools each provides, live logs
+- **Enable/disable:** switch off individual servers or individual tools without deleting them
+- **Add new ones:** register further MCP servers — applied by hot-reload, no container restart
+
+Sign in with the `admin` user from `/var/lib/mcp/mcp_settings.json`. The same port also serves the `/mcp` endpoint for direct MCP clients (Claude Desktop, Cursor, …), protected by the bearer key from `.env`.
+
+> **Restart `mcpo` after every change to the MCP servers** (`docker compose -f docker-compose.rocm.yml restart mcpo`) — otherwise `mcpo` keeps serving the old tool list and Open WebUI won't see the change.
+
+Configurable via `.env`: `PORT_MCP` (default `3000`). `install.sh` opens the port **for the LAN only, regardless of firewall mode**: the UI and endpoint are protected (login / bearer key respectively), but they grant access to every tool including write access to the vault.
 
 ### Code sandbox (`run_python` / `run_shell` for the LLM)
 
@@ -141,7 +171,42 @@ Alongside MCP Gateway, the stack ships a dedicated **code sandbox** (`sandbox-mc
 
 > ⚠️ **Security note:** for the sandbox service to spin up a fresh container per call, it needs access to the host's **Docker socket** (`/var/run/docker.sock`). That's powerful — anyone who can reach this internal service can, in principle, start arbitrary containers on the host. It is therefore deliberately reachable **internally only**, with no port published outside the Docker network. For a single-user setup on your own LAN this is a reasonable tradeoff; if you don't want this capability, just remove the `sandbox-mcp` service (and the matching `code_sandbox` entry in `litellm/config.yaml`) and restart the stack.
 
-Configurable via `.env`: `SANDBOX_IMAGE` (the sandbox's base image, default `python:3.12-slim`), `SANDBOX_DEFAULT_TIMEOUT`, `SANDBOX_MAX_TIMEOUT`, `SANDBOX_MEM_LIMIT`, `SANDBOX_NETWORK` (default `none`; set e.g. `bridge` if the code needs internet access — you then lose the network-isolation protection).
+Configurable via `.env`: `SANDBOX_IMAGE` (the sandbox's base image, default `python:3.12-slim`), `SANDBOX_DEFAULT_TIMEOUT`, `SANDBOX_MAX_TIMEOUT`, `SANDBOX_MEM_LIMIT`, `SANDBOX_TMPFS_SIZE` (size of the writable `/tmp`, default `64m`), `SANDBOX_NETWORK` (default `none`; set e.g. `bridge` if the code needs internet access — you then lose the network-isolation protection).
+
+#### More languages in the sandbox
+
+With the default image `python:3.12-slim` the sandbox can run **Python and shell** (Debian base, so bash and the usual command-line tools) — nothing else. No Java, no Node, no compilers. When a model claims it can do "C++, Rust, JS, if installed", that's a guess; what actually counts is what's in the runner image.
+
+The repo therefore ships an optional multi-language runner image (`sandbox-mcp/runner-multilang.Dockerfile`) — Python, Node/npm, Java (JDK), Go, gcc/g++/make, plus git/curl/jq:
+
+```bash
+docker build -f sandbox-mcp/runner-multilang.Dockerfile \
+  -t ai-stack-sandbox-runner:multilang sandbox-mcp/
+```
+
+Then in `.env`:
+
+```bash
+SANDBOX_IMAGE=ai-stack-sandbox-runner:multilang
+SANDBOX_MEM_LIMIT=2g
+SANDBOX_TMPFS_SIZE=1g
+SANDBOX_DEFAULT_TIMEOUT=60
+SANDBOX_MAX_TIMEOUT=180
+```
+
+```bash
+docker compose -f docker-compose.rocm.yml up -d sandbox-mcp
+```
+
+> ⚠️ **The raised limits are not optional.** `javac`, `go build` and `g++` fail reliably against the defaults (256 MB RAM, 64 MB `/tmp`, 15s) — swapping the image alone is not enough.
+
+**Known limits of this approach:**
+
+- **No network** (default `SANDBOX_NETWORK=none`): `npm install`, `pip install`, `go get` and Gradle dependencies won't work. Standard library and whatever is baked into the image only. If you need more, set `SANDBOX_NETWORK=bridge` and give up the isolation.
+- **No state between calls** — every call is a fresh container. Multi-stage builds that rely on intermediate state won't work.
+- **Package versions come from Debian stable** and are correspondingly conservative (e.g. Node 18, Go 1.19, JDK 17). Adjust the Dockerfile for newer ones.
+- **PowerShell is not included** (not in the Debian repos, would need Microsoft's package source) — add it to the Dockerfile if you need it.
+- **Android app development doesn't work this way** — SDK, Gradle and emulator far exceed what a throwaway container without network can do. That needs a dedicated, persistent build service with network access and a persistent Gradle cache.
 
 ### Enable the tools in Open WebUI (mcpo)
 

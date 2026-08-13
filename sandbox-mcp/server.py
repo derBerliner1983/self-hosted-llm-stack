@@ -33,6 +33,11 @@ RUNNER_IMAGE = os.environ.get("SANDBOX_IMAGE", "python:3.12-slim")
 DEFAULT_TIMEOUT = int(os.environ.get("SANDBOX_DEFAULT_TIMEOUT", "15"))
 MAX_TIMEOUT = int(os.environ.get("SANDBOX_MAX_TIMEOUT", "60"))
 MEM_LIMIT = os.environ.get("SANDBOX_MEM_LIMIT", "256m")
+# Größe des beschreibbaren /tmp im Wegwerf-Container (der Rest des
+# Dateisystems ist read-only). Für reines Python reichen 64 MB; Compiler
+# (javac, go build, g++) brauchen deutlich mehr Platz für Zwischenstände —
+# siehe README, Abschnitt "Mehr Sprachen in der Sandbox".
+TMPFS_SIZE = os.environ.get("SANDBOX_TMPFS_SIZE", "64m")
 NETWORK_MODE = os.environ.get("SANDBOX_NETWORK", "none")  # "none" = kein Internetzugriff
 MAX_OUTPUT_CHARS = 20_000
 
@@ -82,7 +87,7 @@ def _run_in_sandbox(cmd: list[str], timeout_seconds: int) -> dict:
             nano_cpus=1_000_000_000,  # 1 CPU-Kern
             pids_limit=128,
             read_only=True,
-            tmpfs={"/tmp": "rw,size=64m,mode=1777"},
+            tmpfs={"/tmp": f"rw,size={TMPFS_SIZE},mode=1777"},
             working_dir="/tmp",
             user="65534:65534",  # nobody:nogroup — kein root
             cap_drop=["ALL"],

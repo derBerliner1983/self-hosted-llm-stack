@@ -37,6 +37,7 @@ PORT_DASHBOARD="${PORT_DASHBOARD:-8600}"
 PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
 PORT_SYNCTHING_GUI="${PORT_SYNCTHING_GUI:-8384}"
 PORT_MCPO="${PORT_MCPO:-8800}"
+PORT_MCP="${PORT_MCP:-3000}"
 MCP_VAULT_MOUNT_MODE="${MCP_VAULT_MOUNT_MODE:-ro}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -434,6 +435,13 @@ else
     # ohnehin containerintern, ganz ohne veröffentlichten Port.
     $SUDO ufw allow from "$LAN_SUBNET" to any port "$PORT_MCPO" proto tcp >/dev/null 2>&1 || true
 
+    # MCP Gateway (MCPHub-Oberfläche + /mcp-Endpunkt) ebenfalls immer nur LAN.
+    # Beides ist zwar abgesichert (UI per Login, /mcp per Bearer-Key), gibt
+    # aber Zugriff auf alle Werkzeuge inkl. Vault-Schreibzugriff - fürs
+    # Internet lieber gezielt über einen Reverse-Proxy mit eigener
+    # Zugriffskontrolle, statt den Port pauschal aufzumachen.
+    $SUDO ufw allow from "$LAN_SUBNET" to any port "$PORT_MCP" proto tcp >/dev/null 2>&1 || true
+
     if [ "$FIREWALL_MODE" = "lan" ]; then
       for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI"; do
         $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto tcp >/dev/null 2>&1 || true
@@ -517,6 +525,10 @@ PORT_SYNCTHING_GUI=8384
 # Modellen zur Verfügung stehen. Wird nur fürs LAN freigegeben (mcpo hat keine
 # eigene Authentifizierung), Open WebUI erreicht mcpo containerintern.
 PORT_MCPO=${PORT_MCPO}
+# MCP Gateway: MCPHub-Oberfläche zum Verwalten der MCP-Server (hinzufügen,
+# ein-/ausschalten) und der /mcp-Endpunkt für direkte MCP-Clients wie Claude
+# Desktop oder Cursor. Ebenfalls nur fürs LAN freigegeben.
+PORT_MCP=${PORT_MCP}
 
 # Code-Sandbox (run_python/run_shell fürs LLM; Wegwerf-Container pro Aufruf,
 # siehe README "Code-Sandbox"). SANDBOX_NETWORK=none = kein Internetzugriff
@@ -526,6 +538,10 @@ SANDBOX_IMAGE=python:3.12-slim
 SANDBOX_DEFAULT_TIMEOUT=15
 SANDBOX_MAX_TIMEOUT=60
 SANDBOX_MEM_LIMIT=256m
+# Größe des beschreibbaren /tmp im Wegwerf-Container. 64m reicht für Python;
+# für Compiler (Java/Go/C++) deutlich höher setzen — siehe README,
+# "Mehr Sprachen in der Sandbox".
+SANDBOX_TMPFS_SIZE=64m
 SANDBOX_NETWORK=none
 
 # Vault-Bridge (Obsidian-Vault auf Nextcloud <-> MCP-Gateway-Dateisystem-
