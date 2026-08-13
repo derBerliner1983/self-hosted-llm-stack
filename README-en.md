@@ -156,7 +156,7 @@ The `mcp` container runs [MCPHub](https://github.com/samanhappy/mcphub), which s
 
 Sign in with the `admin` user from `/var/lib/mcp/mcp_settings.json`. The same port also serves the `/mcp` endpoint for direct MCP clients (Claude Desktop, Cursor, …), protected by the bearer key from `.env`.
 
-> **Restart `mcpo` after every change to the MCP servers** (`docker compose -f docker-compose.rocm.yml restart mcpo`) — otherwise `mcpo` keeps serving the old tool list and Open WebUI won't see the change.
+> **Restart `mcpo` after every change to the MCP servers** (`./scripts/restart-mcp.sh --mcpo-only`) — otherwise `mcpo` keeps serving the old tool list and Open WebUI won't see the change.
 
 Configurable via `.env`: `PORT_MCP` (default `3000`). `install.sh` opens the port **for the LAN only, regardless of firewall mode**: the UI and endpoint are protected (login / bearer key respectively), but they grant access to every tool including write access to the vault.
 
@@ -363,6 +363,8 @@ The script stays available as a manual fallback (e.g. for instant control instea
 ```bash
 ./scripts/show-credentials.sh                                 # URLs, master key, passwords
 ./scripts/wire-mcp.sh                                         # (re-)wire MCP Gateway with LiteLLM + Open WebUI (mcpo)
+./scripts/restart-mcp.sh                                      # restart the MCP services — mcpo last, automatically (fixes "MCP session is not available")
+./scripts/restart-mcp.sh --build                              # ...also rebuild vault-bridge and sandbox-mcp (after code changes)
 ./scripts/diagnose-chat.sh <model> ["message"]                # narrow down broken replies layer by layer (Ollama/LiteLLM/WebUI)
 LITELLM_KEY_OVERRIDE=<key> ./scripts/diagnose-chat.sh <model>  # ...test with a LiteLLM virtual key instead of the master key
 docker compose -f docker-compose.rocm.yml ps                  # status

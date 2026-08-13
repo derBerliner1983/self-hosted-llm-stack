@@ -156,7 +156,7 @@ Im `mcp`-Container läuft [MCPHub](https://github.com/samanhappy/mcphub), das ei
 
 Angemeldet wird sich mit dem `admin`-Benutzer aus `/var/lib/mcp/mcp_settings.json`. Derselbe Port bedient auch den `/mcp`-Endpunkt für direkte MCP-Clients (Claude Desktop, Cursor …), abgesichert über den Bearer-Key aus der `.env`.
 
-> **Nach jeder Änderung an den MCP-Servern `mcpo` neu starten** (`docker compose -f docker-compose.rocm.yml restart mcpo`) — sonst hält `mcpo` weiter die alte Werkzeugliste und Open WebUI sieht die Änderung nicht.
+> **Nach jeder Änderung an den MCP-Servern `mcpo` neu starten** (`./scripts/restart-mcp.sh --mcpo-only`) — sonst hält `mcpo` weiter die alte Werkzeugliste und Open WebUI sieht die Änderung nicht.
 
 Konfigurierbar über `.env`: `PORT_MCP` (Standard `3000`). `install.sh` gibt den Port **unabhängig vom Firewall-Modus nur fürs LAN** frei: Oberfläche und Endpunkt sind zwar abgesichert (Login bzw. Bearer-Key), geben aber Zugriff auf alle Werkzeuge inklusive Vault-Schreibzugriff.
 
@@ -364,6 +364,8 @@ Das Skript bleibt als manueller Fallback erhalten (z. B. für sofortige Kontroll
 ```bash
 ./scripts/show-credentials.sh                                 # URLs, Master-Key, Passwörter
 ./scripts/wire-mcp.sh                                         # MCP Gateway (neu) mit LiteLLM + Open WebUI (mcpo) verdrahten
+./scripts/restart-mcp.sh                                      # MCP-Dienste neu starten — mcpo automatisch zuletzt (gegen "MCP session is not available")
+./scripts/restart-mcp.sh --build                              # ...zusätzlich vault-bridge und sandbox-mcp neu bauen (nach Code-Änderungen)
 ./scripts/diagnose-chat.sh <modell> ["nachricht"]             # Kaputte Antworten Schicht für Schicht eingrenzen (Ollama/LiteLLM/WebUI)
 LITELLM_KEY_OVERRIDE=<key> ./scripts/diagnose-chat.sh <modell> # ...testweise mit einem LiteLLM-Virtual-Key statt dem Master-Key
 docker compose -f docker-compose.rocm.yml ps                  # Status
