@@ -162,10 +162,15 @@ Konfigurierbar über `.env`: `PORT_MCP` (Standard `3000`). `install.sh` gibt den
 
 ### Code-Sandbox (`run_python` / `run_shell` fürs LLM)
 
-Zusätzlich zu MCP Gateway bringt der Stack eine eigene **Code-Sandbox** mit (`sandbox-mcp/`), damit das Modell selbst geschriebenen Code **testen, Fehler erkennen und iterativ korrigieren** kann, statt ungetesteten Code auszugeben. Zwei Werkzeuge, über denselben LiteLLM-MCP-Mechanismus bereitgestellt:
+Zusätzlich zu MCP Gateway bringt der Stack eine eigene **Code-Sandbox** mit (`sandbox-mcp/`), damit das Modell selbst geschriebenen Code **testen, Fehler erkennen und iterativ korrigieren** kann, statt ungetesteten Code auszugeben. Drei Werkzeuge, über denselben LiteLLM-MCP-Mechanismus bereitgestellt:
 
 - `run_python(code)` — führt Python-Code aus
-- `run_shell(command)` — führt einen Shell-Befehl aus
+- `run_shell(command)` — führt einen Shell-Befehl aus (**bash**, nicht `sh` — Modelle schreiben fast immer Bash-Syntax)
+- `run_script(script, interpreter, args)` — führt ein **komplettes, mehrzeiliges Skript** aus: bash, sh, python3, node, ruby, perl, php oder pwsh, wahlweise mit Argumenten
+
+> **Warum `run_script` zusätzlich zu `run_shell`?** Ein ganzes Skript in einen Einzeiler zu quetschen scheitert regelmäßig an Anführungszeichen und Zeilenumbrüchen — genau daran verheddern sich Modelle und probieren dann dutzende Varianten. `run_script` nimmt den Inhalt unverändert entgegen (intern base64-kodiert übertragen, damit Quotes, `$`, Backslashes und Umlaute garantiert heil ankommen), legt ihn als Datei ab und ruft den gewünschten Interpreter darauf auf.
+
+> ⚠️ **Kein Terminal in der Sandbox:** `tput cols`/`tput lines` liefern dort keine echten Werte, und Farb-Escapes erscheinen in der Ausgabe als Rohtext. Beides ist normal und sagt nichts darüber aus, wie sich das Skript im Terminal des Nutzers verhält — Skripte sollten für `tput` einen Rückfallwert vorsehen (`$(tput cols 2>/dev/null || echo 80)`).
 
 **Wie die Isolation funktioniert:** Jeder einzelne Aufruf startet einen **komplett neuen, isolierten Wegwerf-Container** — kein Netzwerkzugriff, schreibgeschütztes Dateisystem (nur `/tmp` beschreibbar), Speicher-/CPU-/Prozess-Limits, kein root, alle Linux-Capabilities entfernt, Zeitlimit (Standard 15 s, maximal 60 s). Nach jedem Lauf wird der Container sofort gelöscht — es gibt also **keinen Zustand zum Zurücksetzen**: jeder Aufruf startet garantiert bei null.
 
