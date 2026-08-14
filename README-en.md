@@ -172,11 +172,22 @@ Alongside MCP Gateway, the stack ships a dedicated **code sandbox** (`sandbox-mc
 
 > ⚠️ **No terminal in the sandbox:** `tput cols`/`tput lines` return no real values there, and colour escapes appear as raw text in the output. Both are normal and say nothing about how the script behaves in the user's terminal — scripts should provide a fallback for `tput` (`$(tput cols 2>/dev/null || echo 80)`).
 
-**How isolation works:** every single call spins up a **brand-new, isolated, throwaway container** — no network access, read-only filesystem (only `/tmp` is writable), memory/CPU/process limits, no root, all Linux capabilities dropped, a timeout (15s default, 60s max). The container is deleted immediately after each run — there's no state to reset: every call starts from zero, guaranteed.
+**How isolation works:** every single call spins up a **brand-new, isolated, throwaway container** — no network access, read-only filesystem, memory/CPU/process limits, no root, all Linux capabilities dropped, a timeout (15s default, 60s max). The container is deleted immediately after each run.
+
+**Two writable areas — the difference matters:**
+
+| Path | Behaviour | For |
+|---|---|---|
+| **`/work`** | **persists across calls** (its own `sandbox-work` Docker volume), and is the working directory | Creating test files and testing against them in a later call, iterating on scripts |
+| `/tmp` | wiped on every call | Throwaway intermediates |
+
+> **Why `/work` exists at all:** without a persistent area, multi-step work is impossible — a model that creates test directories and wants to test against them in the next call simply can't find them any more and spins in circles (observed exactly like that in practice). Tasks of the form "write a script **and test it**" only work with this.
+
+> ⚠️ **Security note:** `/work` deliberately outlives calls — so code from one call can leave files behind for later ones. Isolation towards the host and the rest of the stack is unchanged (no network, no root, no access to the vault or other volumes). To wipe the area: `docker volume rm sandbox-work` (stop the service first).
 
 > ⚠️ **Security note:** for the sandbox service to spin up a fresh container per call, it needs access to the host's **Docker socket** (`/var/run/docker.sock`). That's powerful — anyone who can reach this internal service can, in principle, start arbitrary containers on the host. It is therefore deliberately reachable **internally only**, with no port published outside the Docker network. For a single-user setup on your own LAN this is a reasonable tradeoff; if you don't want this capability, just remove the `sandbox-mcp` service (and the matching `code_sandbox` entry in `litellm/config.yaml`) and restart the stack.
 
-Configurable via `.env`: `SANDBOX_IMAGE` (the sandbox's base image, default `python:3.12-slim`), `SANDBOX_DEFAULT_TIMEOUT`, `SANDBOX_MAX_TIMEOUT`, `SANDBOX_MEM_LIMIT`, `SANDBOX_TMPFS_SIZE` (size of the writable `/tmp`, default `64m`), `SANDBOX_NETWORK` (default `none`; set e.g. `bridge` if the code needs internet access — you then lose the network-isolation protection).
+Configurable via `.env`: `SANDBOX_IMAGE` (the sandbox's base image, default `python:3.12-slim`), `SANDBOX_DEFAULT_TIMEOUT`, `SANDBOX_MAX_TIMEOUT`, `SANDBOX_MEM_LIMIT`, `SANDBOX_TMPFS_SIZE` (size of the ephemeral `/tmp`, default `64m`), `SANDBOX_WORK_VOLUME` (volume backing the persistent `/work` area, default `sandbox-work`), `SANDBOX_NETWORK` (default `none`; set e.g. `bridge` if the code needs internet access — you then lose the network-isolation protection).
 
 #### More languages in the sandbox
 

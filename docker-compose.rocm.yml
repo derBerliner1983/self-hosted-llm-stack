@@ -200,8 +200,13 @@ services:
       - SANDBOX_MEM_LIMIT=${SANDBOX_MEM_LIMIT:-256m}
       - SANDBOX_TMPFS_SIZE=${SANDBOX_TMPFS_SIZE:-64m}
       - SANDBOX_NETWORK=${SANDBOX_NETWORK:-none}
+      - SANDBOX_WORK_VOLUME=${SANDBOX_WORK_VOLUME:-sandbox-work}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Persistenter Arbeitsbereich der Sandbox. Hier ebenfalls eingehängt,
+      # damit der Dienst (läuft als root) beim Start die Schreibrechte für
+      # die Wegwerf-Container setzen kann, die als 'nobody' laufen.
+      - sandbox-work:/work
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import socket; socket.create_connection(('127.0.0.1',8000),3)\" || exit 1"]
       interval: 15s
@@ -424,6 +429,8 @@ volumes:
     name: vault-bridge-data
   syncthing-config:
     name: syncthing-config
+  sandbox-work:
+    name: sandbox-work
   android-workspace:
     name: android-workspace
   android-gradle:

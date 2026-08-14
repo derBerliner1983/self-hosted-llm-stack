@@ -172,11 +172,22 @@ Zusätzlich zu MCP Gateway bringt der Stack eine eigene **Code-Sandbox** mit (`s
 
 > ⚠️ **Kein Terminal in der Sandbox:** `tput cols`/`tput lines` liefern dort keine echten Werte, und Farb-Escapes erscheinen in der Ausgabe als Rohtext. Beides ist normal und sagt nichts darüber aus, wie sich das Skript im Terminal des Nutzers verhält — Skripte sollten für `tput` einen Rückfallwert vorsehen (`$(tput cols 2>/dev/null || echo 80)`).
 
-**Wie die Isolation funktioniert:** Jeder einzelne Aufruf startet einen **komplett neuen, isolierten Wegwerf-Container** — kein Netzwerkzugriff, schreibgeschütztes Dateisystem (nur `/tmp` beschreibbar), Speicher-/CPU-/Prozess-Limits, kein root, alle Linux-Capabilities entfernt, Zeitlimit (Standard 15 s, maximal 60 s). Nach jedem Lauf wird der Container sofort gelöscht — es gibt also **keinen Zustand zum Zurücksetzen**: jeder Aufruf startet garantiert bei null.
+**Wie die Isolation funktioniert:** Jeder einzelne Aufruf startet einen **komplett neuen, isolierten Wegwerf-Container** — kein Netzwerkzugriff, schreibgeschütztes Dateisystem, Speicher-/CPU-/Prozess-Limits, kein root, alle Linux-Capabilities entfernt, Zeitlimit (Standard 15 s, maximal 60 s). Nach jedem Lauf wird der Container sofort gelöscht.
+
+**Zwei Schreibbereiche — der Unterschied ist wichtig:**
+
+| Pfad | Verhalten | wofür |
+|---|---|---|
+| **`/work`** | **bleibt zwischen Aufrufen erhalten** (eigenes Docker-Volume `sandbox-work`), ist das Startverzeichnis | Testdateien anlegen und im nächsten Aufruf dagegen testen, Skripte iterativ verbessern |
+| `/tmp` | wird bei jedem Aufruf geleert | Wegwerf-Zwischenstände |
+
+> **Warum `/work` überhaupt existiert:** Ohne persistenten Bereich ist mehrschrittige Arbeit unmöglich — ein Modell, das Testverzeichnisse anlegt und im nächsten Aufruf dagegen testen will, findet sie schlicht nicht mehr und dreht sich im Kreis (im Betrieb genau so beobachtet). Aufgaben der Form „schreib ein Skript **und teste es**" gehen erst damit.
+
+> ⚠️ **Sicherheitliche Einordnung:** `/work` überdauert bewusst die Aufrufe — Code aus einem Aufruf kann also Dateien für spätere Aufrufe hinterlassen. Gegenüber dem Host und dem restlichen Stack bleibt die Isolation unverändert (kein Netz, kein root, kein Zugriff auf Vault oder andere Volumes). Wer den Bereich leeren will: `docker volume rm sandbox-work` (Dienst vorher stoppen).
 
 > ⚠️ **Sicherheitshinweis:** Damit der Sandbox-Dienst pro Aufruf einen frischen Container starten kann, braucht er Zugriff auf den **Docker-Socket** des Hosts (`/var/run/docker.sock`). Das ist mächtig — wer diesen internen Dienst erreichen kann, kann im Prinzip beliebige Container auf dem Host starten. Der Dienst ist deshalb bewusst **nur intern** im Docker-Netz erreichbar, ohne Port nach außen. Für ein Einzelnutzer-Setup im eigenen LAN ist das ein vertretbarer Kompromiss; falls du diese Fähigkeit nicht willst, entferne einfach den `sandbox-mcp`-Dienst (und den zugehörigen `code_sandbox`-Eintrag in `litellm/config.yaml`) und starte den Stack neu.
 
-Konfigurierbar über `.env`: `SANDBOX_IMAGE` (Basis-Image der Sandbox, Standard `python:3.12-slim`), `SANDBOX_DEFAULT_TIMEOUT`, `SANDBOX_MAX_TIMEOUT`, `SANDBOX_MEM_LIMIT`, `SANDBOX_TMPFS_SIZE` (Größe des beschreibbaren `/tmp`, Standard `64m`), `SANDBOX_NETWORK` (Standard `none`; z. B. `bridge` setzen, falls der Code Internetzugriff braucht — dann verlierst du den Netzwerk-Isolationsschutz).
+Konfigurierbar über `.env`: `SANDBOX_IMAGE` (Basis-Image der Sandbox, Standard `python:3.12-slim`), `SANDBOX_DEFAULT_TIMEOUT`, `SANDBOX_MAX_TIMEOUT`, `SANDBOX_MEM_LIMIT`, `SANDBOX_TMPFS_SIZE` (Größe des flüchtigen `/tmp`, Standard `64m`), `SANDBOX_WORK_VOLUME` (Volume für den persistenten `/work`-Bereich, Standard `sandbox-work`), `SANDBOX_NETWORK` (Standard `none`; z. B. `bridge` setzen, falls der Code Internetzugriff braucht — dann verlierst du den Netzwerk-Isolationsschutz).
 
 #### Mehr Sprachen in der Sandbox
 

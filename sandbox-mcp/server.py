@@ -41,6 +41,16 @@ MEM_LIMIT = os.environ.get("SANDBOX_MEM_LIMIT", "256m")
 # siehe README, Abschnitt "Mehr Sprachen in der Sandbox".
 TMPFS_SIZE = os.environ.get("SANDBOX_TMPFS_SIZE", "64m")
 NETWORK_MODE = os.environ.get("SANDBOX_NETWORK", "none")  # "none" = kein Internetzugriff
+# Persistenter Arbeitsbereich, der ALLE Aufrufe überdauert (benanntes
+# Docker-Volume, in jeden Wegwerf-Container unter /work eingehängt).
+#
+# Ohne ihn ist die Sandbox für mehrschrittige Arbeit unbrauchbar: Bei
+# "lege Testdateien an, dann teste das Skript dagegen" ist nach dem ersten
+# Aufruf alles wieder weg, und das Modell dreht sich im Kreis (live
+# beobachtet). /tmp bleibt bewusst flüchtig - wer Wegwerf-Kram will,
+# nutzt weiter /tmp.
+WORK_VOLUME = os.environ.get("SANDBOX_WORK_VOLUME", "sandbox-work")
+WORK_DIR = "/work"
 MAX_OUTPUT_CHARS = 20_000
 
 # HOST/PORT werden erst bei .run() übergeben (MCPServer nimmt sie nicht im
@@ -90,7 +100,13 @@ def _run_in_sandbox(cmd: list[str], timeout_seconds: int) -> dict:
             pids_limit=128,
             read_only=True,
             tmpfs={"/tmp": f"rw,size={TMPFS_SIZE},mode=1777"},
-            working_dir="/tmp",
+            # Persistenter Arbeitsbereich. Docker legt das benannte Volume
+            # beim ersten Gebrauch selbst an.
+            volumes={WORK_VOLUME: {"bind": WORK_DIR, "mode": "rw"}},
+            # Startverzeichnis ist /work, damit relative Pfade automatisch
+            # im persistenten Bereich landen - das ist beim iterativen
+            # Arbeiten fast immer gemeint.
+            working_dir=WORK_DIR,
             user="65534:65534",  # nobody:nogroup — kein root
             cap_drop=["ALL"],
             security_opt=["no-new-privileges:true"],
@@ -140,9 +156,9 @@ def run_python(code: str, timeout_seconds: int = DEFAULT_TIMEOUT) -> dict:
     bevor du ihn als Antwort ausgibst: führe den Code aus, prüfe die Ausgabe
     auf Fehler/Tracebacks, korrigiere den Code bei Bedarf und teste erneut.
 
-    Kein Netzwerk (pip install schlägt fehl), kein Zustand zwischen
-    Aufrufen, kein Android SDK - für Android gibt es eigene Werkzeuge in
-    einem anderen Dienst. Siehe run_shell für Details.
+    Kein Netzwerk (pip install schlägt fehl), kein Android SDK - für Android
+    gibt es eigene Werkzeuge in einem anderen Dienst. /work bleibt zwischen
+    Aufrufen erhalten, /tmp nicht. Siehe run_shell für Details.
 
     :param code: Der auszuführende Python-Code.
     :param timeout_seconds: Zeitlimit in Sekunden (Standard 15, maximal 60).
@@ -163,12 +179,21 @@ def run_shell(command: str, timeout_seconds: int = DEFAULT_TIMEOUT) -> dict:
       sdk_packages, ...) in einem anderen Dienst. Suche Android NICHT hier.
     - KEIN Netzwerk: apt-get/pip install/npm install/curl schlagen immer
       fehl. Nur was im Image liegt, ist nutzbar.
-    - KEIN Zustand zwischen Aufrufen: Jeder Aufruf startet einen frischen
-      Container. In einem früheren Aufruf angelegte Dateien sind weg.
-      Schreibe und nutze eine Datei deshalb IMMER im selben Aufruf
-      (mit && verketten).
     - KEIN Zugriff auf den Vault oder andere Stack-Verzeichnisse. Dateien
       liest/schreibst du mit den Dateisystem-Werkzeugen, nicht hier.
+
+    ARBEITSVERZEICHNIS - wichtig für mehrschrittiges Arbeiten:
+
+    - /work BLEIBT zwischen Aufrufen erhalten und ist das Startverzeichnis.
+      Lege Testdateien, Skripte und Testverzeichnisse IMMER hier an, wenn du
+      sie in einem späteren Aufruf noch brauchst.
+    - /tmp wird bei JEDEM Aufruf geleert (frischer Container). Was du dort
+      ablegst, ist im nächsten Aufruf weg.
+
+    Wenn eine Datei aus einem früheren Aufruf "nicht gefunden" wird, hast du
+    sie mit hoher Wahrscheinlichkeit unter /tmp statt /work angelegt -
+    wiederhole den Schritt unter /work, statt denselben Befehl mehrfach zu
+    versuchen.
 
     Wenn ein Befehl "not found" meldet, ist das Programm schlicht nicht
     installiert - probiere dann NICHT dutzende Varianten und Pfade durch,
@@ -200,7 +225,10 @@ def run_script(script: str, interpreter: str = "bash", args: str = "",
       keine echten Werte - schreibe Skripte so, dass sie einen Rückfallwert
       haben (z. B. "$(tput cols 2>/dev/null || echo 80)"). Dass das hier
       greift, heißt NICHT, dass es auf dem Rechner des Nutzers so ist.
-    - KEIN Netzwerk und kein Zustand zwischen Aufrufen (siehe run_shell).
+    - KEIN Netzwerk (siehe run_shell).
+    - Das Skript wird unter /work/script abgelegt und von dort ausgeführt.
+      /work bleibt zwischen Aufrufen erhalten - Testdateien, die du vorher
+      dort angelegt hast, sind also noch da.
     - Die Ausgabe enthält Farb-Escapes als Rohtext - das ist normal und im
       echten Terminal des Nutzers dann bunt.
 
@@ -229,11 +257,29 @@ def run_script(script: str, interpreter: str = "bash", args: str = "",
     # unproblematisch - genau daran scheitern naive Ansätze.
     encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
     inner = (
-        f"printf '%s' '{encoded}' | base64 -d > /tmp/script && "
-        f"{interpreter} /tmp/script {args}"
+        f"printf '%s' '{encoded}' | base64 -d > {WORK_DIR}/script && "
+        f"{interpreter} {WORK_DIR}/script {args}"
     )
     return _run_in_sandbox(["bash", "-c", inner], timeout_seconds)
 
 
+def _prepare_workdir():
+    """Rechte auf dem persistenten Arbeitsbereich setzen.
+
+    Ein frisch angelegtes Docker-Volume gehört root und ist nur für root
+    beschreibbar - die Wegwerf-Container laufen aber als 'nobody'. Ohne
+    diesen Schritt scheitert dort jeder Schreibvorgang mit "Permission
+    denied". Dieser Dienst läuft als root und hat dasselbe Volume unter
+    /work eingehängt, kann die Rechte also einmalig beim Start setzen.
+    """
+    try:
+        os.makedirs(WORK_DIR, exist_ok=True)
+        os.chmod(WORK_DIR, 0o1777)  # wie /tmp: jeder darf schreiben, nur der
+                                    # Eigentümer darf löschen (Sticky Bit)
+    except OSError as exc:
+        print(f"Warnung: Arbeitsbereich {WORK_DIR} nicht vorbereitbar: {exc}", flush=True)
+
+
 if __name__ == "__main__":
+    _prepare_workdir()
     mcp.run(transport="streamable-http", host=HOST, port=PORT)
