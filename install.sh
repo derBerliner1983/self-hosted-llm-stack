@@ -544,13 +544,25 @@ SANDBOX_MEM_LIMIT=256m
 SANDBOX_TMPFS_SIZE=64m
 SANDBOX_NETWORK=none
 
+# Android-Build-Umgebung (android-mcp): Gradle + Android SDK als
+# MCP-Werkzeuge, siehe README "Android-Entwicklung". Anders als die
+# Code-Sandbox laufen die Builds direkt im Dienst-Container, mit Netzwerk
+# und persistentem Gradle-Cache - Android-Builds brauchen beides.
+ANDROID_DEFAULT_TIMEOUT=600
+ANDROID_MAX_TIMEOUT=1800
+ANDROID_COMPILE_SDK=34
+ANDROID_MIN_SDK=24
+
 # Vault-Bridge (Obsidian-Vault auf Nextcloud <-> MCP-Gateway-Dateisystem-
 # Werkzeug, siehe README "Vault-Bridge"). Verbindung wird über die eigene
 # Web-Oberfläche (Port PORT_VAULT_BRIDGE) hergestellt, nicht hier — hier nur
 # der Port. MCP_SERVERS/MCP_FILESYSTEM_DIRS unten steuern, welche MCP-
 # Gateway-Werkzeuge aktiv sind und welche Verzeichnisse sie sehen.
 MCP_SERVERS=fetch,filesystem
-MCP_FILESYSTEM_DIRS=/vault
+# /vault = Obsidian-Vault, /workspace = Android-Projekte (siehe android-mcp).
+# Beide werden vom Dateisystem-Werkzeug freigegeben; scripts/wire-mcp.sh
+# trägt fehlende Verzeichnisse auch in eine bestehende Installation nach.
+MCP_FILESYSTEM_DIRS=/vault,/workspace
 # ro = KI kann den Vault nur lesen (Standard). rw = KI kann auch schreiben —
 # nur zusammen mit Zwei-Wege-Sync (Vault-Bridge) bzw. einem "Senden & Empfangen"-
 # Ordner (Syncthing) sinnvoll, sonst überschreibt der nächste Sync-Lauf

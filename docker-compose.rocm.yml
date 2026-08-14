@@ -85,7 +85,7 @@ services:
     restart: always
     environment:
       - MCP_SERVERS=${MCP_SERVERS:-fetch,filesystem}
-      - MCP_FILESYSTEM_DIRS=${MCP_FILESYSTEM_DIRS:-/vault}
+      - MCP_FILESYSTEM_DIRS=${MCP_FILESYSTEM_DIRS:-/vault,/workspace}
     # Port 3000 bedient zweierlei:
     #   1. die MCPHub-Weboberfläche - dort lassen sich MCP-Server ansehen,
     #      ein-/ausschalten und neue hinzufügen (Hot-Reload, kein Neustart
@@ -99,6 +99,11 @@ services:
       - mcp-data:/var/lib/mcp
       - mcp-shared:/var/lib/mcp-shared
       - vault-data:/vault:${MCP_VAULT_MOUNT_MODE:-ro}
+      # Android-Projektquellen: read-write, damit die Dateisystem-Werkzeuge
+      # den Code bearbeiten können, den android-mcp anschließend baut.
+      # Damit der filesystem-Server dieses Verzeichnis auch tatsächlich
+      # freigibt, trägt scripts/wire-mcp.sh es mit ein.
+      - android-workspace:/workspace
       - ./mcp-tools:/opt/mcp-tools:ro
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:3000/health"]
@@ -204,6 +209,38 @@ services:
       start_period: 30s
       retries: 3
 
+  # ── Android-Build-Umgebung (Gradle + Android SDK als MCP-Werkzeuge) ────────
+  # Bewusst NICHT nach dem Wegwerf-Muster von sandbox-mcp gebaut: Android-
+  # Builds brauchen Netzwerk (Gradle lädt Abhängigkeiten), einen persistenten
+  # Cache und Laufzeiten in Minuten. Die Befehle laufen deshalb direkt in
+  # diesem Container - der dafür auch keinen Docker-Socket braucht.
+  #
+  # Das Image ist groß (~6-8 GB, Android SDK) und der erste Bau dauert
+  # entsprechend. Wer keine Android-Entwicklung braucht, kann diesen Dienst
+  # ersatzlos streichen (dann auch den android_build-Eintrag in
+  # mcpo/config.template.json entfernen).
+  android-mcp:
+    build: ./android-mcp
+    container_name: android-mcp
+    restart: always
+    environment:
+      - ANDROID_DEFAULT_TIMEOUT=${ANDROID_DEFAULT_TIMEOUT:-600}
+      - ANDROID_MAX_TIMEOUT=${ANDROID_MAX_TIMEOUT:-1800}
+      - ANDROID_COMPILE_SDK=${ANDROID_COMPILE_SDK:-34}
+      - ANDROID_MIN_SDK=${ANDROID_MIN_SDK:-24}
+    volumes:
+      # Projektquellen. Dasselbe Volume hängt read-write im mcp-Container,
+      # damit die Dateisystem-Werkzeuge den Code bearbeiten können.
+      - android-workspace:/workspace
+      # Gradle-Cache: ohne ihn lädt jeder Build alle Abhängigkeiten neu.
+      - android-gradle:/gradle
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import socket; socket.create_connection(('127.0.0.1',8000),3)\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
   # ── mcpo (MCP → OpenAPI-Proxy) ──────────────────────────────────────────────
   # Open WebUI spricht kein rohes MCP, nur OpenAPI. mcpo übersetzt mcp und
   # sandbox-mcp dafür. mcpo/config.json wird von scripts/wire-mcp.sh mit dem
@@ -228,6 +265,8 @@ services:
       mcp:
         condition: service_healthy
       sandbox-mcp:
+        condition: service_healthy
+      android-mcp:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs')\" || exit 1"]
@@ -385,3 +424,7 @@ volumes:
     name: vault-bridge-data
   syncthing-config:
     name: syncthing-config
+  android-workspace:
+    name: android-workspace
+  android-gradle:
+    name: android-gradle
