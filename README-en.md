@@ -184,6 +184,14 @@ docker build -f sandbox-mcp/runner-multilang.Dockerfile \
   -t ai-stack-sandbox-runner:multilang sandbox-mcp/
 ```
 
+Optionally add **PowerShell** (`pwsh`) — costs ~200 MB and comes from Microsoft's package source, hence off by default:
+
+```bash
+docker build --build-arg WITH_POWERSHELL=1 \
+  -f sandbox-mcp/runner-multilang.Dockerfile \
+  -t ai-stack-sandbox-runner:multilang sandbox-mcp/
+```
+
 Then in `.env`:
 
 ```bash
@@ -205,7 +213,7 @@ docker compose -f docker-compose.rocm.yml up -d sandbox-mcp
 - **No network** (default `SANDBOX_NETWORK=none`): `npm install`, `pip install`, `go get` and Gradle dependencies won't work. Standard library and whatever is baked into the image only. If you need more, set `SANDBOX_NETWORK=bridge` and give up the isolation.
 - **No state between calls** — every call is a fresh container. Multi-stage builds that rely on intermediate state won't work.
 - **Package versions come from Debian stable** and are correspondingly conservative (e.g. Node 18, Go 1.19, JDK 17). Adjust the Dockerfile for newer ones.
-- **PowerShell is not included** (not in the Debian repos, would need Microsoft's package source) — add it to the Dockerfile if you need it.
+- **PowerShell** is not included by default but can be enabled at build time (see above). Windows-specific cmdlets (registry, WMI, Active Directory, …) naturally still don't exist on Linux.
 - **Android app development doesn't work this way** — SDK, Gradle and emulator far exceed what a throwaway container without network can do. That needs a dedicated, persistent build service with network access and a persistent Gradle cache.
 
 ### Enable the tools in Open WebUI (mcpo)
