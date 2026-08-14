@@ -5,11 +5,11 @@
 [![Powered by Docker Compose](docs/images/powered-by-docker-compose.svg)](https://docs.docker.com/compose/) &nbsp;[![Docker Pulls](https://raw.githubusercontent.com/hwdsl2/badges/main/img/docker-pulls-ai-stack.svg)](https://hub.docker.com/u/hwdsl2) &nbsp;[![License: MIT](docs/images/license.svg)](https://opensource.org/licenses/MIT)
 
 <p align="center">
-  <img src="docs/images/self-hosted-ai-stack-overview.png"
-       alt="Self-Hosted AI Stack: deploy a complete self-hosted AI stack with one command"
+  <img src="docs/images/stack-overview-en.svg"
+       alt="Self-Hosted AI Stack: Open WebUI, LiteLLM and Ollama on AMD ROCm, plus MCP tools for a knowledge vault, code sandbox, Android builds, web fetch and time — set up with a single command"
        width="100%">
 </p>
-<p align="center"><sub>Shows the general concept of the original CPU/NVIDIA variant. For the current AMD ROCm stack diagram, see the <a href="#architecture">Architecture section</a> below.</sub></p>
+<p align="center"><sub>The full architecture diagram with every service is in the <a href="#architecture">Architecture section</a> below.</sub></p>
 
 Includes Ollama, LiteLLM, AnythingLLM, Whisper, MCP Gateway, Embeddings, Docling, and Kokoro — fully configured and ready to run with Docker Compose.
 
