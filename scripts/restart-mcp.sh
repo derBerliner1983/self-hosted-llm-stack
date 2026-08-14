@@ -74,20 +74,22 @@ wait_healthy() {
 
 if [ "$MCPO_ONLY" -eq 0 ]; then
   if [ "$BUILD" -eq 1 ]; then
-    # Nur diese beiden Dienste werden aus lokalem Quellcode gebaut; alle
-    # anderen kommen als fertiges Image aus einer Registry.
-    info "Baue die lokal gebauten Images neu (vault-bridge, sandbox-mcp)…"
-    compose build vault-bridge sandbox-mcp
-    info "Erzeuge vault-bridge und sandbox-mcp mit dem neuen Stand neu…"
-    compose up -d vault-bridge sandbox-mcp
+    # Nur diese Dienste werden aus lokalem Quellcode gebaut; alle anderen
+    # kommen als fertiges Image aus einer Registry.
+    info "Baue die lokal gebauten Images neu (vault-bridge, sandbox-mcp, android-mcp)…"
+    info "Hinweis: android-mcp ist groß (Android SDK) — der erste Bau dauert lange."
+    compose build vault-bridge sandbox-mcp android-mcp
+    info "Erzeuge die neu gebauten Dienste mit dem neuen Stand neu…"
+    compose up -d vault-bridge sandbox-mcp android-mcp
   else
-    info "Starte mcp und sandbox-mcp neu…"
-    compose restart mcp sandbox-mcp
+    info "Starte mcp, sandbox-mcp und android-mcp neu…"
+    compose restart mcp sandbox-mcp android-mcp
   fi
 
-  info "Warte, bis mcp und sandbox-mcp bereit sind…"
+  info "Warte, bis mcp, sandbox-mcp und android-mcp bereit sind…"
   wait_healthy mcp
   wait_healthy sandbox-mcp
+  wait_healthy android-mcp
 fi
 
 # Der eigentliche Punkt dieses Skripts: mcpo kommt zuletzt, damit es seine

@@ -58,13 +58,27 @@ const path = "/var/lib/mcp/mcp_settings.json";
 const data = JSON.parse(fs.readFileSync(path, "utf8"));
 data.mcpServers = data.mcpServers || {};
 let changed = false;
+const dirs = (process.env.MCP_FILESYSTEM_DIRS || "/vault,/workspace")
+  .split(",").map(d => d.trim()).filter(Boolean);
 if (!data.mcpServers.filesystem) {
-  const dirs = process.env.MCP_FILESYSTEM_DIRS || "/vault";
   data.mcpServers.filesystem = {
     command: "npx",
-    args: ["-y", "@modelcontextprotocol/server-filesystem", ...dirs.split(",")],
+    args: ["-y", "@modelcontextprotocol/server-filesystem", ...dirs],
   };
   changed = true;
+} else {
+  // Schon vorhanden: fehlende Verzeichnisse ergänzen, statt den Eintrag in
+  // Ruhe zu lassen. Sonst bekäme eine bestehende Installation, die nur
+  // /vault kennt, ein später hinzugekommenes Verzeichnis (z. B. den
+  // Android-Arbeitsbereich) nie zu sehen.
+  const args = data.mcpServers.filesystem.args || [];
+  for (const dir of dirs) {
+    if (!args.includes(dir)) {
+      args.push(dir);
+      changed = true;
+    }
+  }
+  data.mcpServers.filesystem.args = args;
 }
 if (!data.mcpServers.time) {
   data.mcpServers.time = {

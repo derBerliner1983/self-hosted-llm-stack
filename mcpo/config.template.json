@@ -10,6 +10,10 @@
     "code_sandbox": {
       "type": "streamable-http",
       "url": "http://sandbox-mcp:8000/mcp"
+    },
+    "android_build": {
+      "type": "streamable-http",
+      "url": "http://android-mcp:8000/mcp"
     }
   }
 }
