@@ -22,7 +22,9 @@ Host-Port.
 This file is part of Self-Hosted AI Stack. MIT License.
 """
 
+import base64
 import os
+import re
 import uuid
 
 import docker
@@ -175,7 +177,62 @@ def run_shell(command: str, timeout_seconds: int = DEFAULT_TIMEOUT) -> dict:
     :param command: Der auszuführende Shell-Befehl.
     :param timeout_seconds: Zeitlimit in Sekunden (Standard 15, maximal 60).
     """
-    return _run_in_sandbox(["sh", "-c", command], timeout_seconds)
+    # bash statt sh: Modelle schreiben fast immer Bash-Syntax ([[ ]], Arrays,
+    # $'...'), die unter dash/sh scheitert. Das Image bringt bash mit.
+    return _run_in_sandbox(["bash", "-c", command], timeout_seconds)
+
+
+@mcp.tool()
+def run_script(script: str, interpreter: str = "bash", args: str = "",
+               timeout_seconds: int = DEFAULT_TIMEOUT) -> dict:
+    """Schreibt ein KOMPLETTES, mehrzeiliges Skript in eine Datei und führt es
+    aus. Nutze dieses Werkzeug für alles, was länger als ein Einzeiler ist -
+    statt zu versuchen, ein ganzes Skript in einen run_shell-Befehl zu
+    quetschen (dort scheitert es meist an Anführungszeichen und Zeilenumbrüchen).
+
+    So testest du selbst geschriebene Skripte: Skript hier hineingeben,
+    Ausgabe und Exit-Code prüfen, bei Fehlern korrigieren und erneut
+    aufrufen - bevor du dem Nutzer das Ergebnis gibst.
+
+    Zu beachten, weil es sonst zu falschen Schlüssen führt:
+
+    - Es gibt KEIN Terminal (TTY). "tput cols"/"tput lines" liefern daher
+      keine echten Werte - schreibe Skripte so, dass sie einen Rückfallwert
+      haben (z. B. "$(tput cols 2>/dev/null || echo 80)"). Dass das hier
+      greift, heißt NICHT, dass es auf dem Rechner des Nutzers so ist.
+    - KEIN Netzwerk und kein Zustand zwischen Aufrufen (siehe run_shell).
+    - Die Ausgabe enthält Farb-Escapes als Rohtext - das ist normal und im
+      echten Terminal des Nutzers dann bunt.
+
+    :param script: Der vollständige Skriptinhalt (mehrzeilig, ohne Escaping).
+    :param interpreter: bash (Standard), sh, python3, node, ruby, perl, php, pwsh.
+    :param args: Argumente, die dem Skript übergeben werden, z. B. "2".
+    :param timeout_seconds: Zeitlimit in Sekunden (Standard 15, maximal 60).
+    """
+    allowed = {"bash", "sh", "python3", "node", "ruby", "perl", "php", "pwsh"}
+    if interpreter not in allowed:
+        return {
+            "output": "", "exit_code": None, "timed_out": False,
+            "error": f"Unbekannter Interpreter '{interpreter}'. Erlaubt: {', '.join(sorted(allowed))}.",
+        }
+    # Argumente nur zulassen, wenn sie harmlos aussehen - sie landen in einer
+    # Shell-Zeile. Das Skript selbst geht base64-kodiert rüber und wird
+    # deshalb nie von der Shell interpretiert.
+    if args and not re.match(r"^[A-Za-z0-9 ._:=/+-]*$", args):
+        return {
+            "output": "", "exit_code": None, "timed_out": False,
+            "error": "Ungültige Zeichen in args. Erlaubt: Buchstaben, Ziffern und . _ : = / + - Leerzeichen.",
+        }
+
+    # base64 statt direktem Einbetten: So sind Anführungszeichen,
+    # Zeilenumbrüche, $-Zeichen und Backslashes im Skript garantiert
+    # unproblematisch - genau daran scheitern naive Ansätze.
+    encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
+    inner = (
+        f"printf '%s' '{encoded}' | base64 -d > /tmp/script && "
+        f"{interpreter} /tmp/script {args}"
+    )
+    return _run_in_sandbox(["bash", "-c", inner], timeout_seconds)
 
 
 if __name__ == "__main__":

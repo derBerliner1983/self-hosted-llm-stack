@@ -162,10 +162,15 @@ Configurable via `.env`: `PORT_MCP` (default `3000`). `install.sh` opens the por
 
 ### Code sandbox (`run_python` / `run_shell` for the LLM)
 
-Alongside MCP Gateway, the stack ships a dedicated **code sandbox** (`sandbox-mcp/`) so the model can **test code it writes, catch errors, and iterate** instead of handing you untested code. Two tools, exposed through the same LiteLLM MCP mechanism:
+Alongside MCP Gateway, the stack ships a dedicated **code sandbox** (`sandbox-mcp/`) so the model can **test code it writes, catch errors, and iterate** instead of handing you untested code. Three tools, exposed through the same LiteLLM MCP mechanism:
 
 - `run_python(code)` — runs Python code
-- `run_shell(command)` — runs a shell command
+- `run_shell(command)` — runs a shell command (**bash**, not `sh` — models almost always write bash syntax)
+- `run_script(script, interpreter, args)` — runs a **complete, multi-line script**: bash, sh, python3, node, ruby, perl, php or pwsh, optionally with arguments
+
+> **Why `run_script` in addition to `run_shell`?** Squeezing a whole script into a one-liner regularly fails on quoting and newlines — exactly where models get stuck and then try dozens of variants. `run_script` takes the content as-is (transferred base64-encoded internally so quotes, `$`, backslashes and non-ASCII characters arrive intact), writes it to a file and invokes the chosen interpreter on it.
+
+> ⚠️ **No terminal in the sandbox:** `tput cols`/`tput lines` return no real values there, and colour escapes appear as raw text in the output. Both are normal and say nothing about how the script behaves in the user's terminal — scripts should provide a fallback for `tput` (`$(tput cols 2>/dev/null || echo 80)`).
 
 **How isolation works:** every single call spins up a **brand-new, isolated, throwaway container** — no network access, read-only filesystem (only `/tmp` is writable), memory/CPU/process limits, no root, all Linux capabilities dropped, a timeout (15s default, 60s max). The container is deleted immediately after each run — there's no state to reset: every call starts from zero, guaranteed.
 
