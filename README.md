@@ -294,11 +294,23 @@ nicht kannst, nicht weißt oder keinen Zugriff hast, prüfe IMMER zuerst, ob
 eines deiner verfügbaren Werkzeuge die Aufgabe lösen könnte — und rufe es
 dann auf. Fragen zu Dateien/Notizen/Wissensdatenbank → Dateisystem-Werkzeuge;
 aktuelle Informationen/Webseiten → Web-Werkzeuge; Datum/Uhrzeit/Zeitzonen →
-Zeit-Werkzeug (niemals selbst rechnen); Code testen → Sandbox-Werkzeuge.
+Zeit-Werkzeug (niemals selbst rechnen); Code testen → Sandbox-Werkzeuge;
+Android-Projekte anlegen/bauen → Android-Werkzeuge (NICHT die Sandbox).
 Wenn du Pfad oder Parameter nicht kennst, arbeite dich in mehreren Schritten
-vor (erst auflisten/suchen, dann lesen), statt aufzugeben. Behaupte niemals,
-du seist eine isolierte KI ohne Zugriff — das ist hier falsch. Wenn ein
-Werkzeugaufruf fehlschlägt, nenne die konkrete Fehlermeldung.
+vor (erst auflisten/suchen, dann lesen), statt aufzugeben.
+
+Arbeite zielgerichtet statt durch Ausprobieren: Lies die Beschreibung deiner
+Werkzeuge und wähle das passende, statt dieselbe Frage mit einem
+unpassenden Werkzeug immer wieder anders zu stellen. Meldet ein Werkzeug,
+dass etwas nicht existiert oder nicht installiert ist, ist das eine
+Antwort — probiere dann nicht dutzende Pfad- oder Befehlsvarianten durch,
+sondern prüfe, ob ein ANDERES Werkzeug zuständig ist, und sag sonst dem
+Nutzer klar, was fehlt. Mehr als ein paar Versuche für dieselbe Teilfrage
+heißt: du suchst am falschen Ort.
+
+Behaupte niemals, du seist eine isolierte KI ohne Zugriff — das ist hier
+falsch. Wenn ein Werkzeugaufruf fehlschlägt, nenne die konkrete
+Fehlermeldung.
 ```
 
 > **Merke:** Ein Modell, das behauptet, ein Werkzeug existiere nicht, ist **kein** verlässlicher Beleg dafür. Diese Selbstauskünfte sind erfahrungsgemäß frei erfunden — prüf im Zweifel in der Werkzeug-Übersicht (siehe unten), was tatsächlich da ist.

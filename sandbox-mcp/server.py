@@ -138,6 +138,10 @@ def run_python(code: str, timeout_seconds: int = DEFAULT_TIMEOUT) -> dict:
     bevor du ihn als Antwort ausgibst: führe den Code aus, prüfe die Ausgabe
     auf Fehler/Tracebacks, korrigiere den Code bei Bedarf und teste erneut.
 
+    Kein Netzwerk (pip install schlägt fehl), kein Zustand zwischen
+    Aufrufen, kein Android SDK - für Android gibt es eigene Werkzeuge in
+    einem anderen Dienst. Siehe run_shell für Details.
+
     :param code: Der auszuführende Python-Code.
     :param timeout_seconds: Zeitlimit in Sekunden (Standard 15, maximal 60).
     """
@@ -149,6 +153,24 @@ def run_shell(command: str, timeout_seconds: int = DEFAULT_TIMEOUT) -> dict:
     """Führt einen Shell-Befehl in derselben isolierten Wegwerf-Sandbox aus
     wie run_python (kein Netzwerk, wird danach sofort gelöscht) und gibt die
     kombinierte stdout/stderr-Ausgabe sowie den Exit-Code zurück.
+
+    WICHTIG - was hier NICHT vorhanden ist, damit du nicht danach suchst:
+
+    - KEIN Android SDK, kein Gradle, kein adb, kein $ANDROID_HOME. Für alles
+      rund um Android gibt es eigene Werkzeuge (create_project, gradle,
+      sdk_packages, ...) in einem anderen Dienst. Suche Android NICHT hier.
+    - KEIN Netzwerk: apt-get/pip install/npm install/curl schlagen immer
+      fehl. Nur was im Image liegt, ist nutzbar.
+    - KEIN Zustand zwischen Aufrufen: Jeder Aufruf startet einen frischen
+      Container. In einem früheren Aufruf angelegte Dateien sind weg.
+      Schreibe und nutze eine Datei deshalb IMMER im selben Aufruf
+      (mit && verketten).
+    - KEIN Zugriff auf den Vault oder andere Stack-Verzeichnisse. Dateien
+      liest/schreibst du mit den Dateisystem-Werkzeugen, nicht hier.
+
+    Wenn ein Befehl "not found" meldet, ist das Programm schlicht nicht
+    installiert - probiere dann NICHT dutzende Varianten und Pfade durch,
+    sondern sage dem Nutzer, dass es fehlt.
 
     :param command: Der auszuführende Shell-Befehl.
     :param timeout_seconds: Zeitlimit in Sekunden (Standard 15, maximal 60).

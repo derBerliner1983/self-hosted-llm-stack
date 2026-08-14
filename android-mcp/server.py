@@ -209,10 +209,17 @@ public class ExampleUnitTest {{
 
 @mcp.tool()
 def list_projects() -> dict:
-    """Listet alle Android-Projekte im Arbeitsbereich auf.
+    """START HIER FÜR ALLES RUND UM ANDROID. Listet die Android-Projekte im
+    Arbeitsbereich auf.
+
+    Dieser Dienst IST die Android-Umgebung: Android SDK, Gradle und JDK sind
+    hier installiert und einsatzbereit. Suche Android NICHT mit run_shell in
+    der Code-Sandbox - dort gibt es absichtlich kein SDK, und du wirst es
+    dort auch nach beliebig vielen Versuchen nicht finden.
 
     Nutze dieses Werkzeug zuerst, um zu sehen, welche Projekte es gibt,
-    bevor du baust oder Dateien änderst.
+    bevor du baust oder Dateien änderst. Ist noch keines da, legst du mit
+    create_project eines an.
     """
     try:
         entries = sorted(
@@ -343,6 +350,10 @@ def sdk_packages() -> dict:
     """Zeigt, welche Android-SDK-Pakete installiert sind (Plattformen,
     Build-Tools, …). Nützlich, um zu prüfen, ob eine bestimmte API-Ebene
     verfügbar ist, bevor du ein Projekt darauf umstellst.
+
+    Nutze dieses Werkzeug auch, um die Frage "ist Android überhaupt
+    verfügbar?" in EINEM Aufruf zu beantworten - statt in der Code-Sandbox
+    nach SDK-Pfaden oder Umgebungsvariablen zu suchen.
     """
     return _run(["sdkmanager", "--list_installed"], cwd="/", timeout_seconds=120)
 
