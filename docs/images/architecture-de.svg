@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1020" width="1600" height="1020" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif">
+  <title>Architektur des Self-Hosted AI Stack: Datenfluss von den Clients über LiteLLM zu Ollama sowie die MCP-Werkzeugdienste und Speicher</title>
+
+  <defs>
+    <linearGradient id="aiGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#c026d3"/>
+    </linearGradient>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="arwTool" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7c3aed"/>
+    </marker>
+    <marker id="arwData" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0891b2"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="1020" rx="28" fill="#ffffff"/>
+
+  <text x="800" y="72" text-anchor="middle" font-size="46" font-weight="800" fill="#0b1220" letter-spacing="-0.8">
+    Architektur <tspan fill="url(#aiGrad)">·</tspan> Self-Hosted AI Stack
+  </text>
+  <text x="800" y="110" text-anchor="middle" font-size="21" font-weight="500" fill="#64748b">
+    Alles läuft auf deinem Server — Ports in Klammern sind im LAN erreichbar
+  </text>
+
+  <!-- ══ Ebene 1: Zugänge ══════════════════════════════════════════════ -->
+  <text x="70" y="168" font-size="15" font-weight="700" fill="#94a3b8" letter-spacing="1.2">ZUGÄNGE</text>
+  <g>
+    <rect x="70" y="184" width="300" height="86" rx="16" fill="#faf5ff" stroke="#a855f7" stroke-width="2.5"/>
+    <text x="220" y="216" text-anchor="middle" font-size="22" font-weight="700" fill="#0b1220">Open WebUI</text>
+    <text x="220" y="245" text-anchor="middle" font-size="17" fill="#64748b">Chat im Browser (3001)</text>
+
+    <rect x="398" y="184" width="300" height="86" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2.5"/>
+    <text x="548" y="216" text-anchor="middle" font-size="22" font-weight="700" fill="#0b1220">MCP-Clients</text>
+    <text x="548" y="245" text-anchor="middle" font-size="17" fill="#64748b">Claude Desktop, Cursor …</text>
+
+    <rect x="726" y="184" width="300" height="86" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2.5"/>
+    <text x="876" y="216" text-anchor="middle" font-size="22" font-weight="700" fill="#0b1220">Dashboard</text>
+    <text x="876" y="245" text-anchor="middle" font-size="17" fill="#64748b">Status &amp; Modelle (8600)</text>
+
+    <rect x="1054" y="184" width="476" height="86" rx="16" fill="#ecfeff" stroke="#06b6d4" stroke-width="2.5"/>
+    <text x="1292" y="216" text-anchor="middle" font-size="22" font-weight="700" fill="#0b1220">Syncthing</text>
+    <text x="1292" y="245" text-anchor="middle" font-size="17" fill="#64748b">Vault-Sync zu deinen Geräten (8384)</text>
+  </g>
+
+  <!-- ══ Ebene 2: Gateway ══════════════════════════════════════════════ -->
+  <text x="70" y="330" font-size="15" font-weight="700" fill="#94a3b8" letter-spacing="1.2">GATEWAY</text>
+  <rect x="70" y="346" width="628" height="92" rx="16" fill="#f0fdf4" stroke="#22c55e" stroke-width="2.5"/>
+  <text x="384" y="380" text-anchor="middle" font-size="24" font-weight="700" fill="#0b1220">LiteLLM</text>
+  <text x="384" y="410" text-anchor="middle" font-size="17" fill="#64748b">OpenAI-kompatibel · Schlüssel, Limits, Abrechnung (4000)</text>
+
+  <rect x="726" y="346" width="300" height="92" rx="16" fill="#fff7ed" stroke="#f97316" stroke-width="2.5"/>
+  <text x="876" y="380" text-anchor="middle" font-size="24" font-weight="700" fill="#0b1220">mcpo</text>
+  <text x="876" y="410" text-anchor="middle" font-size="17" fill="#64748b">MCP → OpenAPI (8800)</text>
+
+  <!-- Pfeile Zugänge -> Gateway -->
+  <g stroke="#475569" stroke-width="2.5" fill="none" marker-end="url(#arw)">
+    <path d="M220 270 V346"/>
+    <path d="M548 270 V346"/>
+  </g>
+  <g stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#arwTool)">
+    <path d="M300 270 C300 300 876 300 876 346"/>
+  </g>
+  <text x="600" y="300" font-size="15" font-weight="600" fill="#7c3aed">Werkzeuge</text>
+
+  <!-- ══ Ebene 3: Rechenkern + Werkzeuge ═══════════════════════════════ -->
+  <text x="70" y="500" font-size="15" font-weight="700" fill="#94a3b8" letter-spacing="1.2">RECHENKERN</text>
+  <rect x="70" y="516" width="300" height="110" rx="16" fill="#eff6ff" stroke="#3b82f6" stroke-width="3"/>
+  <text x="220" y="552" text-anchor="middle" font-size="24" font-weight="700" fill="#0b1220">Ollama</text>
+  <text x="220" y="580" text-anchor="middle" font-size="17" fill="#64748b">LLM-Engine</text>
+  <text x="220" y="604" text-anchor="middle" font-size="16" font-weight="700" fill="#dc2626">AMD ROCm · GPU</text>
+
+  <text x="398" y="500" font-size="15" font-weight="700" fill="#94a3b8" letter-spacing="1.2">WERKZEUG-DIENSTE (MCP)</text>
+  <rect x="398" y="516" width="628" height="110" rx="16" fill="#fbfdff" stroke="#e2e8f0" stroke-width="2"/>
+
+  <g>
+    <rect x="418" y="534" width="192" height="74" rx="12" fill="#ffffff" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="514" y="562" text-anchor="middle" font-size="18" font-weight="700" fill="#0b1220">MCP Gateway</text>
+    <text x="514" y="586" text-anchor="middle" font-size="14" fill="#64748b">Dateien · Web · Zeit (3000)</text>
+
+    <rect x="622" y="534" width="192" height="74" rx="12" fill="#ffffff" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="718" y="562" text-anchor="middle" font-size="18" font-weight="700" fill="#0b1220">Code-Sandbox</text>
+    <text x="718" y="586" text-anchor="middle" font-size="14" fill="#64748b">ausführen &amp; testen</text>
+
+    <rect x="826" y="534" width="182" height="74" rx="12" fill="#ffffff" stroke="#22c55e" stroke-width="2"/>
+    <text x="917" y="562" text-anchor="middle" font-size="18" font-weight="700" fill="#0b1220">Android-Build</text>
+    <text x="917" y="586" text-anchor="middle" font-size="14" fill="#64748b">Gradle · SDK</text>
+  </g>
+
+  <text x="1054" y="500" font-size="15" font-weight="700" fill="#94a3b8" letter-spacing="1.2">WEITERE DIENSTE</text>
+  <rect x="1054" y="516" width="476" height="110" rx="16" fill="#fbfdff" stroke="#e2e8f0" stroke-width="2"/>
+  <g>
+    <rect x="1074" y="534" width="216" height="74" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+    <text x="1182" y="562" text-anchor="middle" font-size="18" font-weight="700" fill="#0b1220">Whisper</text>
+    <text x="1182" y="586" text-anchor="middle" font-size="14" fill="#64748b">Sprache → Text (9000)</text>
+
+    <rect x="1302" y="534" width="208" height="74" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+    <text x="1406" y="562" text-anchor="middle" font-size="18" font-weight="700" fill="#0b1220">Embeddings</text>
+    <text x="1406" y="586" text-anchor="middle" font-size="14" fill="#64748b">Text → Vektoren (8000)</text>
+  </g>
+
+  <!-- Pfeile Gateway -> Kern/Werkzeuge -->
+  <g stroke="#475569" stroke-width="2.5" fill="none" marker-end="url(#arw)">
+    <path d="M220 438 V516"/>
+  </g>
+  <g stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#arwTool)">
+    <path d="M470 438 C470 470 514 470 514 534"/>
+    <path d="M876 438 C876 470 718 470 718 534"/>
+    <path d="M940 438 C940 470 917 470 917 534"/>
+  </g>
+
+  <!-- ══ Ebene 4: Speicher ═════════════════════════════════════════════ -->
+  <text x="70" y="700" font-size="15" font-weight="700" fill="#94a3b8" letter-spacing="1.2">SPEICHER (Docker-Volumes)</text>
+  <g>
+    <!-- Reihenfolge so gewählt, dass jedes Volume möglichst direkt unter
+         seinem Nutzer steht und die Pfeile kurz bleiben. -->
+    <rect x="70" y="716" width="300" height="88" rx="16" fill="#eff6ff" stroke="#3b82f6" stroke-width="2.5"/>
+    <text x="220" y="748" text-anchor="middle" font-size="20" font-weight="700" fill="#0b1220">ollama-data</text>
+    <text x="220" y="776" text-anchor="middle" font-size="16" fill="#64748b">heruntergeladene Modelle</text>
+
+    <rect x="398" y="716" width="300" height="88" rx="16" fill="#fffbeb" stroke="#f59e0b" stroke-width="2.5"/>
+    <text x="548" y="748" text-anchor="middle" font-size="20" font-weight="700" fill="#0b1220">vault-data</text>
+    <text x="548" y="776" text-anchor="middle" font-size="16" fill="#64748b">dein Obsidian-Vault</text>
+
+    <rect x="726" y="716" width="300" height="88" rx="16" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2.5"/>
+    <text x="876" y="748" text-anchor="middle" font-size="20" font-weight="700" fill="#0b1220">sandbox-work</text>
+    <text x="876" y="776" text-anchor="middle" font-size="16" fill="#64748b">Arbeitsbereich der Sandbox</text>
+
+    <rect x="1054" y="716" width="230" height="88" rx="16" fill="#f0fdf4" stroke="#22c55e" stroke-width="2.5"/>
+    <text x="1169" y="748" text-anchor="middle" font-size="19" font-weight="700" fill="#0b1220">android-workspace</text>
+    <text x="1169" y="776" text-anchor="middle" font-size="16" fill="#64748b">Projekte</text>
+
+    <rect x="1300" y="716" width="230" height="88" rx="16" fill="#f0f9ff" stroke="#0891b2" stroke-width="2.5"/>
+    <text x="1415" y="748" text-anchor="middle" font-size="19" font-weight="700" fill="#0b1220">PostgreSQL</text>
+    <text x="1415" y="776" text-anchor="middle" font-size="16" fill="#64748b">pgvector · LiteLLM</text>
+  </g>
+
+  <!-- Datenpfeile: kurz und eindeutig, jeder Dienst zu seinem Speicher -->
+  <g stroke="#0891b2" stroke-width="2.5" fill="none" marker-end="url(#arwData)">
+    <path d="M220 626 V716"/>                                  <!-- Ollama → ollama-data -->
+    <path d="M514 608 V716"/>                                  <!-- MCP Gateway → vault-data -->
+    <path d="M740 608 C740 665 850 660 850 716"/>              <!-- Code-Sandbox → sandbox-work -->
+    <path d="M950 608 C950 665 1130 660 1130 716"/>            <!-- Android-Build → android-workspace -->
+    <!-- LiteLLM speichert Schlüssel/Verbrauch in Postgres; am rechten Rand
+         entlang geführt, damit die Linie nichts überdeckt. -->
+    <path d="M660 438 V468 H1562 V692 H1470 V716"/>
+    <!-- Syncthing hält den Vault mit deinen Geräten synchron -->
+    <path d="M1440 270 H1524 V676 H620 V716" stroke-dasharray="7 6"/>
+  </g>
+  <text x="1572" y="520" font-size="14" font-weight="600" fill="#0891b2" transform="rotate(90 1572 520)" text-anchor="middle">LiteLLM → DB</text>
+
+  <!-- ══ Legende ═══════════════════════════════════════════════════════ -->
+  <rect x="70" y="850" width="1460" height="104" rx="16" fill="#fbfdff" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="96" y="884" font-size="15" font-weight="700" fill="#94a3b8" letter-spacing="1.2">LEGENDE</text>
+  <g font-size="16" fill="#334155">
+    <line x1="96" y1="912" x2="146" y2="912" stroke="#475569" stroke-width="2.5" marker-end="url(#arw)"/>
+    <text x="158" y="918">Anfragen ans Modell</text>
+
+    <line x1="386" y1="912" x2="436" y2="912" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#arwTool)"/>
+    <text x="448" y="918">Werkzeugaufrufe (MCP)</text>
+
+    <line x1="700" y1="912" x2="750" y2="912" stroke="#0891b2" stroke-width="2.5" marker-end="url(#arwData)"/>
+    <text x="762" y="918">Datenzugriff</text>
+
+    <line x1="960" y1="912" x2="1010" y2="912" stroke="#0891b2" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arwData)"/>
+    <text x="1022" y="918">Sync von außerhalb</text>
+  </g>
+  <text x="96" y="944" font-size="15" fill="#64748b">Dienste ohne Portangabe sind ausschließlich containerintern erreichbar.</text>
+</svg>
