@@ -248,7 +248,16 @@ sys_state() {
     ufw)
       command -v ufw >/dev/null 2>&1 || { echo missing; return; }
       if $SUDO ufw status 2>/dev/null | head -1 | grep -qi 'active'; then echo run; else echo stopped; fi ;;
-    env) [ -f "$ENV_FILE" ] && echo run || echo missing ;;
+    env)
+      [ -f "$ENV_FILE" ] || { echo missing; return; }
+      # "vorhanden" reicht nicht: einer älteren Installation fehlen Schlüssel,
+      # die erst später dazukamen. Genau daran scheiterten sonst die
+      # Zugangsdaten-Skripte, ohne dass man den Grund sähe.
+      if bash "$ROOT_DIR/scripts/env-repair.sh" --check >/dev/null 2>&1; then
+        echo run
+      else
+        echo partial
+      fi ;;
   esac
 }
 
@@ -296,7 +305,7 @@ state_badge() {
     svc:stopped)   BADGE_TXT="gestoppt" ;;
     svc:missing)   BADGE_TXT="nicht da" ;;
     sys:run)       BADGE_TXT="bereit" ;;
-    sys:partial)   BADGE_TXT="teilweise" ;;
+    sys:partial)   BADGE_TXT="lückenhaft" ;;
     sys:stopped)   BADGE_TXT="aus" ;;
     sys:missing)   BADGE_TXT="fehlt" ;;
     cli:run)       BADGE_TXT="installiert" ;;
@@ -880,10 +889,16 @@ open_item() {
             off)    confirm "Firewall wirklich ausschalten?" && run_cmd "Firewall aus" bash -c "$SUDO ufw disable" ;;
           esac ;;
         env)
-          mitem show "Werte anzeigen (Schlüssel maskiert)"
-          mitem edit "Bearbeiten (\$EDITOR)"
+          [ "$st" = "partial" ] && mitem repair "Auffrischen (Sicherung + fehlende Werte ergänzen)"
+          mitem check "Auf Vollständigkeit prüfen"
+          mitem show  "Werte anzeigen (Schlüssel maskiert)"
+          mitem edit  "Bearbeiten (\$EDITOR)"
+          [ "$st" != "partial" ] && mitem repair "Auffrischen (Sicherung + fehlende Werte ergänzen)"
           menu_pick ".env $G_ARROW was tun?" || return
           case "$PICKED" in
+            repair) confirm "Fehlende Werte ergänzen? Die alte .env wird vorher gesichert." \
+                      && run_cmd ".env auffrischen" bash -c "cd '$ROOT_DIR' && bash scripts/env-repair.sh" ;;
+            check)  run_cmd ".env prüfen" bash -c "cd '$ROOT_DIR' && bash scripts/env-repair.sh --check" ;;
             show) run_cmd ".env" bash -c "sed -E 's/(KEY|PASSWORD|SECRET|TOKEN)=.*/\\1=********/' '$ENV_FILE'" ;;
             edit) run_cmd "Bearbeiten" bash -c "\${EDITOR:-nano} '$ENV_FILE'" ;;
           esac ;;
@@ -939,6 +954,23 @@ main() {
   build_items
   refresh_state
   first_selectable
+
+  # Beim Start einmal nachsehen, ob die .env noch alles enthält. Fehlt etwas,
+  # scheitern sonst später die Zugangsdaten-Skripte mit "fehlt in der .env",
+  # ohne dass man den Grund sieht. Es wird nur GEFRAGT, nichts stillschweigend
+  # geändert — und die alte Datei wird vorher gesichert.
+  if [ -f "$ENV_FILE" ] && ! bash "$ROOT_DIR/scripts/env-repair.sh" --check >/dev/null 2>&1; then
+    draw
+    if confirm ".env ist unvollständig (ältere Installation). Jetzt neu aufbauen? Sicherung wird angelegt."; then
+      run_cmd ".env neu aufbauen" bash -c "cd '$ROOT_DIR' && bash scripts/env-repair.sh"
+      # Adressen und Ports neu einlesen, sie können sich geändert haben.
+      set -a
+      # shellcheck disable=SC1090
+      . "$ENV_FILE" 2>/dev/null || true
+      set +a
+      refresh_state
+    fi
+  fi
 
   local key rest
   while :; do

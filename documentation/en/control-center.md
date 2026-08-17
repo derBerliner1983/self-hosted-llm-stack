@@ -115,6 +115,31 @@ There's nothing to create for the others: LiteLLM signs in as `admin` with the m
 
 > For Syncthing the display checks the actual configuration to see whether the password is **really** set — the value in `.env` is only the intent until `--create` has run.
 
+### When credentials show as "nicht gesetzt"
+
+Then those keys are missing from your `.env`. This happens on installations older than the keys themselves: `install.sh` only writes them during its own run.
+
+**The menu notices on its own.** At startup it checks `.env` and asks if something is missing:
+
+```
+.env ist unvollständig (ältere Installation). Jetzt neu aufbauen? Sicherung wird angelegt. [j/N]
+```
+
+A `j` is enough. Under **System**, `.env` also shows permanently as `▲ lückenhaft`, with the same entry in its submenu. On the command line:
+
+```bash
+./scripts/env-repair.sh --check   # look only, change nothing
+./scripts/env-repair.sh           # back up + rebuild
+```
+
+**What happens:** the old file is backed up (`.env.bak-<timestamp>`, mode 600), then a new, section-ordered `.env` is written **based on the old one**. Every existing value is carried over — including ones the script doesn't know about: your own addresses, changed ports, custom entries. Those end up unchanged in an "Eigene Einträge" section at the bottom. Only what's missing gets added, passwords generated once at random.
+
+> That's the difference from "just create a new one": a fresh file from the template would silently discard your own values. Here the old file is the basis — and the backup sits next to it regardless.
+
+On top of that the scripts heal themselves: showing credentials or creating an account backfills missing values automatically, and says what it added.
+
+> Freshly generated passwords only apply once the account is **created** with them. If the account already exists, the script says so and changes nothing.
+
 ## The sections
 
 **Einrichtung (setup)** — run `install.sh`, check only (`--check-only`, changes nothing), show credentials.
