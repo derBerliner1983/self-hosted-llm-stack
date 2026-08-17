@@ -170,6 +170,7 @@ check_shell() {
     "$ROOT_DIR/scripts/ci-static-checks.sh"
     "$ROOT_DIR/scripts/restart-mcp.sh"
     "$ROOT_DIR/scripts/librechat-user.sh"
+    "$ROOT_DIR/scripts/service-credentials.sh"
     "$ROOT_DIR/scripts/interpreter.sh"
     "$ROOT_DIR/stack-menu.sh"
     "$ROOT_DIR/interpreter/entrypoint.sh"

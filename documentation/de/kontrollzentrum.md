@@ -56,6 +56,7 @@ Die Kopfzeile fasst zusammen: Compose-Datei, Docker-Zustand, wie viele Dienste l
 | `x` | Dienst stoppen |
 | `l` | Logs ansehen (letzte 200 Zeilen) |
 | `o` | Adresse des Dienstes anzeigen |
+| `z` | Zugangsdaten des Dienstes anzeigen |
 | `r` | Status neu einlesen |
 | `q` | Beenden |
 | `Esc` | Aus einem Untermenü zurück |
@@ -88,6 +89,29 @@ Die Adresse wird aus dem Port (`.env`) und der IP des Rechners gebildet, auf dem
 | MCP Gateway | `URL_MCP` |
 
 `./scripts/show-credentials.sh` benutzt dieselben Werte. Erkennt das Menü die falsche IP (mehrere Netzwerkkarten), setz `STACK_HOST` in der `.env`.
+
+## Zugangsdaten
+
+Jeder Dienst hat im Menü **Zugangsdaten anzeigen** (Direkttaste `z`) — Adresse, Benutzer, Passwort bzw. Schlüssel, plus den Hinweis, wie die Anmeldung dort überhaupt funktioniert. Alles auf einmal gibt es unter **Einrichtung → Zugangsdaten anzeigen** oder auf der Kommandozeile:
+
+```bash
+./scripts/service-credentials.sh              # alle Dienste
+./scripts/service-credentials.sh librechat    # nur einer
+```
+
+Bei drei Diensten kann das Menü das Standard-Konto auch **anlegen** (`Standard-Konto anlegen`, bzw. `--create`):
+
+| Dienst | Was passiert |
+|---|---|
+| **LibreChat** | Konto über LibreChats eigenes `create-user`; Passwort aus der `.env` |
+| **Open WebUI** | Registriert das Konto über die API der laufenden Instanz. Der Pfad wird aus deren OpenAPI-Beschreibung ermittelt statt fest eingebaut — Open WebUI ändert seine Routen zwischen Versionen. Findet sich keiner, sagt das Skript das und nennt die Daten fürs Registrieren im Browser |
+| **Syncthing** | Setzt Benutzer und Passwort der Oberfläche (`syncthing generate`) und startet den Container neu |
+
+Bei allen anderen gibt es nichts anzulegen: LiteLLM meldet sich mit `admin` und dem Master-Key an, Dashboard, mcpo und Vault-Bridge haben gar keine Anmeldung — dort steht stattdessen, warum sie nur ins LAN gehören.
+
+Die Passwörter erzeugt `install.sh` einmalig zufällig und legt sie in der `.env` ab. Bewusst keine festen Standardpasswörter: diese Dienste kommen über die MCP-Werkzeuge an deinen Vault.
+
+> Bei Syncthing prüft die Anzeige in der Konfiguration nach, ob das Passwort **wirklich** gesetzt ist — der Wert in der `.env` ist nur der Wunsch, bis `--create` gelaufen ist.
 
 ## Die Bereiche
 

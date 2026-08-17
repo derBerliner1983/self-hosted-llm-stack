@@ -150,7 +150,7 @@ build_items() {
   add head "" "Einrichtung" "" ""
   add act  install     "Stack installieren"        "install.sh — Hardware prüfen, .env anlegen, alles starten" ""
   add act  check       "Nur prüfen"                "install.sh --check-only — nichts verändern"                ""
-  add act  credentials "Zugangsdaten anzeigen"     "URLs, Master-Key, Passwörter"                              ""
+  add act  credentials "Zugangsdaten anzeigen"     "Adressen, Benutzer und Passwörter aller Dienste"           ""
 
   add head "" "Kern" "" ""
   add svc  ollama    "Ollama"      "LLM-Engine (AMD ROCm)"                 "ollama"
@@ -213,6 +213,7 @@ refresh_state() {
     ST_EXISTING=" $(docker ps -a --format '{{.Names}}' 2>/dev/null | tr '\n' ' ')"
     ST_UNHEALTHY=" $(docker ps --filter health=unhealthy --format '{{.Names}}' 2>/dev/null | tr '\n' ' ')"
   fi
+  [ "${#ITEMS[@]}" -gt 0 ] && compute_states
 }
 
 # Ist "$1" in der Liste "$2" (Liste ist leerzeichengerahmt)?
@@ -306,7 +307,10 @@ state_badge() {
   esac
 }
 
-item_state() {
+# Zustand EINES Eintrags ermitteln. Das kostet je nach Art mehrere
+# Unterprozesse (docker image inspect, ufw status …) — deshalb wird das
+# nicht beim Zeichnen aufgerufen, sondern einmal in compute_states().
+probe_state() {
   local kind="$1" id="$2" extra="$3"
   case "$kind" in
     svc) [ "$DOCKER_UP" -eq 1 ] && svc_state "$extra" || echo missing ;;
@@ -317,15 +321,46 @@ item_state() {
   esac
 }
 
+# Zustände aller Einträge einmal berechnen und merken. Vorher wurde bei JEDEM
+# Tastendruck der komplette Bildschirm neu gezeichnet und dabei für jede Zeile
+# erneut gemessen — rund 65 Messungen pro Bild, jede mit eigenen Prozessen.
+# Das Menü reagierte dadurch träge und flackerte sichtbar.
+STATE_CACHE=()
+SUM_TOTAL=0; SUM_RUN=0; SUM_MISS=0
+compute_states() {
+  STATE_CACHE=(); SUM_TOTAL=0; SUM_RUN=0; SUM_MISS=0
+  local line kind id extra st
+  for line in "${ITEMS[@]}"; do
+    IFS='|' read -r kind id _ _ extra <<<"$line"
+    st="$(probe_state "$kind" "$id" "$extra")"
+    STATE_CACHE+=("$st")
+    if [ "$kind" = "svc" ]; then
+      SUM_TOTAL=$((SUM_TOTAL+1))
+      case "$st" in
+        run)     SUM_RUN=$((SUM_RUN+1)) ;;
+        missing) SUM_MISS=$((SUM_MISS+1)) ;;
+      esac
+    fi
+  done
+}
+
+# Beim Zeichnen nur noch nachschlagen — kein einziger Unterprozess.
+item_state() { printf '%s' "${STATE_CACHE[$1]:-none}"; }
+
 # ════════════════════════════════════════════════════════════════════════════
 # Zeichnen
 # ════════════════════════════════════════════════════════════════════════════
 # Waagerechte Linie der Breite $1. Bewusst ohne 'tr': tr arbeitet bytewise und
 # würde das mehrbyte '─' in Einzelbytes zerhacken.
+# Ergebnis in $HR; zusätzlich gemerkt, damit dieselbe Breite nicht bei jedem
+# Bild neu zusammengesetzt wird.
+HR=""; HR_WIDTH=-1
 hr() {
   local n="$1" s
+  [ "$n" = "$HR_WIDTH" ] && return 0
   printf -v s '%*s' "$n" ''
-  printf '%s' "${s// /$G_HL}"
+  HR="${s// /$G_HL}"
+  HR_WIDTH="$n"
 }
 
 # Zeichenweise lesen, ohne Echo — aber bewusst NICHT über "stty raw":
@@ -345,10 +380,15 @@ measure() {
 
 # Auf $2 Zeichen kürzen/auffüllen — zeichen-, nicht bytebasiert (UTF-8-Locale
 # ist oben gesetzt), damit Umlaute die Spalten nicht verschieben.
+# Auf $2 Zeichen kürzen/auffüllen — Ergebnis landet in $FIT.
+# Bewusst KEINE Ausgabe: ein "$(fit …)" pro Spalte und Zeile wären rund 60
+# Forks je Bildaufbau, und genau daran hing die Trägheit beim Blättern.
+EOL=$'\033[K'
+FIT=""
 fit() {
   local s="$1" w="$2"
-  if [ "${#s}" -gt "$w" ]; then printf '%s%s' "${s:0:$((w-1))}" "$G_CUT"
-  else printf '%s%*s' "$s" "$((w - ${#s}))" ""; fi
+  if [ "${#s}" -gt "$w" ]; then FIT="${s:0:$((w-1))}$G_CUT"
+  else printf -v FIT '%s%*s' "$s" "$((w - ${#s}))" ""; fi
 }
 
 # Eigenes Logo: ein Chip mit Pins — steht für "läuft auf eigener Hardware".
@@ -384,9 +424,9 @@ HEADER_LINES=$((LOGO_LINES + 2))
 draw_logo() {
   local i=0
   while [ "$i" -lt "$LOGO_LINES" ]; do
-    printf '  %s%s%s  %s%s%s\n' \
+    printf '  %s%s%s  %s%s%s%s\n' \
       "$c_cyan" "${CHIP[$i]}" "$c_reset" \
-      "${WORDCOL[$i]}" "${WORD[$i]}" "$c_reset"
+      "${WORDCOL[$i]}" "${WORD[$i]}" "$c_reset" "$EOL"
     i=$((i+1))
   done
 }
@@ -394,15 +434,8 @@ draw_logo() {
 draw_header() {
   local inner=$((COLS - 2))
   draw_logo
-  # Zusammenfassung: wie viele Dienste laufen, wie viele fehlen
-  local total=0 running=0 missing=0 line kind id extra st
-  for line in "${ITEMS[@]}"; do
-    IFS='|' read -r kind id _ _ extra <<<"$line"
-    [ "$kind" = "svc" ] || continue
-    total=$((total+1))
-    st=$(item_state "$kind" "$id" "$extra")
-    case "$st" in run) running=$((running+1)) ;; missing) missing=$((missing+1)) ;; esac
-  done
+  # Zahlen stammen aus compute_states() — hier wird nicht gemessen.
+  local total="$SUM_TOTAL" running="$SUM_RUN" missing="$SUM_MISS"
   local dockertxt
   if [ "$DOCKER_UP" -eq 1 ]; then dockertxt="${c_green}${G_RUN} Docker${c_reset}"
   elif [ "$HAS_DOCKER" -eq 1 ]; then dockertxt="${c_red}${G_WARN} Docker aus${c_reset}"
@@ -420,21 +453,21 @@ draw_header() {
 
   plain="  ${COMPOSE_FILE}  ${dockerplain}  ${stats_long}"
   if [ "${#plain}" -le "$COLS" ]; then
-    printf '  %s%s%s  %s  %sDienste:%s %s%d läuft%s · %s%d fehlt%s · %d gesamt\n' \
+    printf '  %s%s%s  %s  %sDienste:%s %s%d läuft%s · %s%d fehlt%s · %d gesamt%s\n' \
       "$c_dim" "$COMPOSE_FILE" "$c_reset" "$dockertxt" \
-      "$c_dim" "$c_reset" "$c_green" "$running" "$c_reset" "$c_dim" "$missing" "$c_reset" "$total"
+      "$c_dim" "$c_reset" "$c_green" "$running" "$c_reset" "$c_dim" "$missing" "$c_reset" "$total" "$EOL"
   else
     plain="  ${dockerplain}  ${stats_long}"
     if [ "${#plain}" -le "$COLS" ]; then
-      printf '  %s  %sDienste:%s %s%d läuft%s · %s%d fehlt%s · %d gesamt\n' \
+      printf '  %s  %sDienste:%s %s%d läuft%s · %s%d fehlt%s · %d gesamt%s\n' \
         "$dockertxt" "$c_dim" "$c_reset" "$c_green" "$running" "$c_reset" \
-        "$c_dim" "$missing" "$c_reset" "$total"
+        "$c_dim" "$missing" "$c_reset" "$total" "$EOL"
     else
-      printf '  %s  %s%d/%d läuft%s · %s%d fehlt%s\n' \
-        "$dockertxt" "$c_green" "$running" "$total" "$c_reset" "$c_dim" "$missing" "$c_reset"
+      printf '  %s  %s%d/%d läuft%s · %s%d fehlt%s%s\n' \
+        "$dockertxt" "$c_green" "$running" "$total" "$c_reset" "$c_dim" "$missing" "$c_reset" "$EOL"
     fi
   fi
-  printf '  %s%s%s\n' "$c_dim" "$(hr "$inner")" "$c_reset"
+  hr "$inner"; printf '  %s%s%s%s\n' "$c_dim" "$HR" "$c_reset" "$EOL"
 }
 
 SEL=0        # Index in ITEMS
@@ -451,28 +484,30 @@ draw_list() {
     [ "$shown" -ge "$VIEW" ] && break
     IFS='|' read -r kind id label desc extra <<<"$line"
     if [ "$kind" = "head" ]; then
-      printf '  %s%s%s%s\n' "$c_bold" "$c_blue" "$label" "$c_reset"
+      printf '  %s%s%s%s%s\n' "$c_bold" "$c_blue" "$label" "$c_reset" "$EOL"
     else
-      st=$(item_state "$kind" "$id" "$extra"); state_badge "$st" "$kind"
-      local mark="  " lab
-      lab="$(fit "$label" "$labw")"
+      st="$(item_state "$i")"; state_badge "$st" "$kind"
+      local mark="  " lab badge dsc
+      fit "$label" "$labw"; lab="$FIT"
+      fit "$BADGE_TXT" $((statw-2)); badge="$FIT"
+      fit "$desc" "$descw"; dsc="$FIT"
       if [ "$i" -eq "$SEL" ]; then
         mark="${c_bold}${c_mag}${G_SEL} ${c_reset}"
         lab="${c_bold}${lab}${c_reset}"
       fi
-      printf '  %s%s %s%s %s%s%s  %s%s%s\n' \
+      printf '  %s%s %s%s %s%s%s  %s%s%s%s\n' \
         "$mark" "$lab" \
-        "$BADGE_COL" "$BADGE_SYM" "$BADGE_COL" "$(fit "$BADGE_TXT" $((statw-2)))" "$c_reset" \
-        "$c_dim" "$(fit "$desc" "$descw")" "$c_reset"
+        "$BADGE_COL" "$BADGE_SYM" "$BADGE_COL" "$badge" "$c_reset" \
+        "$c_dim" "$dsc" "$c_reset" "$EOL"
     fi
     shown=$((shown+1)); i=$((i+1))
   done
-  while [ "$shown" -lt "$VIEW" ]; do printf '\n'; shown=$((shown+1)); done
+  while [ "$shown" -lt "$VIEW" ]; do printf '%s\n' "$EOL"; shown=$((shown+1)); done
 }
 
 draw_footer() {
   local inner=$((COLS - 2))
-  printf '  %s%s%s\n' "$c_dim" "$(hr "$inner")" "$c_reset"
+  hr "$inner"; printf '  %s%s%s%s\n' "$c_dim" "$HR" "$c_reset" "$EOL"
   local more=""
   [ "$((TOP + VIEW))" -lt "${#ITEMS[@]}" ] && more="${c_yellow}↓ mehr${c_reset}  "
   [ "$TOP" -gt 0 ] && more="${c_yellow}↑ mehr${c_reset}  $more"
@@ -482,17 +517,16 @@ draw_footer() {
   [ "$TOP" -gt 0 ] && moreplain="↑ mehr  $moreplain"
   local keys_long="  ${moreplain}↑↓ wählen  Enter öffnen  s starten  x stoppen  l Logs  r neu prüfen  q Ende"
   if [ "${#keys_long}" -le "$COLS" ]; then
-    printf '  %s%s↑↓%s wählen  %sEnter%s öffnen  %ss%s starten  %sx%s stoppen  %sl%s Logs  %sr%s neu prüfen  %sq%s Ende\n' \
+    printf '  %s%s↑↓%s wählen  %sEnter%s öffnen  %ss%s starten  %sx%s stoppen  %sl%s Logs  %sr%s neu prüfen  %sq%s Ende%s\n' \
       "$more" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" \
-      "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset"
+      "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$EOL"
   else
-    printf '  %s%s↑↓%s wählen  %sEnter%s öffnen  %sr%s neu  %sq%s Ende\n' \
-      "$more" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset"
+    printf '  %s%s↑↓%s wählen  %sEnter%s öffnen  %sr%s neu  %sq%s Ende%s\n' \
+      "$more" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$EOL"
   fi
 }
 
 draw() {
-  measure
   VIEW=$((ROWS - HEADER_LINES - 3))
   [ "$VIEW" -lt 3 ] && VIEW=3
   # Auswahl im sichtbaren Bereich halten
@@ -500,7 +534,7 @@ draw() {
   [ "$SEL" -ge "$((TOP + VIEW))" ] && TOP=$((SEL - VIEW + 1))
   [ "$TOP" -lt 0 ] && TOP=0
   # Ganzen Frame auf einmal ausgeben (weniger Flackern)
-  { printf '\033[H\033[2J'; draw_header; draw_list; draw_footer; } 2>/dev/null
+  { printf '\033[H'; draw_header; draw_list; draw_footer; printf '\033[J'; } 2>/dev/null
 }
 
 # ── Navigation ──────────────────────────────────────────────────────────────
@@ -747,7 +781,7 @@ menu_pick() {
 open_item() {
   local line kind id label desc extra st
   line="${ITEMS[$SEL]}"; IFS='|' read -r kind id label desc extra <<<"$line"
-  st=$(item_state "$kind" "$id" "$extra")
+  st="$(item_state "$SEL")"
 
   MENU_KEYS=(); MENU_LABELS=()
   case "$kind" in
@@ -771,7 +805,10 @@ open_item() {
         mitem url    "Adresse anzeigen (zum Anklicken)"
         mitem seturl "Adresse festlegen (eigene Domain / anderer Host)"
       fi
-      [ "$id" = "librechat" ] && mitem lcuser "Zugangsdaten anzeigen / Konto anlegen"
+      mitem creds "Zugangsdaten anzeigen"
+      case "$id" in
+        librechat|open-webui|syncthing) mitem mkacct "Standard-Konto anlegen (Skript)" ;;
+      esac
       mitem logs  "Logs ansehen"
       mitem build "Neu bauen und starten"
       mitem rm    "Container entfernen (Daten bleiben)"
@@ -781,7 +818,9 @@ open_item() {
         logs) svc_logs "$id" ;; build) svc_build "$id" ;;
         url) show_url "$id" "$label" ;;
         seturl) set_url "$id" "$label" ;;
-        lcuser) run_cmd "LibreChat-Zugang" bash -c "cd '$ROOT_DIR' && bash scripts/librechat-user.sh --show" ;;
+        creds)  run_cmd "$label $G_ARROW Zugangsdaten" bash -c "cd '$ROOT_DIR' && bash scripts/service-credentials.sh '$id'" ;;
+        mkacct) confirm "Standard-Konto für $label anlegen?" \
+                  && run_cmd "$label $G_ARROW Konto anlegen" bash -c "cd '$ROOT_DIR' && bash scripts/service-credentials.sh '$id' --create" ;;
         rm) confirm "$label entfernen? Daten-Volumes bleiben erhalten." && svc_rm "$id" ;;
       esac ;;
     cli)
@@ -853,7 +892,7 @@ open_item() {
       case "$id" in
         install)     run_cmd "install.sh"        bash -c "cd '$ROOT_DIR' && $SUDO ./install.sh" ;;
         check)       run_cmd "install.sh --check-only" bash -c "cd '$ROOT_DIR' && ./install.sh --check-only" ;;
-        credentials) run_cmd "Zugangsdaten"      bash -c "cd '$ROOT_DIR' && ./scripts/show-credentials.sh" ;;
+        credentials) run_cmd "Zugangsdaten aller Dienste" bash -c "cd '$ROOT_DIR' && bash scripts/service-credentials.sh" ;;
         stopall)     confirm "Alle Dienste stoppen?" && run_cmd "Stoppe alles" bash -c "cd '$ROOT_DIR' && $DC -f '$COMPOSE_FILE' stop" ;;
         restart)     run_cmd "Starte alles neu"  bash -c "cd '$ROOT_DIR' && $DC -f '$COMPOSE_FILE' up -d" ;;
         restmcp)     run_cmd "MCP-Dienste neu starten" bash -c "cd '$ROOT_DIR' && bash scripts/restart-mcp.sh" ;;
@@ -891,11 +930,12 @@ main() {
   STTY_SAVE="$(stty -g 2>/dev/null || true)"
   trap cleanup EXIT
   trap 'exit 130' INT TERM
-  trap 'measure' WINCH
+  trap 'measure; NEED_MEASURE=1' WINCH
   tput smcup 2>/dev/null || printf '\033[?1049h'
   printf '\033[?25l'
   term_read_mode
 
+  measure
   build_items
   refresh_state
   first_selectable
@@ -921,6 +961,7 @@ main() {
       x) svc_shortcut stop ;;
       l) svc_shortcut logs ;;
       o) svc_shortcut url ;;
+      z) svc_shortcut creds ;;
       r) refresh_state ;;
       q) break ;;
     esac
@@ -937,6 +978,7 @@ svc_shortcut() {
     stop) svc_stop "$id" ;;
     logs) svc_logs "$id" ;;
     url)  show_url "$id" "$(printf '%s' "${ITEMS[$SEL]}" | cut -d'|' -f3)" ;;
+    creds) run_cmd "Zugangsdaten" bash -c "cd '$ROOT_DIR' && bash scripts/service-credentials.sh '$id'" ;;
   esac
 }
 

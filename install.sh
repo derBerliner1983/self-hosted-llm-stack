@@ -58,6 +58,13 @@ LIBRECHAT_ADMIN_EMAIL="${LIBRECHAT_ADMIN_EMAIL:-admin@stack.local}"
 LIBRECHAT_ADMIN_NAME="${LIBRECHAT_ADMIN_NAME:-Admin}"
 LIBRECHAT_ADMIN_USERNAME="${LIBRECHAT_ADMIN_USERNAME:-admin}"
 
+# Open WebUI und Syncthing: Zugangsdaten vorbereiten, damit sie in den
+# Zugangsdaten stehen und per Skript angelegt werden können. Passwoerter
+# werden wie bei LibreChat einmalig zufaellig erzeugt.
+OPENWEBUI_ADMIN_EMAIL="${OPENWEBUI_ADMIN_EMAIL:-admin@stack.local}"
+OPENWEBUI_ADMIN_NAME="${OPENWEBUI_ADMIN_NAME:-Admin}"
+SYNCTHING_GUI_USER="${SYNCTHING_GUI_USER:-admin}"
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
@@ -557,6 +564,8 @@ LIBRECHAT_CREDS_IV="${LIBRECHAT_CREDS_IV:-$(hexrand 16)}"
 LIBRECHAT_JWT_SECRET="${LIBRECHAT_JWT_SECRET:-$(hexrand 32)}"
 LIBRECHAT_JWT_REFRESH_SECRET="${LIBRECHAT_JWT_REFRESH_SECRET:-$(hexrand 32)}"
 LIBRECHAT_ADMIN_PASSWORD="${LIBRECHAT_ADMIN_PASSWORD:-$(rand 20)}"
+OPENWEBUI_ADMIN_PASSWORD="${OPENWEBUI_ADMIN_PASSWORD:-$(rand 20)}"
+SYNCTHING_GUI_PASSWORD="${SYNCTHING_GUI_PASSWORD:-$(rand 20)}"
 
 # Host-MTU der Standardroute ermitteln und die Container-MTU daran anpassen.
 # Verhindert TLS-Timeouts ("i/o timeout") aus Containern hinter VPN/Cloud-Overlays.
@@ -674,6 +683,18 @@ LIBRECHAT_ADMIN_EMAIL=${LIBRECHAT_ADMIN_EMAIL}
 LIBRECHAT_ADMIN_NAME=${LIBRECHAT_ADMIN_NAME}
 LIBRECHAT_ADMIN_USERNAME=${LIBRECHAT_ADMIN_USERNAME}
 LIBRECHAT_ADMIN_PASSWORD=${LIBRECHAT_ADMIN_PASSWORD}
+
+# Open WebUI: der erste registrierte Account wird automatisch Admin. Diese
+# Werte sind der Vorschlag dafuer - anlegen mit
+#   ./scripts/service-credentials.sh open-webui --create
+OPENWEBUI_ADMIN_EMAIL=${OPENWEBUI_ADMIN_EMAIL}
+OPENWEBUI_ADMIN_NAME=${OPENWEBUI_ADMIN_NAME}
+OPENWEBUI_ADMIN_PASSWORD=${OPENWEBUI_ADMIN_PASSWORD}
+
+# Syncthing: die Oberflaeche hat ab Werk KEIN Passwort. Setzen mit
+#   ./scripts/service-credentials.sh syncthing --create
+SYNCTHING_GUI_USER=${SYNCTHING_GUI_USER}
+SYNCTHING_GUI_PASSWORD=${SYNCTHING_GUI_PASSWORD}
 
 # Eigene Adressen der Dienste (optional). Leer = aus IP und Port dieses
 # Rechners gebildet. Trag hier den Namen ein, unter dem ein Dienst von

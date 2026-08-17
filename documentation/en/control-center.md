@@ -58,6 +58,7 @@ The header line summarises: compose file, Docker state, how many services are ru
 | `x` | Stop service |
 | `l` | Show logs (last 200 lines) |
 | `o` | Show the service's address |
+| `z` | Show the service's credentials |
 | `r` | Re-read state |
 | `q` | Quit |
 | `Esc` | Back out of a submenu |
@@ -90,6 +91,29 @@ The address is built from the port (`.env`) and the IP of the machine the menu r
 | MCP Gateway | `URL_MCP` |
 
 `./scripts/show-credentials.sh` uses the same values. If the menu picks the wrong IP (several network interfaces), set `STACK_HOST` in `.env`.
+
+## Credentials
+
+Every service has **Zugangsdaten anzeigen** in the menu (shortcut `z`) — address, user, password or key, plus a note on how signing in works there at all. Everything at once via **Einrichtung → Zugangsdaten anzeigen**, or on the command line:
+
+```bash
+./scripts/service-credentials.sh              # all services
+./scripts/service-credentials.sh librechat    # just one
+```
+
+For three services the menu can also **create** the default account (`Standard-Konto anlegen`, or `--create`):
+
+| Service | What happens |
+|---|---|
+| **LibreChat** | Account via LibreChat's own `create-user`; password from `.env` |
+| **Open WebUI** | Registers the account through the running instance's API. The path is discovered from its OpenAPI description rather than hard-coded — Open WebUI moves its routes between versions. If none is found, the script says so and gives you the details to register in the browser |
+| **Syncthing** | Sets the UI user and password (`syncthing generate`) and restarts the container |
+
+There's nothing to create for the others: LiteLLM signs in as `admin` with the master key; dashboard, mcpo and Vault-Bridge have no login at all — for those it explains why they belong on the LAN only.
+
+`install.sh` generates the passwords once at random and stores them in `.env`. Deliberately no fixed default passwords: these services can reach your vault through the MCP tools.
+
+> For Syncthing the display checks the actual configuration to see whether the password is **really** set — the value in `.env` is only the intent until `--create` has run.
 
 ## The sections
 
