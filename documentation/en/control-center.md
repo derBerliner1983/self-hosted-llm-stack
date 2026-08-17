@@ -95,6 +95,7 @@ Every command's output is also written to a log file; the path is shown at the b
 | Everything says "nicht da" although it's running | Docker daemon unreachable, or your user isn't in the `docker` group |
 | Box characters and umlauts are mangled | No UTF-8 locale — the menu falls back to plain ASCII; for the nicer rendering set `LANG=en_US.UTF-8` (or `C.UTF-8`) |
 | Menu leaves artefacts behind | Terminal too small; roughly 50×12 characters is the usable minimum |
+| Lines stagger diagonally to the right | Fixed — happened before `94e3c83`, when the terminal was switched to raw mode and `\n` lost its carriage return. A `git pull` is enough |
 
 Using a different compose file:
 
