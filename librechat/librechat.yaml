@@ -1,0 +1,78 @@
+# LibreChat-Konfiguration für diesen Stack.
+#
+# Zwei Dinge werden hier verdrahtet:
+#
+#   1. endpoints.custom -> LiteLLM. LibreChat bekommt also dieselben Modelle
+#      wie Open WebUI, über dasselbe Gateway (Schlüssel, Limits, Verbrauch
+#      bleiben an einer Stelle).
+#
+#   2. mcpServers -> unsere MCP-Dienste, DIREKT. Das ist der eigentliche
+#      Unterschied zu Open WebUI: LibreChat spricht MCP nativ, der Umweg
+#      über mcpo (MCP -> OpenAPI) entfällt komplett. Damit fallen auch die
+#      typischen mcpo-Stolpersteine weg - insbesondere die abgerissene
+#      Session nach einem Neustart von mcp ("MCP session is not available").
+#
+# Nach jeder Änderung an dieser Datei LibreChat neu starten:
+#   docker compose -f docker-compose.rocm.yml restart librechat
+
+version: 1.2.8
+cache: true
+
+interface:
+  # Die librechat.yaml ist die Wahrheit; Nutzer sollen Endpunkte nicht
+  # versehentlich in der Oberfläche überschreiben.
+  endpointsMenu: true
+  modelSelect: true
+  parameters: true
+  sidePanel: true
+  presets: true
+  prompts: true
+  bookmarks: true
+  multiConvo: true
+  agents: true
+
+endpoints:
+  custom:
+    - name: "LiteLLM"
+      # Containerinterner Name - LibreChat und LiteLLM liegen im selben
+      # Docker-Netz, der veröffentlichte Port wird nicht gebraucht.
+      baseURL: "http://litellm:4000/v1"
+      apiKey: "${LITELLM_MASTER_KEY}"
+      # "fetch: true" holt die Modellliste zur Laufzeit von LiteLLM - neue
+      # Modelle tauchen dadurch automatisch auf, ohne diese Datei zu ändern.
+      models:
+        default: ["ollama/llama3.1:8b"]
+        fetch: true
+      titleConvo: true
+      titleModel: "current_model"
+      modelDisplayLabel: "LiteLLM (lokal)"
+
+# ── MCP-Werkzeuge, nativ ────────────────────────────────────────────────
+# Dieselben Dienste, die Open WebUI über mcpo erreicht - hier direkt.
+mcpServers:
+  mcp_gateway:
+    type: "streamable-http"
+    url: "http://mcp:3000/mcp"
+    headers:
+      Authorization: "Bearer ${MCP_API_KEY}"
+    timeout: 60000
+    serverInstructions: |
+      Werkzeuge für Dateisystem (/vault = Wissensdatenbank, /workspace =
+      Android-Projekte), Web-Abruf und exakte Zeitzonen. Nutze das
+      Zeit-Werkzeug statt selbst zu rechnen.
+
+  code_sandbox:
+    type: "streamable-http"
+    url: "http://sandbox-mcp:8000/mcp"
+    timeout: 120000
+    serverInstructions: |
+      Code ausführen und testen. /work bleibt zwischen Aufrufen erhalten,
+      /tmp nicht. Kein Netzwerk. Nutze run_script für mehrzeilige Skripte.
+
+  android_build:
+    type: "streamable-http"
+    url: "http://android-mcp:8000/mcp"
+    timeout: 1800000
+    serverInstructions: |
+      Android-Projekte anlegen, bauen und testen (Gradle, SDK). Der erste
+      Build eines Projekts dauert mehrere Minuten.
