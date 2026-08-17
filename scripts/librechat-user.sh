@@ -48,6 +48,23 @@ set -a
 . "$ENV_FILE"
 set +a
 
+# shellcheck source=scripts/env-lib.sh
+. "$SCRIPT_DIR/env-lib.sh"
+
+# Fehlende Zugangsdaten nachtragen, statt daran zu scheitern: bei einer
+# Installation, die vor diesen Schlüsseln angelegt wurde, stehen sie schlicht
+# nicht in der .env — der Nutzer hat nichts falsch gemacht.
+env_ensure LIBRECHAT_ADMIN_EMAIL    "admin@stack.local" || true
+env_ensure LIBRECHAT_ADMIN_NAME     "Admin"             || true
+env_ensure LIBRECHAT_ADMIN_USERNAME "admin"             || true
+env_ensure LIBRECHAT_ADMIN_PASSWORD "$(env_rand 20)"    || true
+ENV_ADDED_ALL="$ENV_ADDED"
+env_report_added
+
+# Wurde das Passwort gerade erst erzeugt? Dann kann es nicht zu einem bereits
+# bestehenden Konto passen — darauf muss unten hingewiesen werden.
+case " $ENV_ADDED_ALL " in *" LIBRECHAT_ADMIN_PASSWORD "*) FRESH_PASSWORD=1 ;; *) FRESH_PASSWORD=0 ;; esac
+
 EMAIL="${LIBRECHAT_ADMIN_EMAIL:-}"
 PASSWORD="${LIBRECHAT_ADMIN_PASSWORD:-}"
 NAME="${LIBRECHAT_ADMIN_NAME:-Admin}"
@@ -102,6 +119,10 @@ done
 if [ "$MODE" != "force" ]; then
   if docker exec librechat npm run list-users --silent 2>/dev/null | grep -q '@'; then
     ok "Es gibt bereits mindestens ein LibreChat-Konto — nichts zu tun."
+    if [ "$FRESH_PASSWORD" -eq 1 ]; then
+      warn "Das Passwort unten wurde gerade erst erzeugt und gilt daher NICHT"
+      warn "für das vorhandene Konto. Zum Neuanlegen: --force"
+    fi
     show_credentials
     exit 0
   fi

@@ -45,6 +45,28 @@ set -a
 . "$ENV_FILE"
 set +a
 
+# shellcheck source=scripts/env-lib.sh
+. "$SCRIPT_DIR/env-lib.sh"
+
+# Zugangsdaten, die noch nicht in der .env stehen, hier nachtragen statt
+# "<nicht gesetzt>" anzuzeigen. Ältere Installationen kennen diese Schlüssel
+# nicht — sie kamen erst später dazu, und install.sh schreibt sie nur beim
+# eigenen Lauf. Ohne das Nachtragen stünde man vor leeren Feldern und wüsste
+# nicht, warum.
+ensure_credentials() {
+  env_ensure LIBRECHAT_ADMIN_EMAIL    "admin@stack.local" || true
+  env_ensure LIBRECHAT_ADMIN_NAME     "Admin"             || true
+  env_ensure LIBRECHAT_ADMIN_USERNAME "admin"             || true
+  env_ensure LIBRECHAT_ADMIN_PASSWORD "$(env_rand 20)"    || true
+  env_ensure OPENWEBUI_ADMIN_EMAIL    "admin@stack.local" || true
+  env_ensure OPENWEBUI_ADMIN_NAME     "Admin"             || true
+  env_ensure OPENWEBUI_ADMIN_PASSWORD "$(env_rand 20)"    || true
+  env_ensure SYNCTHING_GUI_USER       "admin"             || true
+  env_ensure SYNCTHING_GUI_PASSWORD   "$(env_rand 20)"    || true
+}
+ensure_credentials
+NEWLY_ADDED="$ENV_ADDED"
+
 HOST_IP="${STACK_HOST:-}"
 [ -z "$HOST_IP" ] && HOST_IP="$(ip -o -f inet addr show scope global 2>/dev/null | awk '{print $4}' | head -1 | cut -d/ -f1)"
 HOST_IP="${HOST_IP:-<server-ip>}"
@@ -71,10 +93,19 @@ show_open_webui() {
     row "E-Mail:"   "$OPENWEBUI_ADMIN_EMAIL"
     row "Passwort:" "${OPENWEBUI_ADMIN_PASSWORD:-<nicht gesetzt>}"
     note "Konto anlegen (falls noch nicht geschehen): --create"
+    fresh_note OPENWEBUI_ADMIN_PASSWORD
   else
     note "Kein Konto hinterlegt. Open WebUI macht den ERSTEN registrierten"
     note "Account automatisch zum Admin — im Browser registrieren."
   fi
+}
+
+# Passwort gerade erst erzeugt? Dann passt es nicht zu einem Konto, das es
+# vielleicht schon gibt — das muss dabeistehen, sonst probiert man vergeblich.
+fresh_note() {
+  case " $NEWLY_ADDED " in
+    *" $1 "*) note "Passwort gerade erzeugt — gilt erst, wenn das Konto damit angelegt wird." ;;
+  esac
 }
 
 show_librechat() {
@@ -83,6 +114,7 @@ show_librechat() {
   row "E-Mail:"   "${LIBRECHAT_ADMIN_EMAIL:-<nicht gesetzt>}"
   row "Passwort:" "${LIBRECHAT_ADMIN_PASSWORD:-<nicht gesetzt>}"
   note "Registrierung ist zu (LIBRECHAT_ALLOW_REGISTRATION=false)."
+  fresh_note LIBRECHAT_ADMIN_PASSWORD
 }
 
 show_litellm() {
@@ -261,4 +293,8 @@ BANNER
   printf '\n%s%sHinweis:%s Diese Werte stehen im Klartext in %s.env%s — nicht committen/teilen.\n' \
     "$c_blue" "$c_bold" "$c_reset$c_dim" "$c_bold" "$c_reset"
   printf '%sKonto anlegen:%s ./scripts/service-credentials.sh <dienst> --create\n' "$c_dim" "$c_reset"
+  if [ -n "$NEWLY_ADDED" ]; then
+    printf '\n%s%sIn die .env ergänzt:%s %s\n' "$c_yellow" "$c_bold" "$c_reset" "$NEWLY_ADDED"
+    printf '%sDiese Werte gelten erst, wenn das jeweilige Konto damit angelegt wird.%s\n' "$c_dim" "$c_reset"
+  fi
 fi

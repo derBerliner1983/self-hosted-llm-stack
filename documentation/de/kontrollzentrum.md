@@ -113,6 +113,31 @@ Die Passwörter erzeugt `install.sh` einmalig zufällig und legt sie in der `.en
 
 > Bei Syncthing prüft die Anzeige in der Konfiguration nach, ob das Passwort **wirklich** gesetzt ist — der Wert in der `.env` ist nur der Wunsch, bis `--create` gelaufen ist.
 
+### Wenn Zugangsdaten „nicht gesetzt" sind
+
+Dann fehlen die Schlüssel in deiner `.env`. Das passiert bei Installationen, die älter sind als die Schlüssel selbst: `install.sh` schreibt sie nur bei seinem eigenen Lauf.
+
+**Das Menü merkt das von allein.** Beim Start prüft es die `.env` und fragt, wenn etwas fehlt:
+
+```
+.env ist unvollständig (ältere Installation). Jetzt neu aufbauen? Sicherung wird angelegt. [j/N]
+```
+
+Ein `j` genügt. Unter **System** steht die `.env` außerdem dauerhaft als `▲ lückenhaft`, mit demselben Punkt im Untermenü. Auf der Kommandozeile:
+
+```bash
+./scripts/env-repair.sh --check   # nur nachsehen, ändert nichts
+./scripts/env-repair.sh           # Sicherung + neu aufbauen
+```
+
+**Was dabei passiert:** Die alte Datei wird gesichert (`.env.bak-<Zeitstempel>`, Rechte 600), dann wird eine neue, nach Abschnitten geordnete `.env` **auf Grundlage der alten** geschrieben. Alle vorhandenen Werte werden übernommen — auch die, die das Skript gar nicht kennt: eigene Adressen, geänderte Ports, selbst gesetzte Einträge. Die landen unverändert in einem Abschnitt „Eigene Einträge" am Ende. Ergänzt wird nur, was fehlt; Passwörter dabei einmalig zufällig.
+
+> Das ist der Unterschied zu „neu anlegen": eine frische Datei aus der Vorlage würde deine eigenen Werte stillschweigend wegwerfen. Hier ist die alte Datei die Grundlage — und liegt als Sicherung trotzdem daneben.
+
+Zusätzlich heilen sich die Skripte selbst: wer Zugangsdaten anzeigt oder ein Konto anlegt, bekommt fehlende Werte automatisch nachgetragen, mit einem Hinweis, was ergänzt wurde.
+
+> Frisch erzeugte Passwörter gelten erst, wenn das Konto damit **angelegt** wird. Gibt es das Konto schon, sagt das Skript das und ändert nichts.
+
 ## Die Bereiche
 
 **Einrichtung** — `install.sh` starten, nur prüfen (`--check-only`, verändert nichts), Zugangsdaten anzeigen.
