@@ -33,16 +33,24 @@ cd self-hosted-ai-stack
 
 Afterwards `./scripts/show-credentials.sh` prints every URL and credential.
 
+For everything beyond that there's a menu — it shows what is already installed, and adds or removes individual pieces:
+
+```bash
+./stack-menu.sh     # or: ./install.sh --menu
+```
+
 The full walkthrough — requirements, GPU setup and troubleshooting — is in the [installation docs](documentation/en/installation.md).
 
 ## Documentation
 
 | Topic | Contents |
 |---|---|
+| **[Control center (menu)](documentation/en/control-center.md)** | One menu for everything: see status, add parts, remove parts |
 | **[Installation & getting started](documentation/en/installation.md)** | Requirements, installer, ROCm/GPU, uninstalling |
 | **[Architecture & services](documentation/en/architecture.md)** | How the services fit together, ports, dashboard |
 | **[Tools for the LLM (MCP)](documentation/en/tools.md)** | MCP Gateway, wiring into Open WebUI, **per-model checklist** |
 | **[LibreChat (second UI)](documentation/en/librechat.md)** | Alternative to Open WebUI, speaks MCP directly |
+| **[Open Interpreter (CLI)](documentation/en/open-interpreter.md)** | Terminal assistant, optional at install time |
 | **[Code sandbox](documentation/en/code-sandbox.md)** | Running and testing code, workspace, more languages |
 | **[Android development](documentation/en/android.md)** | Creating, building and testing projects |
 | **[Knowledge base (vault)](documentation/en/knowledge-base.md)** | Wiring an Obsidian vault in via Syncthing or Vault-Bridge |
@@ -66,6 +74,7 @@ The full walkthrough — requirements, GPU setup and troubleshooting — is in t
 | **mcpo** | MCP → OpenAPI for Open WebUI, tool overview | `8800` |
 | **Code sandbox** | Running and testing code | internal only |
 | **Android build** | Gradle and Android SDK | internal only |
+| **Open Interpreter** | CLI assistant that runs code (optional) | not a service |
 | **Syncthing** | Vault sync between your devices | `8384` |
 | **PostgreSQL** | Database with pgvector | internal only |
 | **Whisper / Embeddings** | Speech-to-text, text-to-vectors | `9000` / `8000` |

@@ -4,7 +4,7 @@ How the services fit together, which ports are used, and what the dashboard show
 
 [← Back to overview](../../README-en.md) &nbsp;|&nbsp; [Deutsche Fassung](../de/architektur.md)
 
-**Documentation:** [Installation & getting started](installation.md) · **Architecture & services** · [Tools for the LLM (MCP)](tools.md) · [LibreChat (second UI)](librechat.md) · [Code sandbox](code-sandbox.md) · [Android development](android.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · [Operations & maintenance](operations.md) · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
+**Documentation:** [Installation & getting started](installation.md) · [Control center (menu)](control-center.md) · **Architecture & services** · [Tools for the LLM (MCP)](tools.md) · [LibreChat (second UI)](librechat.md) · [Code sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android development](android.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · [Operations & maintenance](operations.md) · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
 
 ---
 

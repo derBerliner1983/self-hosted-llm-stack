@@ -33,6 +33,12 @@ cd self-hosted-ai-stack
 
 Danach zeigt dir `./scripts/show-credentials.sh` alle URLs und Zugangsdaten.
 
+Für alles Weitere gibt es ein Menü — es zeigt, was schon installiert ist, und installiert bzw. entfernt einzelne Bausteine:
+
+```bash
+./stack-menu.sh     # oder: ./install.sh --menu
+```
+
 Die ausführliche Anleitung samt Voraussetzungen, GPU-Einrichtung und Fehlersuche steht in der [Installationsdokumentation](documentation/de/installation.md).
 
 ## Dokumentation
@@ -40,10 +46,12 @@ Die ausführliche Anleitung samt Voraussetzungen, GPU-Einrichtung und Fehlersuch
 | Thema | Inhalt |
 |---|---|
 | **[Installation & Erste Schritte](documentation/de/installation.md)** | Voraussetzungen, Installer, ROCm/GPU, Deinstallation |
+| **[Kontrollzentrum (Menü)](documentation/de/kontrollzentrum.md)** | Menü für alles: Status sehen, nachinstallieren, entfernen |
 | **[Architektur & Dienste](documentation/de/architektur.md)** | Zusammenspiel der Dienste, Ports, Dashboard |
 | **[Werkzeuge fürs LLM (MCP)](documentation/de/werkzeuge.md)** | MCP Gateway, Anbindung an Open WebUI, **Checkliste pro Modell** |
 | **[LibreChat (zweite Oberfläche)](documentation/de/librechat.md)** | Alternative zu Open WebUI, spricht MCP direkt |
 | **[Code-Sandbox](documentation/de/code-sandbox.md)** | Code ausführen und testen lassen, Arbeitsbereich, weitere Sprachen |
+| **[Open Interpreter (CLI)](documentation/de/open-interpreter.md)** | Assistent fürs Terminal, optional mitinstallierbar |
 | **[Android-Entwicklung](documentation/de/android.md)** | Projekte anlegen, bauen, testen |
 | **[Wissensdatenbank (Vault)](documentation/de/wissensdatenbank.md)** | Obsidian-Vault per Syncthing oder Vault-Bridge anbinden |
 | **[Modelle verwalten](documentation/de/modelle.md)** | Modelle laden, entladen, bei LiteLLM registrieren |
@@ -67,6 +75,7 @@ Die ausführliche Anleitung samt Voraussetzungen, GPU-Einrichtung und Fehlersuch
 | **Code-Sandbox** | Code ausführen und testen | nur intern |
 | **Android-Build** | Gradle und Android SDK | nur intern |
 | **Syncthing** | Vault-Sync zwischen deinen Geräten | `8384` |
+| **Open Interpreter** | CLI-Assistent, führt Code aus (optional) | kein Dienst |
 | **PostgreSQL** | Datenbank mit pgvector | nur intern |
 | **Whisper / Embeddings** | Sprache-zu-Text, Text-zu-Vektoren | `9000` / `8000` |
 
