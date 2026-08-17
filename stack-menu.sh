@@ -64,6 +64,69 @@ resolve_dc() {
 }
 command -v docker >/dev/null 2>&1 && resolve_dc
 
+# ── Adressen der Dienste ────────────────────────────────────────────────────
+# Der Port steht in der .env, die IP kommt vom Rechner, auf dem das Menü läuft.
+# Zusätzlich kann pro Dienst eine eigene Adresse hinterlegt werden — etwa der
+# Name hinter einem Reverse-Proxy (https://chat.example.com). Die hat Vorrang.
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE" 2>/dev/null || true
+  set +a
+fi
+
+HOST_IP="${STACK_HOST:-}"
+if [ -z "$HOST_IP" ]; then
+  HOST_IP="$(ip -o -f inet addr show scope global 2>/dev/null | awk '{print $4}' | head -1 | cut -d/ -f1)"
+fi
+HOST_IP="${HOST_IP:-localhost}"
+
+# Port und Pfad je Dienst. Dienste ohne Weboberfläche stehen bewusst nicht drin.
+svc_port_path() {
+  case "$1" in
+    open-webui)   printf '%s %s' "${PORT_WEBUI:-3001}"          "/" ;;
+    librechat)    printf '%s %s' "${PORT_LIBRECHAT:-3080}"      "/" ;;
+    litellm)      printf '%s %s' "${PORT_LITELLM:-4000}"        "/ui" ;;
+    dashboard)    printf '%s %s' "${PORT_DASHBOARD:-8600}"      "/" ;;
+    vault-bridge) printf '%s %s' "${PORT_VAULT_BRIDGE:-8700}"   "/" ;;
+    syncthing)    printf '%s %s' "${PORT_SYNCTHING_GUI:-8384}"  "/" ;;
+    mcpo)         printf '%s %s' "${PORT_MCPO:-8800}"           "/mcp_gateway/docs" ;;
+    mcp)          printf '%s %s' "${PORT_MCP:-3000}"            "/" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Name der .env-Variablen für eine selbst hinterlegte Adresse: URL_OPEN_WEBUI …
+url_var_name() {
+  printf 'URL_%s' "$(printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_')"
+}
+
+# Adresse eines Dienstes; leer, wenn er keine Oberfläche hat.
+svc_url() {
+  local id="$1" var custom port path
+  var="$(url_var_name "$id")"
+  custom="${!var:-}"
+  if [ -n "$custom" ]; then printf '%s' "$custom"; return 0; fi
+  read -r port path <<<"$(svc_port_path "$id")" || return 1
+  [ -n "${port:-}" ] || return 1
+  printf 'http://%s:%s%s' "$HOST_IP" "$port" "$path"
+}
+
+# Anklickbar machen: OSC 8 markiert Text als Verweis (Windows Terminal, iTerm2,
+# GNOME Terminal, WezTerm, Kitty …). Terminals ohne Unterstützung — PuTTY etwa —
+# ignorieren die Sequenz und zeigen einfach die Adresse als Text, den man
+# markieren und kopieren kann. Abschaltbar über MENU_HYPERLINKS=0.
+link() {
+  local url="$1"
+  if [ "${MENU_HYPERLINKS:-1}" = "1" ]; then
+    # OSC 8: ESC ] 8 ;; <url> ST <text> ESC ] 8 ;; ST   (ST = ESC \)
+    local osc=$'\033]8;;' st=$'\033\\'
+    printf '%s%s%s%s%s%s' "$osc" "$url" "$st" "$url" "$osc" "$st"
+  else
+    printf '%s' "$url"
+  fi
+}
+
 dc() {
   [ -n "$DC" ] || { echo "Docker Compose nicht gefunden."; return 1; }
   # shellcheck disable=SC2086
@@ -533,6 +596,82 @@ confirm_word() {
   [ "$ans" = "$word" ]
 }
 
+# ── Adressen: anzeigen und hinterlegen ──────────────────────────────────────
+# Schreibt KEY=WERT in die .env: vorhandene Zeile ersetzen, sonst anhängen.
+# Der Wert geht über eine Umgebungsvariable an awk, damit Zeichen wie & oder /
+# darin nichts anrichten (sed würde sie als Ersetzungsmuster deuten).
+env_set() {
+  local key="$1" val="$2" tmp
+  [ -f "$ENV_FILE" ] || { printf '%s=%s\n' "$key" "$val" >> "$ENV_FILE"; return 0; }
+  tmp="$(mktemp "${ENV_FILE}.XXXXXX")" || return 1
+  KEY="$key" VAL="$val" awk '
+    BEGIN { key = ENVIRON["KEY"]; val = ENVIRON["VAL"]; done = 0 }
+    $0 ~ "^" key "=" { print key "=" val; done = 1; next }
+    { print }
+    END { if (!done) print key "=" val }
+  ' "$ENV_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+  chmod --reference="$ENV_FILE" "$tmp" 2>/dev/null || chmod 600 "$tmp"
+  mv "$tmp" "$ENV_FILE"
+}
+
+# Adresse groß anzeigen — anklickbar, wo das Terminal das kann.
+show_url() {
+  local id="$1" label="$2" url var
+  url="$(svc_url "$id")" || url=""
+  var="$(url_var_name "$id")"
+  measure
+  printf '\033[H\033[2J'; draw_header
+  printf '  %s%s%s\n\n' "$c_bold" "$label" "$c_reset"
+  if [ -n "$url" ]; then
+    printf '    %s%s%s\n\n' "$c_bold$c_blue" "$(link "$url")" "$c_reset"
+    if [ -n "${!var:-}" ]; then
+      printf '  %sEigene Adresse aus der .env (%s).%s\n' "$c_dim" "$var" "$c_reset"
+    else
+      printf '  %sAus dem Port und der IP dieses Rechners gebildet.%s\n' "$c_dim" "$c_reset"
+      printf '  %sEigene Adresse hinterlegen: Menüpunkt "Adresse festlegen".%s\n' "$c_dim" "$c_reset"
+    fi
+    printf '\n  %sTerminals mit Verweis-Unterstützung (Windows Terminal, iTerm2,\n' "$c_dim"
+    printf '  GNOME Terminal, WezTerm) öffnen sie per Klick oder Strg-Klick.\n'
+    printf '  In PuTTY markieren und im Browser einfügen.%s\n' "$c_reset"
+  else
+    printf '  %sDieser Dienst hat keine Weboberfläche.%s\n' "$c_dim" "$c_reset"
+  fi
+  printf '\n  %sWeiter mit Enter …%s' "$c_dim" "$c_reset"
+  term_read_mode
+  read -r -n 1 _ >/dev/null 2>&1
+}
+
+# Eigene Adresse hinterlegen (etwa der Name hinter einem Reverse-Proxy).
+set_url() {
+  local id="$1" label="$2" var ans
+  var="$(url_var_name "$id")"
+  measure
+  printf '\033[H\033[2J'; draw_header
+  printf '  %s%s %s Adresse festlegen%s\n\n' "$c_bold" "$label" "$G_ARROW" "$c_reset"
+  printf '  %sWird als %s in die .env geschrieben und hat dann Vorrang vor der\n' "$c_dim" "$var"
+  printf '  automatisch gebildeten Adresse.%s\n\n' "$c_reset"
+  printf '  %sBeispiel:%s https://chat.example.com\n' "$c_dim" "$c_reset"
+  printf '  %sLeer lassen und Enter entfernt eine hinterlegte Adresse wieder.%s\n\n' "$c_dim" "$c_reset"
+  printf '  Adresse: '
+  printf '\033[?25h'
+  stty "$STTY_SAVE" 2>/dev/null || true
+  read -r ans || ans=""
+  term_read_mode
+  printf '\033[?25l'
+
+  ans="${ans#"${ans%%[![:space:]]*}"}"
+  ans="${ans%"${ans##*[![:space:]]}"}"
+  if [ -n "$ans" ]; then
+    case "$ans" in
+      http://*|https://*) ;;
+      *) ans="http://$ans" ;;
+    esac
+  fi
+  if env_set "$var" "$ans"; then
+    export "$var=$ans"
+  fi
+}
+
 # ── Aktionen ────────────────────────────────────────────────────────────────
 svc_up()      { run_cmd "Starte $1 …"     bash -c "cd '$ROOT_DIR' && $DC -f '$COMPOSE_FILE' up -d ${1//,/ }"; }
 svc_build()   { run_cmd "Baue $1 neu …"   bash -c "cd '$ROOT_DIR' && $DC -f '$COMPOSE_FILE' up -d --build ${1//,/ }"; }
@@ -613,19 +752,36 @@ open_item() {
   MENU_KEYS=(); MENU_LABELS=()
   case "$kind" in
     svc)
+      local url title
+      url="$(svc_url "$id")" || url=""
+      # Adresse gleich in die Überschrift — dann sieht man sie, ohne erst
+      # einen Menüpunkt öffnen zu müssen.
+      if [ -n "$url" ]; then
+        title="$label  $(link "$url")"
+      else
+        title="$label $G_ARROW was tun?"
+      fi
       if [ "$st" = "missing" ] || [ "$st" = "stopped" ]; then
         mitem up "Starten / installieren"
       else
         mitem restart "Neu starten"
         mitem stop    "Stoppen"
       fi
+      if [ -n "$url" ]; then
+        mitem url    "Adresse anzeigen (zum Anklicken)"
+        mitem seturl "Adresse festlegen (eigene Domain / anderer Host)"
+      fi
+      [ "$id" = "librechat" ] && mitem lcuser "Zugangsdaten anzeigen / Konto anlegen"
       mitem logs  "Logs ansehen"
       mitem build "Neu bauen und starten"
       mitem rm    "Container entfernen (Daten bleiben)"
-      menu_pick "$label $G_ARROW was tun?" || return
+      menu_pick "$title" || return
       case "$PICKED" in
         up) svc_up "$id" ;; restart) svc_restart "$id" ;; stop) svc_stop "$id" ;;
         logs) svc_logs "$id" ;; build) svc_build "$id" ;;
+        url) show_url "$id" "$label" ;;
+        seturl) set_url "$id" "$label" ;;
+        lcuser) run_cmd "LibreChat-Zugang" bash -c "cd '$ROOT_DIR' && bash scripts/librechat-user.sh --show" ;;
         rm) confirm "$label entfernen? Daten-Volumes bleiben erhalten." && svc_rm "$id" ;;
       esac ;;
     cli)
@@ -764,6 +920,7 @@ main() {
       s) svc_shortcut up ;;
       x) svc_shortcut stop ;;
       l) svc_shortcut logs ;;
+      o) svc_shortcut url ;;
       r) refresh_state ;;
       q) break ;;
     esac
@@ -779,6 +936,7 @@ svc_shortcut() {
     up)   svc_up   "$id" ;;
     stop) svc_stop "$id" ;;
     logs) svc_logs "$id" ;;
+    url)  show_url "$id" "$(printf '%s' "${ITEMS[$SEL]}" | cut -d'|' -f3)" ;;
   esac
 }
 

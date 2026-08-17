@@ -18,8 +18,10 @@ ENV_FILE="$ROOT_DIR/.env"
 c_reset=$'\033[0m'; c_bold=$'\033[1m'; c_dim=$'\033[2m'; c_blue=$'\033[0;34m'
 
 [ -f "$ENV_FILE" ] || { echo "Keine .env gefunden unter $ENV_FILE — erst ./install.sh ausführen." >&2; exit 1; }
+set -a
 # shellcheck disable=SC1090
-set -a; . "$ENV_FILE"; set +a
+. "$ENV_FILE"
+set +a
 
 PORT_WEBUI="${PORT_WEBUI:-3001}"
 PORT_LITELLM="${PORT_LITELLM:-4000}"
@@ -30,8 +32,18 @@ PORT_MCPO="${PORT_MCPO:-8800}"
 PORT_MCP="${PORT_MCP:-3000}"
 PORT_LIBRECHAT="${PORT_LIBRECHAT:-3080}"
 
-IP="$(ip -o -f inet addr show scope global 2>/dev/null | awk '{print $4}' | head -1 | cut -d/ -f1 || true)"
+IP="${STACK_HOST:-}"
+[ -z "$IP" ] && IP="$(ip -o -f inet addr show scope global 2>/dev/null | awk '{print $4}' | head -1 | cut -d/ -f1 || true)"
 IP="${IP:-<server-ip>}"
+
+# Adresse eines Dienstes: eine in der .env hinterlegte URL_* hat Vorrang vor
+# der aus IP und Port gebildeten - so steht hier der Name, unter dem der Dienst
+# tatsaechlich erreichbar ist (etwa hinter einem Reverse-Proxy).
+addr() {
+  local custom="$1" port="$2" path="${3:-}"
+  if [ -n "$custom" ]; then printf '%s' "$custom"
+  else printf 'http://%s:%s%s' "$IP" "$port" "$path"; fi
+}
 
 printf '%s' "$c_bold"
 echo "╔══════════════════════════════════════════════════════╗"
@@ -40,14 +52,14 @@ echo "╚═══════════════════════�
 printf '%s\n' "$c_reset"
 
 printf '%sDienste%s\n' "$c_bold" "$c_reset"
-printf '  Dashboard      http://%s:%s\n' "$IP" "$PORT_DASHBOARD"
-printf '  Chat (WebUI)   http://%s:%s\n' "$IP" "$PORT_WEBUI"
-printf '  Chat (LibreChat) http://%s:%s\n' "$IP" "$PORT_LIBRECHAT"
-printf '  LiteLLM-UI     http://%s:%s/ui\n' "$IP" "$PORT_LITELLM"
-printf '  Vault-Bridge   http://%s:%s\n' "$IP" "$PORT_VAULT_BRIDGE"
-printf '  Syncthing      http://%s:%s\n' "$IP" "$PORT_SYNCTHING_GUI"
-printf '  Werkzeuge      http://%s:%s/mcp_gateway/docs\n' "$IP" "$PORT_MCPO"
-printf '  MCP-Verwaltung http://%s:%s\n' "$IP" "$PORT_MCP"
+printf '  Dashboard        %s\n' "$(addr "${URL_DASHBOARD:-}"    "$PORT_DASHBOARD")"
+printf '  Chat (WebUI)     %s\n' "$(addr "${URL_OPEN_WEBUI:-}"   "$PORT_WEBUI")"
+printf '  Chat (LibreChat) %s\n' "$(addr "${URL_LIBRECHAT:-}"    "$PORT_LIBRECHAT")"
+printf '  LiteLLM-UI       %s\n' "$(addr "${URL_LITELLM:-}"      "$PORT_LITELLM" "/ui")"
+printf '  Vault-Bridge     %s\n' "$(addr "${URL_VAULT_BRIDGE:-}" "$PORT_VAULT_BRIDGE")"
+printf '  Syncthing        %s\n' "$(addr "${URL_SYNCTHING:-}"    "$PORT_SYNCTHING_GUI")"
+printf '  Werkzeuge        %s\n' "$(addr "${URL_MCPO:-}"         "$PORT_MCPO" "/mcp_gateway/docs")"
+printf '  MCP-Verwaltung   %s\n' "$(addr "${URL_MCP:-}"          "$PORT_MCP")"
 echo
 
 printf '%sLiteLLM%s\n' "$c_bold" "$c_reset"
@@ -64,6 +76,17 @@ printf '%sOpen WebUI%s\n' "$c_bold" "$c_reset"
 printf '  %sKein vorgegebenes Passwort:%s der erste Account, den du unter\n' "$c_dim" "$c_reset"
 printf '  http://%s:%s registrierst, wird automatisch Admin.\n' "$IP" "$PORT_WEBUI"
 printf '  Interner Secret-Key (Sessions/Cookies): %s\n' "${WEBUI_SECRET_KEY:-<nicht gesetzt>}"
+echo
+
+printf '%sLibreChat%s\n' "$c_bold" "$c_reset"
+if [ -n "${LIBRECHAT_ADMIN_EMAIL:-}" ]; then
+  printf '  E-Mail:     %s\n' "$LIBRECHAT_ADMIN_EMAIL"
+  printf '  Passwort:   %s\n' "${LIBRECHAT_ADMIN_PASSWORD:-<nicht gesetzt>}"
+  printf '  %sVom Installer angelegt; Registrierung ist zu. Passwort nach der\n' "$c_dim"
+  printf '  ersten Anmeldung ändern. Konto neu anlegen: ./scripts/librechat-user.sh%s\n' "$c_reset"
+else
+  printf '  %sKein Erstkonto hinterlegt — ./scripts/librechat-user.sh anlegen.%s\n' "$c_dim" "$c_reset"
+fi
 echo
 
 printf '%sMCP Gateway%s\n' "$c_bold" "$c_reset"

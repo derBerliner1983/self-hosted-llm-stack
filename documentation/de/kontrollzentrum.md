@@ -55,9 +55,39 @@ Die Kopfzeile fasst zusammen: Compose-Datei, Docker-Zustand, wie viele Dienste l
 | `s` | Dienst starten (auf Dienst-Einträgen) |
 | `x` | Dienst stoppen |
 | `l` | Logs ansehen (letzte 200 Zeilen) |
+| `o` | Adresse des Dienstes anzeigen |
 | `r` | Status neu einlesen |
 | `q` | Beenden |
 | `Esc` | Aus einem Untermenü zurück |
+
+## Adressen der Dienste
+
+Öffnest du einen Dienst mit `Enter`, steht seine Adresse gleich in der Überschrift; die Direkttaste `o` zeigt sie groß an:
+
+```
+  LibreChat  http://192.168.1.50:3080/
+
+   ❯ Neu starten
+     Adresse anzeigen (zum Anklicken)
+     Adresse festlegen (eigene Domain / anderer Host)
+```
+
+Die Adresse wird aus dem Port (`.env`) und der IP des Rechners gebildet, auf dem das Menü läuft. In Terminals mit Verweis-Unterstützung — Windows Terminal, iTerm2, GNOME Terminal, WezTerm, Kitty — ist sie **anklickbar** und öffnet den Browser. PuTTY kann das nicht; dort steht die Adresse als Text zum Markieren und Kopieren. Abschalten mit `MENU_HYPERLINKS=0 ./stack-menu.sh`.
+
+**Eigene Adresse hinterlegen** — etwa der Name hinter einem Reverse-Proxy: **Adresse festlegen**, Adresse eintippen, fertig. Sie landet als `URL_<DIENST>` in der `.env` und hat ab dann Vorrang. Fehlt `https://`, wird `http://` ergänzt. Leer lassen entfernt sie wieder.
+
+| Dienst | Variable |
+|---|---|
+| Open WebUI | `URL_OPEN_WEBUI` |
+| LibreChat | `URL_LIBRECHAT` |
+| LiteLLM | `URL_LITELLM` |
+| Dashboard | `URL_DASHBOARD` |
+| Vault-Bridge | `URL_VAULT_BRIDGE` |
+| Syncthing | `URL_SYNCTHING` |
+| mcpo | `URL_MCPO` |
+| MCP Gateway | `URL_MCP` |
+
+`./scripts/show-credentials.sh` benutzt dieselben Werte. Erkennt das Menü die falsche IP (mehrere Netzwerkkarten), setz `STACK_HOST` in der `.env`.
 
 ## Die Bereiche
 
