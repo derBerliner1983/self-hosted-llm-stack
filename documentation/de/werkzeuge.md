@@ -4,7 +4,7 @@ MCP Gateway, Anbindung an Open WebUI und die Checkliste pro Modell.
 
 [← Zur Übersicht](../../README.md) &nbsp;|&nbsp; [English version](../en/tools.md)
 
-**Dokumentation:** [Installation & Erste Schritte](installation.md) · [Architektur & Dienste](architektur.md) · **Werkzeuge fürs LLM (MCP)** · [LibreChat (zweite Oberfläche)](librechat.md) · [Code-Sandbox](code-sandbox.md) · [Android-Entwicklung](android.md) · [Wissensdatenbank (Vault)](wissensdatenbank.md) · [Modelle verwalten](modelle.md) · [Betrieb & Wartung](betrieb.md) · [Sicherheit & Fernzugriff](sicherheit.md) · [Weitere Stacks](weitere-stacks.md)
+**Dokumentation:** [Installation & Erste Schritte](installation.md) · [Kontrollzentrum (Menü)](kontrollzentrum.md) · [Architektur & Dienste](architektur.md) · **Werkzeuge fürs LLM (MCP)** · [LibreChat (zweite Oberfläche)](librechat.md) · [Code-Sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android-Entwicklung](android.md) · [Wissensdatenbank (Vault)](wissensdatenbank.md) · [Modelle verwalten](modelle.md) · [Betrieb & Wartung](betrieb.md) · [Sicherheit & Fernzugriff](sicherheit.md) · [Weitere Stacks](weitere-stacks.md)
 
 ---
 

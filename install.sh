@@ -7,8 +7,12 @@
 # Standardmodell, verdrahtet MCP Gateway mit LiteLLM und trägt alle
 # Ollama-Modelle bei LiteLLM ein.
 #
-# Aufruf:   sudo ./install.sh
+# Aufruf:   ./install.sh --menu              # Kontrollzentrum (Menü) öffnen
+#           sudo ./install.sh
 #           ./install.sh --check-only        # nur prüfen, nichts ändern
+#           sudo ./install.sh --firewall=lan # lan | open | none
+#           ./install.sh --with-interpreter   # Open Interpreter (CLI) mitinstallieren
+#           ./install.sh --without-interpreter
 #           DEFAULT_MODEL=qwen2.5:14b ./install.sh
 #           sudo ./install.sh --install-drivers  # AMD-Kernel-Treiber (amdgpu-dkms) installieren
 #           sudo ./install.sh --skip-drivers     # Treiber-Installation nie anbieten
@@ -41,6 +45,11 @@ PORT_MCP="${PORT_MCP:-3000}"
 PORT_LIBRECHAT="${PORT_LIBRECHAT:-3080}"
 MCP_VAULT_MOUNT_MODE="${MCP_VAULT_MOUNT_MODE:-ro}"
 
+# Optionale Komponenten. "ask" = beim Lauf nachfragen (siehe Schritt "Auswahl").
+INSTALL_OPEN_INTERPRETER="${INSTALL_OPEN_INTERPRETER:-ask}"   # ask | yes | no
+INTERPRETER_MODEL="${INTERPRETER_MODEL:-ollama/gemma3:12b}"
+OPEN_INTERPRETER_VERSION="${OPEN_INTERPRETER_VERSION:-0.4.3}"
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
@@ -50,18 +59,27 @@ ASSUME_YES=0
 INSTALL_AMD_DRIVERS="${INSTALL_AMD_DRIVERS:-auto}"   # auto | yes | no
 for arg in "$@"; do
   case "$arg" in
+    --menu)            exec bash "$ROOT_DIR/stack-menu.sh" ;;
     --check-only)      CHECK_ONLY=1 ;;
+    --firewall=*)      FIREWALL_MODE="${arg#*=}" ;;
+    --with-interpreter)    INSTALL_OPEN_INTERPRETER="yes" ;;
+    --without-interpreter) INSTALL_OPEN_INTERPRETER="no" ;;
     --install-drivers) INSTALL_AMD_DRIVERS="yes" ;;
     --skip-drivers)    INSTALL_AMD_DRIVERS="no" ;;
     --uninstall)       MODE="uninstall" ;;
     --purge)           MODE="purge" ;;
     -y|--yes)          ASSUME_YES=1 ;;
     -h|--help)
-      sed -n '3,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '3,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0 ;;
     *) printf 'Unbekannte Option: %s (--help für Hilfe)\n' "$arg" >&2; exit 2 ;;
   esac
 done
+
+case "$FIREWALL_MODE" in
+  lan|open|none) ;;
+  *) printf 'Ungültiger Firewall-Modus: %s (erlaubt: lan, open, none)\n' "$FIREWALL_MODE" >&2; exit 2 ;;
+esac
 
 # ── Ausgabe-Helfer ──────────────────────────────────────────────────────────
 c_reset=$'\033[0m'; c_blue=$'\033[0;34m'; c_green=$'\033[0;32m'
@@ -249,6 +267,38 @@ cat <<'BANNER'
 ╚══════════════════════════════════════════════════════╝
 BANNER
 printf '%s' "$c_reset"
+
+# ════════════════════════════════════════════════════════════════════════════
+# Optionale Komponenten zuerst abfragen, damit die Installation danach ohne
+# weitere Rückfragen durchläuft und die Auswahl in der .env landet (der
+# nächste Lauf übernimmt sie dann automatisch).
+step "Auswahl · Optionale Komponenten"
+
+# Vorhandene Auswahl aus einer früheren Installation übernehmen.
+if [ "$INSTALL_OPEN_INTERPRETER" = "ask" ] && [ -f .env ]; then
+  _prev="$(grep -E '^INSTALL_OPEN_INTERPRETER=' .env 2>/dev/null | tail -1 | cut -d= -f2-)"
+  case "$_prev" in yes|no) INSTALL_OPEN_INTERPRETER="$_prev" ;; esac
+fi
+
+if [ "$INSTALL_OPEN_INTERPRETER" = "ask" ]; then
+  if [ "$ASSUME_YES" -eq 1 ] || [ ! -t 0 ]; then
+    INSTALL_OPEN_INTERPRETER="no"
+  else
+    printf '\n  %sOpen Interpreter%s — Kommandozeilen-Assistent: du beschreibst eine\n' "$c_bold" "$c_reset"
+    printf '  Aufgabe, das Modell schreibt Code und führt ihn aus. Läuft im Container\n'
+    printf '  (sieht nur den Arbeitsbereich /work) und nutzt dein lokales LiteLLM.\n'
+    printf '  %sKein Dienst — wird nur auf Zuruf gestartet: ./scripts/interpreter.sh%s\n\n' "$c_yellow" "$c_reset"
+    printf '  Open Interpreter mitinstallieren? [j/N] '
+    read -r reply || reply=""
+    case "$reply" in [jJyY]*) INSTALL_OPEN_INTERPRETER="yes" ;; *) INSTALL_OPEN_INTERPRETER="no" ;; esac
+  fi
+fi
+
+if [ "$INSTALL_OPEN_INTERPRETER" = "yes" ]; then
+  ok "Open Interpreter: wird mitinstalliert (Modell: ${INTERPRETER_MODEL})."
+else
+  info "Open Interpreter: übersprungen. Später nachrüsten: ./install.sh --with-interpreter"
+fi
 
 # ════════════════════════════════════════════════════════════════════════════
 step "1/8 · System prüfen"
@@ -611,6 +661,15 @@ LIBRECHAT_JWT_REFRESH_SECRET=${LIBRECHAT_JWT_REFRESH_SECRET}
 # niemand sonst registrieren kann.
 LIBRECHAT_ALLOW_REGISTRATION=true
 
+# Open Interpreter (CLI, optional) - Start: ./scripts/interpreter.sh
+# Modellname wie bei LiteLLM registriert (ollama/<name>); das "openai/"-Präfix
+# für den Proxy setzt der Container selbst.
+INSTALL_OPEN_INTERPRETER=${INSTALL_OPEN_INTERPRETER}
+INTERPRETER_MODEL=${INTERPRETER_MODEL}
+OPEN_INTERPRETER_VERSION=${OPEN_INTERPRETER_VERSION}
+INTERPRETER_CONTEXT_WINDOW=16384
+INTERPRETER_MAX_TOKENS=4096
+
 # Firewall
 LAN_SUBNET=${LAN_SUBNET}
 EOF
@@ -636,6 +695,17 @@ step "6/8 · Stack starten"
 
 info "Ziehe Images, baue lokale Dienste (sandbox-mcp, vault-bridge) und starte Container (kann beim ersten Mal dauern)…"
 $DC -f "$COMPOSE_FILE" up -d --build
+
+# Open Interpreter ist ein CLI, kein Dienst — es wird nur gebaut, nicht
+# gestartet (Profil "cli", damit 'up -d' es nicht anfasst).
+if [ "$INSTALL_OPEN_INTERPRETER" = "yes" ]; then
+  info "Baue das Open-Interpreter-Image (dauert beim ersten Mal ein paar Minuten)…"
+  if $DC -f "$COMPOSE_FILE" --profile cli build interpreter; then
+    ok "Open Interpreter bereit — starten mit: ./scripts/interpreter.sh"
+  else
+    note_warn "Open-Interpreter-Image ließ sich nicht bauen. Später erneut: ./scripts/interpreter.sh --build"
+  fi
+fi
 
 info "Warte, bis Ollama bereit ist…"
 for i in $(seq 1 60); do

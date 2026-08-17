@@ -214,6 +214,41 @@ services:
       start_period: 30s
       retries: 3
 
+  # ── Open Interpreter (CLI, optional) ───────────────────────────────────────
+  # Kein Dienst, sondern ein Kommandozeilen-Werkzeug: Du beschreibst eine
+  # Aufgabe, das Modell schreibt Code und führt ihn aus.
+  #
+  # "profiles: [cli]" sorgt dafür, dass 'docker compose up -d' diesen Container
+  # NICHT startet - er würde sonst dauerhaft laufen und auf eine Eingabe warten,
+  # die nie kommt. Gestartet wird er nur auf Zuruf:
+  #
+  #   ./scripts/interpreter.sh          (oder im Menü: Open Interpreter -> Starten)
+  #
+  # Bewusst im Container: Open Interpreter führt aus, was das Modell schreibt.
+  # Auf dem Host wäre das Zugriff auf alles, was dein Benutzer darf; hier sieht
+  # es nur /work. Wer mehr braucht, hängt gezielt weitere Verzeichnisse ein -
+  # den Vault am besten :ro, damit die Wissensdatenbank sauber bleibt.
+  interpreter:
+    profiles: ["cli"]
+    build:
+      context: ./interpreter
+      args:
+        OPEN_INTERPRETER_VERSION: ${OPEN_INTERPRETER_VERSION:-0.4.3}
+    container_name: interpreter
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
+      - INTERPRETER_API_BASE=${INTERPRETER_API_BASE:-http://litellm:4000/v1}
+      - INTERPRETER_MODEL=${INTERPRETER_MODEL:-ollama/gemma3:12b}
+      - INTERPRETER_CONTEXT_WINDOW=${INTERPRETER_CONTEXT_WINDOW:-16384}
+      - INTERPRETER_MAX_TOKENS=${INTERPRETER_MAX_TOKENS:-4096}
+    volumes:
+      # Derselbe Arbeitsbereich wie die Code-Sandbox: was das LLM im Chat
+      # angelegt hat, findest du hier wieder - und umgekehrt.
+      - sandbox-work:/work
+    # Interaktives Terminal - sonst bricht die Eingabeaufforderung sofort ab.
+    stdin_open: true
+    tty: true
+
   # ── LibreChat (Alternative zu Open WebUI, zum Vergleichen) ─────────────────
   # Beide Oberflächen können parallel laufen und nutzen dasselbe LiteLLM -
   # gleiche Modelle, gleiche Schlüssel, gleicher Verbrauch.

@@ -169,6 +169,9 @@ check_shell() {
     "$ROOT_DIR/stacks/voice-chat/chat-ui-bootstrap.sh"
     "$ROOT_DIR/scripts/ci-static-checks.sh"
     "$ROOT_DIR/scripts/restart-mcp.sh"
+    "$ROOT_DIR/scripts/interpreter.sh"
+    "$ROOT_DIR/stack-menu.sh"
+    "$ROOT_DIR/interpreter/entrypoint.sh"
   )
   local sh_scripts=(
     "$ROOT_DIR/scripts/ai-stack-init.sh"
