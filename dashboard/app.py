@@ -50,6 +50,14 @@ SERVICES = [
         "path": "/",
     },
     {
+        "container": "librechat",
+        "label": "LibreChat",
+        "desc": "Chat-Oberfläche · MCP nativ",
+        "icon": "💬",
+        "port": int(os.environ.get("PORT_LIBRECHAT", "3080")),
+        "path": "/",
+    },
+    {
         "container": "litellm",
         "label": "LiteLLM",
         "desc": "AI-Gateway · Admin-UI",

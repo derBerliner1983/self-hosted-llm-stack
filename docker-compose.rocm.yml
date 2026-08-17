@@ -214,6 +214,66 @@ services:
       start_period: 30s
       retries: 3
 
+  # ── LibreChat (Alternative zu Open WebUI, zum Vergleichen) ─────────────────
+  # Beide Oberflächen können parallel laufen und nutzen dasselbe LiteLLM -
+  # gleiche Modelle, gleiche Schlüssel, gleicher Verbrauch.
+  #
+  # Der interessante Unterschied: LibreChat spricht MCP NATIV. Die
+  # Werkzeugdienste stehen in librechat/librechat.yaml direkt drin, der
+  # Umweg über mcpo (MCP -> OpenAPI) entfällt - und mit ihm dessen
+  # Stolpersteine, etwa die abgerissene Session nach einem mcp-Neustart.
+  #
+  # Wer LibreChat nicht braucht, kann diesen Dienst samt librechat-mongo
+  # und den beiden Volumes ersatzlos streichen.
+  librechat:
+    image: registry.librechat.ai/danny-avila/librechat-dev:latest
+    container_name: librechat
+    restart: always
+    ports:
+      - "${PORT_LIBRECHAT:-3080}:3080/tcp"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://librechat-mongo:27017/LibreChat
+      - CONFIG_PATH=/app/librechat.yaml
+      # Verschlüsselung gespeicherter Zugangsdaten und Sitzungen. LibreChat
+      # bricht beim Start ab, wenn Länge/Format nicht stimmen: CREDS_KEY
+      # braucht 64 Hex-Zeichen, CREDS_IV 32. install.sh erzeugt beides.
+      - CREDS_KEY=${LIBRECHAT_CREDS_KEY:-}
+      - CREDS_IV=${LIBRECHAT_CREDS_IV:-}
+      - JWT_SECRET=${LIBRECHAT_JWT_SECRET:-}
+      - JWT_REFRESH_SECRET=${LIBRECHAT_JWT_REFRESH_SECRET:-}
+      # Meilisearch ist nicht Teil dieses Stacks - Suche daher aus, sonst
+      # protokolliert LibreChat dauerhaft Verbindungsfehler.
+      - SEARCH=false
+      # Werden in librechat.yaml als ${...} eingesetzt.
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
+      - MCP_API_KEY=${MCP_API_KEY:-}
+      # Registrierung offen lassen, damit du den ersten Account anlegen
+      # kannst; danach in der .env auf false setzen.
+      - ALLOW_REGISTRATION=${LIBRECHAT_ALLOW_REGISTRATION:-true}
+    volumes:
+      - ./librechat/librechat.yaml:/app/librechat.yaml:ro
+      - librechat-data:/app/client/public/images
+      - librechat-uploads:/app/uploads
+    depends_on:
+      librechat-mongo:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3080/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+
+  librechat-mongo:
+    image: mongo:8.0.20
+    container_name: librechat-mongo
+    restart: always
+    command: mongod --quiet --logpath /dev/null
+    volumes:
+      - librechat-mongo:/data/db
+
   # ── Android-Build-Umgebung (Gradle + Android SDK als MCP-Werkzeuge) ────────
   # Bewusst NICHT nach dem Wegwerf-Muster von sandbox-mcp gebaut: Android-
   # Builds brauchen Netzwerk (Gradle lädt Abhängigkeiten), einen persistenten
@@ -393,6 +453,7 @@ services:
       - PORT_SYNCTHING_GUI=${PORT_SYNCTHING_GUI:-8384}
       - PORT_MCPO=${PORT_MCPO:-8800}
       - PORT_MCP=${PORT_MCP:-3000}
+      - PORT_LIBRECHAT=${PORT_LIBRECHAT:-3080}
     volumes:
       - ./dashboard:/app:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -431,6 +492,12 @@ volumes:
     name: syncthing-config
   sandbox-work:
     name: sandbox-work
+  librechat-mongo:
+    name: librechat-mongo
+  librechat-data:
+    name: librechat-data
+  librechat-uploads:
+    name: librechat-uploads
   android-workspace:
     name: android-workspace
   android-gradle:

@@ -42,6 +42,7 @@ The full walkthrough — requirements, GPU setup and troubleshooting — is in t
 | **[Installation & getting started](documentation/en/installation.md)** | Requirements, installer, ROCm/GPU, uninstalling |
 | **[Architecture & services](documentation/en/architecture.md)** | How the services fit together, ports, dashboard |
 | **[Tools for the LLM (MCP)](documentation/en/tools.md)** | MCP Gateway, wiring into Open WebUI, **per-model checklist** |
+| **[LibreChat (second UI)](documentation/en/librechat.md)** | Alternative to Open WebUI, speaks MCP directly |
 | **[Code sandbox](documentation/en/code-sandbox.md)** | Running and testing code, workspace, more languages |
 | **[Android development](documentation/en/android.md)** | Creating, building and testing projects |
 | **[Knowledge base (vault)](documentation/en/knowledge-base.md)** | Wiring an Obsidian vault in via Syncthing or Vault-Bridge |
@@ -57,6 +58,7 @@ The full walkthrough — requirements, GPU setup and troubleshooting — is in t
 | Service | Purpose | Default port |
 |---|---|---|
 | **Open WebUI** | Chat interface | `3001` |
+| **LibreChat** | Second chat interface, native MCP | `3080` |
 | **LiteLLM** | AI gateway (OpenAI-compatible), keys and limits | `4000` |
 | **Ollama** | LLM engine (AMD ROCm) | internal only |
 | **Dashboard** | Status of all services, model management | `8600` |

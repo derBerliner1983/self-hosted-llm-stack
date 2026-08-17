@@ -38,6 +38,7 @@ PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
 PORT_SYNCTHING_GUI="${PORT_SYNCTHING_GUI:-8384}"
 PORT_MCPO="${PORT_MCPO:-8800}"
 PORT_MCP="${PORT_MCP:-3000}"
+PORT_LIBRECHAT="${PORT_LIBRECHAT:-3080}"
 MCP_VAULT_MOUNT_MODE="${MCP_VAULT_MOUNT_MODE:-ro}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -443,15 +444,15 @@ else
     $SUDO ufw allow from "$LAN_SUBNET" to any port "$PORT_MCP" proto tcp >/dev/null 2>&1 || true
 
     if [ "$FIREWALL_MODE" = "lan" ]; then
-      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI"; do
+      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI" "$PORT_LIBRECHAT"; do
         $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto tcp >/dev/null 2>&1 || true
       done
-      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI} nur aus ${LAN_SUBNET} (Syncthing-Sync/-Erkennung und mcpo immer nur LAN)."
+      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI}/${PORT_LIBRECHAT} nur aus ${LAN_SUBNET} (Syncthing-Sync/-Erkennung und mcpo immer nur LAN)."
     else
-      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI"; do
+      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI" "$PORT_LIBRECHAT"; do
         $SUDO ufw allow "$p"/tcp >/dev/null 2>&1 || true
       done
-      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI} für ALLE offen (nur mit HTTPS davor empfohlen). Syncthing-Sync/-Erkennung und mcpo bleiben LAN-only."
+      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI}/${PORT_LIBRECHAT} für ALLE offen (nur mit HTTPS davor empfohlen). Syncthing-Sync/-Erkennung und mcpo bleiben LAN-only."
     fi
     $SUDO ufw --force enable >/dev/null 2>&1 || true
   else
@@ -481,6 +482,22 @@ fi
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(rand 32)}"
 LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-sk-$(rand 40)}"
 WEBUI_SECRET_KEY="${WEBUI_SECRET_KEY:-$(rand 40)}"
+
+# LibreChat-Secrets. CREDS_KEY/CREDS_IV MÜSSEN hexadezimal sein und exakt
+# 64 bzw. 32 Zeichen lang - LibreChat prüft die Länge beim Start und bricht
+# sonst ab. Deshalb hier openssl statt der rand()-Funktion oben, die auch
+# Buchstaben jenseits von a-f erzeugt.
+hexrand() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex "$1"
+  else
+    LC_ALL=C tr -dc 'a-f0-9' < /dev/urandom 2>/dev/null | head -c "$(( $1 * 2 ))" || true
+  fi
+}
+LIBRECHAT_CREDS_KEY="${LIBRECHAT_CREDS_KEY:-$(hexrand 32)}"
+LIBRECHAT_CREDS_IV="${LIBRECHAT_CREDS_IV:-$(hexrand 16)}"
+LIBRECHAT_JWT_SECRET="${LIBRECHAT_JWT_SECRET:-$(hexrand 32)}"
+LIBRECHAT_JWT_REFRESH_SECRET="${LIBRECHAT_JWT_REFRESH_SECRET:-$(hexrand 32)}"
 
 # Host-MTU der Standardroute ermitteln und die Container-MTU daran anpassen.
 # Verhindert TLS-Timeouts ("i/o timeout") aus Containern hinter VPN/Cloud-Overlays.
@@ -521,6 +538,8 @@ PORT_WHISPER=9000
 PORT_EMBEDDINGS=8000
 PORT_VAULT_BRIDGE=8700
 PORT_SYNCTHING_GUI=8384
+# LibreChat (Alternative zu Open WebUI, siehe Doku "Oberflächen")
+PORT_LIBRECHAT=${PORT_LIBRECHAT}
 # mcpo-Weboberfläche: zeigt unter /mcp_gateway/docs alle Werkzeuge, die den
 # Modellen zur Verfügung stehen. Wird nur fürs LAN freigegeben (mcpo hat keine
 # eigene Authentifizierung), Open WebUI erreicht mcpo containerintern.
@@ -580,6 +599,17 @@ MCP_VAULT_MOUNT_MODE=${MCP_VAULT_MOUNT_MODE}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
 WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+
+# LibreChat: verschlüsselt gespeicherte Zugangsdaten und Sitzungen.
+# CREDS_KEY braucht exakt 64 Hex-Zeichen, CREDS_IV exakt 32 -
+# LibreChat prüft das beim Start und bricht sonst ab.
+LIBRECHAT_CREDS_KEY=${LIBRECHAT_CREDS_KEY}
+LIBRECHAT_CREDS_IV=${LIBRECHAT_CREDS_IV}
+LIBRECHAT_JWT_SECRET=${LIBRECHAT_JWT_SECRET}
+LIBRECHAT_JWT_REFRESH_SECRET=${LIBRECHAT_JWT_REFRESH_SECRET}
+# Nach dem Anlegen deines Kontos auf false setzen, damit sich
+# niemand sonst registrieren kann.
+LIBRECHAT_ALLOW_REGISTRATION=true
 
 # Firewall
 LAN_SUBNET=${LAN_SUBNET}

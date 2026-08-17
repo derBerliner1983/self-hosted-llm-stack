@@ -4,7 +4,7 @@ Everyday commands, updating, backups and credentials.
 
 [← Back to overview](../../README-en.md) &nbsp;|&nbsp; [Deutsche Fassung](../de/betrieb.md)
 
-**Documentation:** [Installation & getting started](installation.md) · [Architecture & services](architecture.md) · [Tools for the LLM (MCP)](tools.md) · [Code sandbox](code-sandbox.md) · [Android development](android.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · **Operations & maintenance** · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
+**Documentation:** [Installation & getting started](installation.md) · [Architecture & services](architecture.md) · [Tools for the LLM (MCP)](tools.md) · [LibreChat (second UI)](librechat.md) · [Code sandbox](code-sandbox.md) · [Android development](android.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · **Operations & maintenance** · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
 
 ---
 
