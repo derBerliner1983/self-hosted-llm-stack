@@ -93,6 +93,7 @@ Die Ausgabe jedes Befehls wird zusätzlich in eine Protokolldatei geschrieben; d
 | Alles zeigt „nicht da", obwohl es läuft | Docker-Daemon nicht erreichbar, oder dein Benutzer ist nicht in der `docker`-Gruppe |
 | Rahmen und Umlaute sind kaputt | Keine UTF-8-Locale — das Menü schaltet dann auf reines ASCII um; für die schöne Darstellung `LANG=de_DE.UTF-8` (oder `C.UTF-8`) setzen |
 | Menü zeichnet Reste | Terminal zu klein; ab ca. 50×12 Zeichen wird es sinnvoll nutzbar |
+| Zeilen laufen treppenförmig nach rechts | Behoben — trat vor `94e3c83` auf, weil das Terminal in den Rohmodus geschaltet wurde und damit `\n` den Wagenrücklauf verlor. `git pull` genügt |
 
 Andere Compose-Datei benutzen:
 

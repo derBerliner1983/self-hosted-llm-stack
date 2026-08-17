@@ -265,6 +265,13 @@ hr() {
   printf '%s' "${s// /$G_HL}"
 }
 
+# Zeichenweise lesen, ohne Echo — aber bewusst NICHT über "stty raw":
+# raw schaltet zusätzlich die AUSGABE-Verarbeitung ab (ONLCR). Dann ist "\n"
+# nur noch ein Zeilenvorschub ohne Wagenrücklauf, jede Zeile beginnt dort, wo
+# die vorige endete, und das Bild läuft treppenförmig nach rechts aus dem
+# Terminal. -icanon -echo gibt uns die Einzelzeichen, ohne das anzurühren.
+term_read_mode() { stty -icanon -echo min 1 time 0 2>/dev/null || true; }
+
 ROWS=24; COLS=80
 measure() {
   ROWS=$(tput lines 2>/dev/null || echo 24)
@@ -337,9 +344,33 @@ draw_header() {
   if [ "$DOCKER_UP" -eq 1 ]; then dockertxt="${c_green}${G_RUN} Docker${c_reset}"
   elif [ "$HAS_DOCKER" -eq 1 ]; then dockertxt="${c_red}${G_WARN} Docker aus${c_reset}"
   else dockertxt="${c_dim}${G_MISS} kein Docker${c_reset}"; fi
-  printf '  %s%s%s  %s  %sDienste:%s %s%d läuft%s · %s%d fehlt%s · %d gesamt\n' \
-    "$c_dim" "$COMPOSE_FILE" "$c_reset" "$dockertxt" \
-    "$c_dim" "$c_reset" "$c_green" "$running" "$c_reset" "$c_dim" "$missing" "$c_reset" "$total"
+  # Auf schmalen Terminals fällt zuerst der Dateiname weg, dann die Langform.
+  # Gemessen wird an der FARBLOSEN Fassung — Escape-Sequenzen belegen keine
+  # Spalten, würden hier aber mitgezählt und die Zeile grundlos kürzen.
+  local dockerplain
+  if [ "$DOCKER_UP" -eq 1 ]; then dockerplain="${G_RUN} Docker"
+  elif [ "$HAS_DOCKER" -eq 1 ]; then dockerplain="${G_WARN} Docker aus"
+  else dockerplain="${G_MISS} kein Docker"; fi
+
+  local stats_long="Dienste: ${running} läuft · ${missing} fehlt · ${total} gesamt"
+  local plain
+
+  plain="  ${COMPOSE_FILE}  ${dockerplain}  ${stats_long}"
+  if [ "${#plain}" -le "$COLS" ]; then
+    printf '  %s%s%s  %s  %sDienste:%s %s%d läuft%s · %s%d fehlt%s · %d gesamt\n' \
+      "$c_dim" "$COMPOSE_FILE" "$c_reset" "$dockertxt" \
+      "$c_dim" "$c_reset" "$c_green" "$running" "$c_reset" "$c_dim" "$missing" "$c_reset" "$total"
+  else
+    plain="  ${dockerplain}  ${stats_long}"
+    if [ "${#plain}" -le "$COLS" ]; then
+      printf '  %s  %sDienste:%s %s%d läuft%s · %s%d fehlt%s · %d gesamt\n' \
+        "$dockertxt" "$c_dim" "$c_reset" "$c_green" "$running" "$c_reset" \
+        "$c_dim" "$missing" "$c_reset" "$total"
+    else
+      printf '  %s  %s%d/%d läuft%s · %s%d fehlt%s\n' \
+        "$dockertxt" "$c_green" "$running" "$total" "$c_reset" "$c_dim" "$missing" "$c_reset"
+    fi
+  fi
   printf '  %s%s%s\n' "$c_dim" "$(hr "$inner")" "$c_reset"
 }
 
@@ -382,9 +413,19 @@ draw_footer() {
   local more=""
   [ "$((TOP + VIEW))" -lt "${#ITEMS[@]}" ] && more="${c_yellow}↓ mehr${c_reset}  "
   [ "$TOP" -gt 0 ] && more="${c_yellow}↑ mehr${c_reset}  $more"
-  printf '  %s%s↑↓%s wählen  %sEnter%s öffnen  %ss%s starten  %sx%s stoppen  %sl%s Logs  %sr%s neu prüfen  %sq%s Ende\n' \
-    "$more" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" \
-    "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset"
+  # Dieselbe Logik wie oben: lieber weniger Hinweise als eine umbrechende Zeile.
+  local moreplain=""
+  [ "$((TOP + VIEW))" -lt "${#ITEMS[@]}" ] && moreplain="↓ mehr  "
+  [ "$TOP" -gt 0 ] && moreplain="↑ mehr  $moreplain"
+  local keys_long="  ${moreplain}↑↓ wählen  Enter öffnen  s starten  x stoppen  l Logs  r neu prüfen  q Ende"
+  if [ "${#keys_long}" -le "$COLS" ]; then
+    printf '  %s%s↑↓%s wählen  %sEnter%s öffnen  %ss%s starten  %sx%s stoppen  %sl%s Logs  %sr%s neu prüfen  %sq%s Ende\n' \
+      "$more" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" \
+      "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset"
+  else
+    printf '  %s%s↑↓%s wählen  %sEnter%s öffnen  %sr%s neu  %sq%s Ende\n' \
+      "$more" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset" "$c_bold" "$c_reset"
+  fi
 }
 
 draw() {
@@ -445,7 +486,7 @@ run_cmd() {
   local rc=0
   "$@" 2>&1 | tee "$LOG_FILE"
   rc=${PIPESTATUS[0]}
-  trap cleanup INT
+  trap 'exit 130' INT
 
   printf '\033[r'                         # Scrollregion zurücksetzen
   # Beide Zeilen vor dem Schreiben leeren (\033[2K) — sonst bleiben Reste der
@@ -459,7 +500,7 @@ run_cmd() {
   printf '   %sProtokoll: %s%s' "$c_dim" "$LOG_FILE" "$c_reset"
   printf '\033[%d;1H\033[2K' "$ROWS"
   printf '  %sWeiter mit Enter …%s' "$c_dim" "$c_reset"
-  stty raw -echo 2>/dev/null || true
+  term_read_mode
   read -r -n 1 _ >/dev/null 2>&1
   printf '\033[?25l'
   refresh_state
@@ -474,7 +515,7 @@ confirm() {
   printf '\033[?25h'
   stty "$STTY_SAVE" 2>/dev/null || true
   read -r ans || ans=""
-  stty raw -echo 2>/dev/null || true
+  term_read_mode
   printf '\033[?25l'
   case "$ans" in [jJyY]*) return 0 ;; *) return 1 ;; esac
 }
@@ -487,7 +528,7 @@ confirm_word() {
   printf '\033[?25h'
   stty "$STTY_SAVE" 2>/dev/null || true
   read -r ans || ans=""
-  stty raw -echo 2>/dev/null || true
+  term_read_mode
   printf '\033[?25l'
   [ "$ans" = "$word" ]
 }
@@ -692,11 +733,12 @@ main() {
     echo "Compose-Datei nicht gefunden: $ROOT_DIR/$COMPOSE_FILE" >&2; exit 1; }
 
   STTY_SAVE="$(stty -g 2>/dev/null || true)"
-  trap cleanup EXIT INT TERM
+  trap cleanup EXIT
+  trap 'exit 130' INT TERM
   trap 'measure' WINCH
   tput smcup 2>/dev/null || printf '\033[?1049h'
   printf '\033[?25l'
-  stty raw -echo 2>/dev/null || true
+  term_read_mode
 
   build_items
   refresh_state
