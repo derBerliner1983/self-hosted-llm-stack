@@ -286,7 +286,7 @@ services:
       - MCP_API_KEY=${MCP_API_KEY:-}
       # Registrierung offen lassen, damit du den ersten Account anlegen
       # kannst; danach in der .env auf false setzen.
-      - ALLOW_REGISTRATION=${LIBRECHAT_ALLOW_REGISTRATION:-true}
+      - ALLOW_REGISTRATION=${LIBRECHAT_ALLOW_REGISTRATION:-false}
     volumes:
       - ./librechat/librechat.yaml:/app/librechat.yaml:ro
       - librechat-data:/app/client/public/images

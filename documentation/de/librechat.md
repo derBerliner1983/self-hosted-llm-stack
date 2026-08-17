@@ -47,14 +47,41 @@ http://<server-ip>:3080
 
 (Auch als Dashboard-Kachel „LibreChat".)
 
-**Der erste Account, den du registrierst, gehört dir** — es gibt kein vorgegebenes Passwort. Danach solltest du die Registrierung schließen, sonst kann sich jeder, der die Oberfläche erreicht, selbst einen Zugang anlegen:
+**Die Zugangsdaten legt der Installer an** — du musst dich nicht erst registrieren. Anzeigen:
 
 ```bash
-sed -i 's/^LIBRECHAT_ALLOW_REGISTRATION=.*/LIBRECHAT_ALLOW_REGISTRATION=false/' .env
+./scripts/show-credentials.sh          # Abschnitt LibreChat
+./scripts/librechat-user.sh --show     # nur LibreChat
+```
+
+Im [Kontrollzentrum](kontrollzentrum.md) steht dasselbe unter **LibreChat → Zugangsdaten anzeigen**.
+
+| | |
+|---|---|
+| E-Mail | `admin@stack.local` (änderbar über `LIBRECHAT_ADMIN_EMAIL`) |
+| Passwort | einmalig zufällig erzeugt, steht in der `.env` |
+
+Das Passwort ist bewusst **nicht** fest eingebaut: LibreChat kommt über die MCP-Werkzeuge an deinen Vault, da wäre ein bekanntes Standardpasswort die schlechteste Idee im ganzen Stack. Ändere es nach der ersten Anmeldung in LibreChat selbst.
+
+Die Registrierung ist deshalb von vornherein **zu** (`LIBRECHAT_ALLOW_REGISTRATION=false`). Sollen sich weitere Leute selbst anmelden können:
+
+```bash
+sed -i 's/^LIBRECHAT_ALLOW_REGISTRATION=.*/LIBRECHAT_ALLOW_REGISTRATION=true/' .env
 docker compose -f docker-compose.rocm.yml up -d librechat
 ```
 
-Steht die Zeile noch nicht in deiner `.env` (ältere Installation), häng sie einfach an: `echo 'LIBRECHAT_ALLOW_REGISTRATION=false' >> .env`.
+Weiteres Konto von Hand anlegen (LibreChats eigenes Kommando):
+
+```bash
+docker exec -it librechat npm run create-user
+docker exec librechat npm run list-users
+```
+
+Wurde das Erstkonto beim Installieren nicht angelegt — etwa weil LibreChat noch nicht bereit war — hol es nach:
+
+```bash
+./scripts/librechat-user.sh
+```
 
 ## Werkzeuge im Chat nutzen
 
@@ -93,7 +120,9 @@ Die Modellliste wird zur Laufzeit von LiteLLM geholt (`fetch: true`). Ein neues 
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `PORT_LIBRECHAT` | `3080` | Port der Oberfläche |
-| `LIBRECHAT_ALLOW_REGISTRATION` | `true` | Registrierung offen — nach dem ersten Account auf `false` |
+| `LIBRECHAT_ALLOW_REGISTRATION` | `false` | Registrierung zu; das Erstkonto legt der Installer an |
+| `LIBRECHAT_ADMIN_EMAIL` | `admin@stack.local` | Anmeldename des Erstkontos |
+| `LIBRECHAT_ADMIN_PASSWORD` | erzeugt | Passwort des Erstkontos |
 | `LIBRECHAT_CREDS_KEY` / `_IV` | erzeugt | Verschlüsselung gespeicherter Zugangsdaten (64 bzw. 32 Hex-Zeichen) |
 | `LIBRECHAT_JWT_SECRET` / `_REFRESH_SECRET` | erzeugt | Sitzungs-Token |
 
@@ -126,7 +155,8 @@ docker logs librechat-mongo --tail 20
 | Keine Modelle in der Auswahl | LiteLLM erreichbar? `docker exec librechat curl -s http://litellm:4000/v1/models -H "Authorization: Bearer $LITELLM_MASTER_KEY"` |
 | Werkzeuge fehlen im Chat | `docker logs librechat \| grep -i mcp` — meldet beim Start, welche MCP-Server verbunden wurden |
 | `mcp_gateway` verbindet nicht | `MCP_API_KEY` in der `.env` gesetzt? Sonst `./scripts/wire-mcp.sh` ausführen |
-| Anmeldung nicht möglich, „registration disabled" | `LIBRECHAT_ALLOW_REGISTRATION=false` — für einen weiteren Account kurz auf `true` setzen und neu starten |
+| Anmeldung nicht möglich, Meldung „registration disabled“ | So gewollt — melde dich mit den Zugangsdaten aus `show-credentials.sh` an, oder setz `LIBRECHAT_ALLOW_REGISTRATION=true` |
+| Zugangsdaten funktionieren nicht | Wurde das Konto angelegt? `docker exec librechat npm run list-users`. Nachholen: `./scripts/librechat-user.sh` |
 
 ## Sicherheit
 

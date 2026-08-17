@@ -57,9 +57,39 @@ The header line summarises: compose file, Docker state, how many services are ru
 | `s` | Start service (on service entries) |
 | `x` | Stop service |
 | `l` | Show logs (last 200 lines) |
+| `o` | Show the service's address |
 | `r` | Re-read state |
 | `q` | Quit |
 | `Esc` | Back out of a submenu |
+
+## Service addresses
+
+Open a service with `Enter` and its address is right there in the heading; the `o` shortcut shows it full size:
+
+```
+  LibreChat  http://192.168.1.50:3080/
+
+   ❯ Neu starten
+     Adresse anzeigen (zum Anklicken)
+     Adresse festlegen (eigene Domain / anderer Host)
+```
+
+The address is built from the port (`.env`) and the IP of the machine the menu runs on. In terminals that support hyperlinks — Windows Terminal, iTerm2, GNOME Terminal, WezTerm, Kitty — it is **clickable** and opens the browser. PuTTY can't do that; there the address is plain text to select and copy. Turn it off with `MENU_HYPERLINKS=0 ./stack-menu.sh`.
+
+**Storing your own address** — the name behind a reverse proxy, for instance: pick **Adresse festlegen**, type it, done. It's written to `.env` as `URL_<SERVICE>` and takes precedence from then on. Without a scheme, `http://` is prepended. Leaving it empty removes it again.
+
+| Service | Variable |
+|---|---|
+| Open WebUI | `URL_OPEN_WEBUI` |
+| LibreChat | `URL_LIBRECHAT` |
+| LiteLLM | `URL_LITELLM` |
+| Dashboard | `URL_DASHBOARD` |
+| Vault-Bridge | `URL_VAULT_BRIDGE` |
+| Syncthing | `URL_SYNCTHING` |
+| mcpo | `URL_MCPO` |
+| MCP Gateway | `URL_MCP` |
+
+`./scripts/show-credentials.sh` uses the same values. If the menu picks the wrong IP (several network interfaces), set `STACK_HOST` in `.env`.
 
 ## The sections
 

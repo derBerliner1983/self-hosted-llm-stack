@@ -50,6 +50,14 @@ INSTALL_OPEN_INTERPRETER="${INSTALL_OPEN_INTERPRETER:-ask}"   # ask | yes | no
 INTERPRETER_MODEL="${INTERPRETER_MODEL:-ollama/gemma3:12b}"
 OPEN_INTERPRETER_VERSION="${OPEN_INTERPRETER_VERSION:-0.4.3}"
 
+# LibreChat-Erstkonto. Das Passwort wird einmalig zufällig erzeugt und steht
+# danach in der .env bzw. unter ./scripts/show-credentials.sh - ein fest
+# eingebautes Standardpasswort wäre für einen Dienst mit Vault-Zugriff keine
+# gute Idee.
+LIBRECHAT_ADMIN_EMAIL="${LIBRECHAT_ADMIN_EMAIL:-admin@stack.local}"
+LIBRECHAT_ADMIN_NAME="${LIBRECHAT_ADMIN_NAME:-Admin}"
+LIBRECHAT_ADMIN_USERNAME="${LIBRECHAT_ADMIN_USERNAME:-admin}"
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
@@ -548,6 +556,7 @@ LIBRECHAT_CREDS_KEY="${LIBRECHAT_CREDS_KEY:-$(hexrand 32)}"
 LIBRECHAT_CREDS_IV="${LIBRECHAT_CREDS_IV:-$(hexrand 16)}"
 LIBRECHAT_JWT_SECRET="${LIBRECHAT_JWT_SECRET:-$(hexrand 32)}"
 LIBRECHAT_JWT_REFRESH_SECRET="${LIBRECHAT_JWT_REFRESH_SECRET:-$(hexrand 32)}"
+LIBRECHAT_ADMIN_PASSWORD="${LIBRECHAT_ADMIN_PASSWORD:-$(rand 20)}"
 
 # Host-MTU der Standardroute ermitteln und die Container-MTU daran anpassen.
 # Verhindert TLS-Timeouts ("i/o timeout") aus Containern hinter VPN/Cloud-Overlays.
@@ -657,9 +666,28 @@ LIBRECHAT_CREDS_KEY=${LIBRECHAT_CREDS_KEY}
 LIBRECHAT_CREDS_IV=${LIBRECHAT_CREDS_IV}
 LIBRECHAT_JWT_SECRET=${LIBRECHAT_JWT_SECRET}
 LIBRECHAT_JWT_REFRESH_SECRET=${LIBRECHAT_JWT_REFRESH_SECRET}
-# Nach dem Anlegen deines Kontos auf false setzen, damit sich
-# niemand sonst registrieren kann.
-LIBRECHAT_ALLOW_REGISTRATION=true
+# Das Erstkonto legt der Installer selbst an (scripts/librechat-user.sh),
+# deshalb ist die Registrierung von vornherein zu. Auf true setzen, wenn
+# sich weitere Leute selbst ein Konto anlegen können sollen.
+LIBRECHAT_ALLOW_REGISTRATION=false
+LIBRECHAT_ADMIN_EMAIL=${LIBRECHAT_ADMIN_EMAIL}
+LIBRECHAT_ADMIN_NAME=${LIBRECHAT_ADMIN_NAME}
+LIBRECHAT_ADMIN_USERNAME=${LIBRECHAT_ADMIN_USERNAME}
+LIBRECHAT_ADMIN_PASSWORD=${LIBRECHAT_ADMIN_PASSWORD}
+
+# Eigene Adressen der Dienste (optional). Leer = aus IP und Port dieses
+# Rechners gebildet. Trag hier den Namen ein, unter dem ein Dienst von
+# aussen erreichbar ist - etwa hinter einem Reverse-Proxy. Das Menue
+# (./stack-menu.sh) zeigt und setzt diese Werte ebenfalls.
+#   URL_OPEN_WEBUI=https://chat.example.com
+URL_OPEN_WEBUI=
+URL_LIBRECHAT=
+URL_LITELLM=
+URL_DASHBOARD=
+URL_VAULT_BRIDGE=
+URL_SYNCTHING=
+URL_MCPO=
+URL_MCP=
 
 # Open Interpreter (CLI, optional) - Start: ./scripts/interpreter.sh
 # Modellname wie bei LiteLLM registriert (ollama/<name>); das "openai/"-Präfix
@@ -738,6 +766,16 @@ else
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
+# LibreChat-Erstkonto anlegen, damit man sich sofort anmelden kann.
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx librechat; then
+  info "Lege das LibreChat-Erstkonto an…"
+  if bash "$ROOT_DIR/scripts/librechat-user.sh" >/dev/null 2>&1; then
+    ok "LibreChat: Anmeldung mit ${LIBRECHAT_ADMIN_EMAIL} (Passwort siehe show-credentials.sh)."
+  else
+    note_warn "LibreChat-Konto konnte nicht angelegt werden — später: ./scripts/librechat-user.sh"
+  fi
+fi
+
 step "7/8 · MCP Gateway mit LiteLLM verdrahten"
 
 bash "$ROOT_DIR/scripts/wire-mcp.sh" || note_warn "MCP-Wiring unvollständig — später erneut ausführen: ./scripts/wire-mcp.sh"
