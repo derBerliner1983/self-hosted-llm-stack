@@ -207,6 +207,12 @@ if [ "$LC_UP" -eq 0 ]; then
   printf '  %s—%s übersprungen: LibreChat läuft nicht\n' "$c_dim" "$c_reset"
 fi
 ALL_LOG="$(docker logs librechat 2>&1)"
+# ANSI-Farbcodes raus, BEVOR "Tools: ..." ausgewertet wird: manche Logger
+# faerben Werte wie "undefined" ein, und "undefined\x1b[39m" ist streng
+# genommen nicht mehr das Wort "undefined" - der Vergleich weiter unten
+# wuerde daran vorbeirutschen, ohne dass im Terminal etwas Auffaelliges zu
+# sehen waere (die Codes setzen nur die Farbe zurueck, ohne sichtbaren Rest).
+ALL_LOG="$(printf '%s' "$ALL_LOG" | sed -E $'s/\x1b\\[[0-9;]*[a-zA-Z]//g')"
 GATEWAY_EMPTY=0
 for srv in mcp_gateway code_sandbox android_build; do
   [ "$LC_UP" -eq 1 ] || break
