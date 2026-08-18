@@ -43,7 +43,7 @@ BANNER
 printf '%s' "$c_reset"
 
 # ── 1) Laufen die Dienste? ──────────────────────────────────────────────────
-step "1/5 · Laufen die MCP-Dienste?"
+step "1/6 · Laufen die MCP-Dienste?"
 RUNNING=" $(docker ps --format '{{.Names}}' 2>/dev/null | tr '\n' ' ')"
 for c in mcp sandbox-mcp android-mcp librechat; do
   case "$RUNNING" in
@@ -58,7 +58,7 @@ for c in mcp sandbox-mcp android-mcp librechat; do
 done
 
 # ── 2) Schlüssel vorhanden? ─────────────────────────────────────────────────
-step "2/5 · MCP-Schlüssel"
+step "2/6 · MCP-Schlüssel"
 if [ -z "${MCP_API_KEY:-}" ]; then
   fail "MCP_API_KEY fehlt in der .env"
   hint "Das MCP Gateway lehnt Anfragen ohne gültigen Schlüssel ab —"
@@ -84,7 +84,7 @@ fi
 # ── 3) Antworten die Dienste auf MCP? ───────────────────────────────────────
 # Eine echte initialize-Anfrage — nur so zeigt sich, ob dort wirklich ein
 # MCP-Server sitzt und den Schlüssel akzeptiert. Ein offener Port sagt nichts.
-step "3/5 · Sprechen die Dienste MCP?"
+step "3/6 · Sprechen die Dienste MCP?"
 INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"diagnose","version":"1.0"}}}'
 
 # Im LibreChat-Image gibt es kein curl — wohl aber node, denn LibreChat IST
@@ -162,7 +162,7 @@ if ! docker exec librechat sh -c 'grep -q "allowedAddresses" /app/librechat.yaml
 fi
 
 # ── 4) Was sagt LibreChat beim Start? ───────────────────────────────────────
-step "4/5 · Meldungen von LibreChat"
+step "4/6 · Meldungen von LibreChat"
 LOG="$(docker logs librechat 2>&1 | grep -iE 'mcp' | tail -15)"
 if [ -z "$LOG" ]; then
   warn "Keine MCP-Meldungen im Log — wird die librechat.yaml überhaupt gelesen?"
@@ -181,8 +181,37 @@ else
   fi
 fi
 
+# ── 4b) Wie viele Werkzeuge liefert JEDER Server? ───────────────────────────
+# "Initialized with 3 configured servers and 8 tools" klingt gut, kann aber
+# bedeuten, dass ein Server gar nichts beigesteuert hat. LibreChat protokolliert
+# die Werkzeuge pro Server — das ist die verlaessliche Quelle, nicht die Summe.
+step "5/6 · Werkzeuge je Server"
+ALL_LOG="$(docker logs librechat 2>&1)"
+for srv in mcp_gateway code_sandbox android_build; do
+  # Ist der Server ueberhaupt konfiguriert?
+  docker exec librechat sh -c "grep -q '^  ${srv}:' /app/librechat.yaml" 2>/dev/null || continue
+  line="$(printf '%s' "$ALL_LOG" | grep -F "[MCP][$srv] Tools:" | tail -1)"
+  if [ -n "$line" ]; then
+    tools="${line#*Tools: }"
+    count="$(printf '%s' "$tools" | tr ',' '\n' | grep -c '[a-zA-Z]')"
+    ok "$srv: $count Werkzeuge"
+    printf '      %s%s%s\n' "$c_dim" "$tools" "$c_reset"
+  else
+    fail "$srv liefert KEINE Werkzeuge"
+    if [ "$srv" = "mcp_gateway" ]; then
+      hint "Das Gateway ist verbunden, meldet aber keine Werkzeuge. Meist sind"
+      hint "in MCPHub keine Server aktiv. Nachsehen und nachtragen:"
+      hint "  ./scripts/wire-mcp.sh"
+      hint "  docker exec mcp cat /var/lib/mcp/mcp_settings.json"
+      hint "Danach: docker compose -f $COMPOSE_FILE restart librechat"
+    else
+      hint "Log ansehen: docker logs librechat 2>&1 | grep '\[MCP\]\[$srv\]'"
+    fi
+  fi
+done
+
 # ── 5) Konfiguration im Container ───────────────────────────────────────────
-step "5/5 · Konfiguration im Container"
+step "6/6 · Konfiguration im Container"
 if docker exec librechat sh -c 'grep -q "^mcpServers:" /app/librechat.yaml' 2>/dev/null; then
   ok "mcpServers steht in der Konfiguration"
   docker exec librechat sh -c "sed -n '/^mcpServers:/,\$p' /app/librechat.yaml | grep -E '^  [a-z_]+:|url:'" 2>/dev/null | sed 's/^/    /'

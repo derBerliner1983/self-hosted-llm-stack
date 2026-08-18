@@ -196,6 +196,27 @@ The most common causes:
 | `MCP_API_KEY` missing or empty in the container | HTTP 401 during the probe | `./scripts/wire-mcp.sh`, then `up -d --force-recreate librechat` |
 | The agent has no tools selected | only `[ResumableAgentController]`, nothing else | Agents → Edit → Tools |
 
+### "N tools" doesn't mean every server delivered
+
+`Initialized with 3 configured servers and 8 tools` sounds fine, but says nothing about **which** server contributed. 8 can just as well be 5 + 3 + **0**. So the diagnosis counts per server:
+
+```
+5/6 · Werkzeuge je Server
+  ✓ code_sandbox: 3 Werkzeuge
+  ✓ android_build: 5 Werkzeuge
+  ✗ mcp_gateway liefert KEINE Werkzeuge
+```
+
+If `mcp_gateway` of all things delivers nothing, it's usually connected but has no active servers in MCPHub. Add them and check:
+
+```bash
+./scripts/wire-mcp.sh
+docker exec mcp cat /var/lib/mcp/mcp_settings.json
+docker compose -f docker-compose.rocm.yml restart librechat
+```
+
+That hits exactly the tools you're most likely to miss: filesystem (vault), web fetch and timezones.
+
 ### Why SSRF protection kicks in
 
 With **no** allowlist configured, LibreChat pre-emptively blocks any target resolving to a **private IP** — standard protection against SSRF (tricking the server into probing internal addresses). Docker-internal names like `mcp` or `sandbox-mcp` resolve to exactly that, `172.x`. So your own services fall under that protection.
