@@ -46,6 +46,49 @@ endpoints:
       titleConvo: true
       titleModel: "current_model"
       modelDisplayLabel: "LiteLLM (lokal)"
+      # Symbol des ENDPUNKTS (gilt fuer alle Modelle darunter). Entweder eine
+      # eigene Datei oder der Name eines mitgelieferten Symbols ("openAI",
+      # "google", "anthropic" ...). Eigene Bilder gehoeren ins Volume
+      # librechat-data, das im Container unter /app/client/public/images
+      # haengt - LibreChat liefert sie dann unter /images/<datei> aus:
+      #   docker cp logo.png librechat:/app/client/public/images/logo.png
+      # iconURL: "/images/litellm.png"
+
+# ── Symbole und Namen je MODELL ─────────────────────────────────────────
+# Anders als Open WebUI kennt LibreChat kein Bearbeiten-Fenster pro Modell -
+# hier wird es in dieser Datei festgelegt. Jeder Eintrag unter "list" ist ein
+# Modell-Steckbrief mit eigenem Namen, Symbol und Beschreibung; "preset" legt
+# fest, welches Modell dahinter wirklich steckt.
+#
+#   enforce: false  -> die normale Modellliste bleibt zusaetzlich waehlbar
+#   prioritize: true -> die Steckbriefe stehen oben in der Auswahl
+#
+# Zum Aktivieren die Zeilen ab "modelSpecs:" auskommentieren, Bilder ablegen
+# und LibreChat neu starten:
+#   docker compose -f docker-compose.rocm.yml restart librechat
+#
+# modelSpecs:
+#   enforce: false
+#   prioritize: true
+#   list:
+#     - name: "gemma-lokal"
+#       label: "Gemma 3 12B"
+#       description: "Allrounder, laeuft auf der eigenen GPU"
+#       iconURL: "/images/gemma.png"
+#       showIconInMenu: true
+#       showIconInHeader: true
+#       order: 1
+#       preset:
+#         endpoint: "LiteLLM"
+#         model: "ollama/gemma3:12b"
+#     - name: "qwen-coder"
+#       label: "Qwen Coder"
+#       description: "Fuer Code"
+#       iconURL: "/images/qwen.png"
+#       order: 2
+#       preset:
+#         endpoint: "LiteLLM"
+#         model: "ollama/qwen3-coder-next:latest"
 
 # ── MCP-Werkzeuge, nativ ────────────────────────────────────────────────
 # Dieselben Dienste, die Open WebUI über mcpo erreicht - hier direkt.
