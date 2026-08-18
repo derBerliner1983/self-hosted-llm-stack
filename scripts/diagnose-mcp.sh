@@ -309,12 +309,16 @@ const parse = (t) => { for (const l of t.split("\n")) { const s = l.startsWith("
       printf '%s\n' "$out" | tail -n +2 | sed 's/^/      /'
       case "$GATEWAY_OAUTH" in
         *"OAuth Required: true"*)
-          hint "Ursache: MCPHubs eingebauter OAuth-Server ist an. LibreChats"
-          hint "MCP-Client bricht die Aushandlung dann ab, bevor er die"
-          hint "Werkzeugliste abholt - unabhaengig davon, dass der Bearer-Key"
-          hint "fuer echte Aufrufe funktioniert (wie eben, direkt getestet)."
-          hint "Behebung: ./scripts/wire-mcp.sh"
-          hint "(schaltet oauthServer.enabled ab und startet mcp + LibreChat neu)" ;;
+          hint "Ursache: LibreChat prueft OAuth-Bedarf beim Start OHNE den"
+          hint "konfigurierten Header. Caddy vor MCPHub sichert dabei auch die"
+          hint "OAuth-Erkennungspfade mit dem Bearer-Key ab, die Pruefung"
+          hint "bekommt darum 401 statt 404 und haelt den Server faelschlich"
+          hint "fuer OAuth-pflichtig - der Bearer-Key selbst funktioniert"
+          hint "einwandfrei (wie eben, direkt getestet)."
+          hint "Behebung: requiresOAuth: false steht seit git pull bei"
+          hint "mcp_gateway in librechat.yaml. Falls noch nicht aktuell:"
+          hint "  git pull"
+          hint "  docker compose -f $COMPOSE_FILE restart librechat" ;;
         *)
           hint "Meist hilft: docker compose -f $COMPOSE_FILE restart librechat" ;;
       esac ;;
