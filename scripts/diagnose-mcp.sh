@@ -87,22 +87,44 @@ fi
 step "3/5 · Sprechen die Dienste MCP?"
 INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"diagnose","version":"1.0"}}}'
 
+# Im LibreChat-Image gibt es kein curl — wohl aber node, denn LibreChat IST
+# eine Node-Anwendung. Die Anfrage geht deshalb über node; so bleibt die
+# Prüfung an genau der Stelle, auf die es ankommt: aus dem Container heraus,
+# über dasselbe Docker-Netz, das LibreChat auch selbst benutzt.
+HTTP_JS='
+const [url, auth, body] = [process.argv[1], process.argv[2], process.argv[3]];
+const lib = url.startsWith("https") ? require("https") : require("http");
+const headers = {
+  "Content-Type": "application/json",
+  "Accept": "application/json, text/event-stream",
+  "Content-Length": Buffer.byteLength(body),
+};
+if (auth) headers["Authorization"] = "Bearer " + auth;
+const req = lib.request(url, { method: "POST", headers, timeout: 12000 }, (res) => {
+  let data = "";
+  res.on("data", (c) => (data += c));
+  res.on("end", () => {
+    console.log(res.statusCode);
+    console.log(data.slice(0, 300));
+  });
+});
+req.on("timeout", () => { console.log("000"); console.log("Zeitüberschreitung"); req.destroy(); });
+req.on("error", (e) => { console.log("000"); console.log(e.message); });
+req.end(body);
+'
+
 probe() {
-  local name="$1" url="$2" auth="$3" body code
-  body="$(docker exec librechat curl -s -o /tmp/mcp-probe.out -w '%{http_code}' --max-time 12 \
-    -X POST "$url" \
-    -H 'Content-Type: application/json' \
-    -H 'Accept: application/json, text/event-stream' \
-    ${auth:+-H "Authorization: Bearer $auth"} \
-    -d "$INIT" 2>/dev/null)"
-  code="$body"
+  local name="$1" url="$2" auth="$3" out code rest
+  out="$(docker exec librechat node -e "$HTTP_JS" "$url" "$auth" "$INIT" 2>&1)"
+  code="$(printf '%s' "$out" | head -1)"
+  rest="$(printf '%s' "$out" | tail -n +2)"
   case "$code" in
     200)
-      if docker exec librechat sh -c 'grep -q "serverInfo\|protocolVersion" /tmp/mcp-probe.out' 2>/dev/null; then
+      if printf '%s' "$rest" | grep -q 'serverInfo\|protocolVersion'; then
         ok "$name antwortet als MCP-Server"
       else
         warn "$name antwortet mit 200, aber ohne MCP-Inhalt"
-        docker exec librechat sh -c 'head -c 200 /tmp/mcp-probe.out' 2>/dev/null | sed 's/^/      /'; echo
+        printf '%s\n' "$rest" | head -3 | sed 's/^/      /'
       fi ;;
     401|403)
       fail "$name lehnt den Schlüssel ab (HTTP $code)"
@@ -110,12 +132,13 @@ probe() {
       hint "danach: docker compose -f $COMPOSE_FILE up -d --force-recreate librechat" ;;
     404)
       fail "$name: Pfad nicht gefunden (HTTP 404) — falsche URL in librechat.yaml?" ;;
-    000|"")
+    000)
       fail "$name ist aus dem librechat-Container nicht erreichbar"
-      hint "Hängen beide im selben Docker-Netz? docker network inspect \$(docker inspect -f '{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}}{{end}}' librechat)" ;;
+      printf '%s\n' "$rest" | head -2 | sed 's/^/      /'
+      hint "Läuft der Dienst, und hängen beide im selben Docker-Netz?" ;;
     *)
-      fail "$name antwortet mit HTTP $code"
-      docker exec librechat sh -c 'head -c 200 /tmp/mcp-probe.out' 2>/dev/null | sed 's/^/      /'; echo ;;
+      fail "$name antwortet unerwartet"
+      printf '%s\n' "$out" | head -3 | sed 's/^/      /' ;;
   esac
 }
 
@@ -127,6 +150,17 @@ case "$RUNNING" in
   *) fail "Ohne laufenden librechat-Container nicht prüfbar" ;;
 esac
 
+# ── 3b) SSRF-Ausnahme vorhanden? ────────────────────────────────────────────
+# Ohne mcpSettings.allowedAddresses blockiert LibreChat jedes Ziel mit privater
+# IP — und Docker-interne Namen zeigen genau dorthin. Der Fehler im Log lautet
+# dann: Domain "http://mcp:3000" is not allowed
+if ! docker exec librechat sh -c 'grep -q "allowedAddresses" /app/librechat.yaml' 2>/dev/null; then
+  fail "mcpSettings.allowedAddresses fehlt in der Konfiguration"
+  hint "Ohne diese Ausnahme lehnt LibreChat interne Adressen ab:"
+  hint '  Domain "http://mcp:3000" is not allowed'
+  hint "Beheben: git pull, dann docker compose -f $COMPOSE_FILE restart librechat"
+fi
+
 # ── 4) Was sagt LibreChat beim Start? ───────────────────────────────────────
 step "4/5 · Meldungen von LibreChat"
 LOG="$(docker logs librechat 2>&1 | grep -iE 'mcp' | tail -15)"
@@ -136,7 +170,11 @@ if [ -z "$LOG" ]; then
   hint "CONFIG_PATH muss auf /app/librechat.yaml zeigen."
 else
   printf '%s\n' "$LOG" | sed 's/^/    /'
-  if printf '%s' "$LOG" | grep -qiE 'error|failed|unavailable|refused'; then
+  if printf '%s' "$LOG" | grep -q 'is not allowed'; then
+    fail "LibreChat blockiert die Adressen (SSRF-Schutz)"
+    hint "mcpSettings.allowedAddresses fehlt oder deckt nicht alle Dienste ab."
+    hint "Beheben: git pull, dann docker compose -f $COMPOSE_FILE restart librechat"
+  elif printf '%s' "$LOG" | grep -qiE 'error|failed|unavailable|refused'; then
     fail "Das Log meldet Fehler (siehe oben)"
   else
     ok "Keine Fehler in den MCP-Meldungen"

@@ -120,6 +120,28 @@ modelSpecs:
         endpoint: "LiteLLM"
         model: "ollama/llama3.1:8b"
 
+# ── SSRF-Ausnahme für die eigenen Dienste ───────────────────────────────
+# Ohne diesen Block lehnt LibreChat die MCP-Server ab:
+#   Domain "http://mcp:3000" is not allowed
+#
+# Grund: Ist keine Positivliste gesetzt, blockiert LibreChat vorsorglich jedes
+# Ziel, das auf eine PRIVATE IP zeigt (Schutz vor SSRF). Docker-interne Namen
+# wie mcp oder sandbox-mcp loesen genau dorthin auf - also auf 172.x - und
+# fallen damit unter diesen Schutz.
+#
+# allowedAddresses ist die dafuer vorgesehene Ausnahmeliste: sie gilt NUR fuer
+# privaten IP-Raum und muss host:port lauten, damit die Ausnahme auf genau
+# einen Dienstport begrenzt bleibt statt auf den ganzen Rechner.
+#
+# Bewusst allowedAddresses und nicht allowedDomains: eine gesetzte
+# allowedDomains-Liste schaltet den SSRF-Schutz komplett ab. So bleibt er
+# aktiv und es sind exakt diese drei Ports ausgenommen.
+mcpSettings:
+  allowedAddresses:
+    - "mcp:3000"
+    - "sandbox-mcp:8000"
+    - "android-mcp:8000"
+
 # ── MCP-Werkzeuge, nativ ────────────────────────────────────────────────
 # Dieselben Dienste, die Open WebUI über mcpo erreicht - hier direkt.
 mcpServers:

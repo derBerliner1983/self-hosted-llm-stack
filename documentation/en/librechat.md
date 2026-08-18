@@ -187,13 +187,32 @@ An **agent** has MCP tools assigned, but LibreChat couldn't connect any MCP serv
 
 It checks: are the services running, is `MCP_API_KEY` set **and did it reach the container**, do the services answer a real MCP `initialize` request from inside the LibreChat container, what does the log say, and is the `mcpServers` block in the config at all.
 
-The three most common causes:
+The most common causes:
 
-| Cause | Fix |
-|---|---|
-| LibreChat started before the MCP services | `docker compose -f docker-compose.rocm.yml restart librechat` |
-| `MCP_API_KEY` missing or empty in the container | `./scripts/wire-mcp.sh`, then `docker compose … up -d --force-recreate librechat` |
-| The agent itself has no tools selected | Agents → Edit → Tools |
+| Cause | How it shows in the log | Fix |
+|---|---|---|
+| **SSRF protection blocks internal addresses** | `Domain "http://mcp:3000" is not allowed` | `mcpSettings.allowedAddresses` (included since `git pull`), then `restart librechat` |
+| LibreChat started before the MCP services | `Failed to initialize` / `ECONNREFUSED` | `docker compose -f docker-compose.rocm.yml restart librechat` |
+| `MCP_API_KEY` missing or empty in the container | HTTP 401 during the probe | `./scripts/wire-mcp.sh`, then `up -d --force-recreate librechat` |
+| The agent has no tools selected | only `[ResumableAgentController]`, nothing else | Agents → Edit → Tools |
+
+### Why SSRF protection kicks in
+
+With **no** allowlist configured, LibreChat pre-emptively blocks any target resolving to a **private IP** — standard protection against SSRF (tricking the server into probing internal addresses). Docker-internal names like `mcp` or `sandbox-mcp` resolve to exactly that, `172.x`. So your own services fall under that protection.
+
+The fix lives in `librechat/librechat.yaml`:
+
+```yaml
+mcpSettings:
+  allowedAddresses:
+    - "mcp:3000"
+    - "sandbox-mcp:8000"
+    - "android-mcp:8000"
+```
+
+`allowedAddresses` is the mechanism made for this: it only applies to private IP space and requires `host:port`, so the exemption is scoped to one service port rather than the whole host.
+
+> Deliberately `allowedAddresses` and **not** `allowedDomains`: setting an `allowedDomains` list disables SSRF protection entirely. This way it stays on and exactly these three ports are exempt. A new MCP service has to be added here too.
 
 > That last one explains why it "works without MCP": with no tools assigned the model simply answers from its own knowledge.
 
