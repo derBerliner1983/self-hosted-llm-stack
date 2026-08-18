@@ -148,16 +148,18 @@ Ein auskommentiertes Beispiel steht schon in der Datei — Zeilen einkommentiere
 
 | Wert | Bedeutung |
 |---|---|
-| `/images/gemma.png` | Eigene Datei aus dem Volume `librechat-data` |
+| `/images/custom/gemma.png` | Eigene Datei aus dem Ordner `images/` |
 | `https://…/logo.png` | Beliebige Adresse im Netz |
 | `openAI`, `google`, `anthropic` … | Ein mitgeliefertes Symbol wiederverwenden |
 
-Eigene Bilder ins Volume kopieren — es hängt im Container unter `/app/client/public/images`, LibreChat liefert den Inhalt unter `/images/` aus:
+Eigene Bilder gehören in den Ordner **`images/`** im Projektverzeichnis. Der ist read-only in den Container eingehängt; LibreChat liefert alles darin unter `/images/custom/` aus:
 
 ```bash
-docker cp gemma.png librechat:/app/client/public/images/gemma.png
-docker compose -f docker-compose.rocm.yml restart librechat
+cp mein-logo.png ~/self-hosted-llm-stack/images/
+# in der YAML dann:  iconURL: "/images/custom/mein-logo.png"
 ```
+
+Kein `docker cp` nötig, und beim Neuerzeugen des Containers bleiben die Bilder erhalten. Ein **neues Bild** ist sofort da (Seite neu laden); nur eine Änderung an der YAML braucht einen Neustart.
 
 Quadratische PNG oder SVG ab etwa 128×128 sehen am besten aus.
 

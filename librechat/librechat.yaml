@@ -56,39 +56,69 @@ endpoints:
 
 # ── Symbole und Namen je MODELL ─────────────────────────────────────────
 # Anders als Open WebUI kennt LibreChat kein Bearbeiten-Fenster pro Modell -
-# hier wird es in dieser Datei festgelegt. Jeder Eintrag unter "list" ist ein
-# Modell-Steckbrief mit eigenem Namen, Symbol und Beschreibung; "preset" legt
-# fest, welches Modell dahinter wirklich steckt.
+# es steht hier. Jeder Eintrag unter "list" ist ein Steckbrief mit eigenem
+# Namen, Symbol und Beschreibung; "preset.model" sagt, welches Modell wirklich
+# dahintersteckt.
 #
-#   enforce: false  -> die normale Modellliste bleibt zusaetzlich waehlbar
+# Bilder: einfach ins Verzeichnis ./images legen (neben dieser Datei, eine
+# Ebene hoeher). Sie sind dann unter /images/custom/<datei> erreichbar.
+#
+#   enforce: false   -> die vollstaendige Modellliste bleibt zusaetzlich waehlbar
 #   prioritize: true -> die Steckbriefe stehen oben in der Auswahl
 #
-# Zum Aktivieren die Zeilen ab "modelSpecs:" auskommentieren, Bilder ablegen
-# und LibreChat neu starten:
-#   docker compose -f docker-compose.rocm.yml restart librechat
+# Die Modellnamen unter "model" muessen exakt so heissen wie in deiner
+# LiteLLM-Liste. Nachsehen:
+#   docker exec litellm curl -s http://127.0.0.1:4000/v1/models \
+#     -H "Authorization: Bearer $LITELLM_MASTER_KEY" | grep -o '"id":"[^"]*"'
 #
-# modelSpecs:
-#   enforce: false
-#   prioritize: true
-#   list:
-#     - name: "gemma-lokal"
-#       label: "Gemma 3 12B"
-#       description: "Allrounder, laeuft auf der eigenen GPU"
-#       iconURL: "/images/gemma.png"
-#       showIconInMenu: true
-#       showIconInHeader: true
-#       order: 1
-#       preset:
-#         endpoint: "LiteLLM"
-#         model: "ollama/gemma3:12b"
-#     - name: "qwen-coder"
-#       label: "Qwen Coder"
-#       description: "Fuer Code"
-#       iconURL: "/images/qwen.png"
-#       order: 2
-#       preset:
-#         endpoint: "LiteLLM"
-#         model: "ollama/qwen3-coder-next:latest"
+# Nach Aenderungen: docker compose -f docker-compose.rocm.yml restart librechat
+modelSpecs:
+  enforce: false
+  prioritize: true
+  list:
+    - name: "gemma4"
+      label: "Gemma 4 12B"
+      description: "Allrounder fuer den Alltag"
+      iconURL: "/images/custom/gemma-color.png"
+      showIconInMenu: true
+      showIconInHeader: true
+      order: 1
+      preset:
+        endpoint: "LiteLLM"
+        model: "ollama/gemma4:12b"
+
+    - name: "gemma3"
+      label: "Gemma 3 12B"
+      description: "Vorgaenger, etwas genuegsamer"
+      iconURL: "/images/custom/gemma-color.png"
+      showIconInMenu: true
+      showIconInHeader: true
+      order: 2
+      preset:
+        endpoint: "LiteLLM"
+        model: "ollama/gemma3:12b"
+
+    - name: "qwen-coder"
+      label: "Qwen Coder"
+      description: "Fuer Code und Werkzeugaufrufe"
+      iconURL: "/images/custom/qwen-color.png"
+      showIconInMenu: true
+      showIconInHeader: true
+      order: 3
+      preset:
+        endpoint: "LiteLLM"
+        model: "ollama/qwen3-coder-next:latest"
+
+    - name: "llama31"
+      label: "Llama 3.1 8B"
+      description: "Klein und schnell"
+      iconURL: "/images/custom/llama.png"
+      showIconInMenu: true
+      showIconInHeader: true
+      order: 4
+      preset:
+        endpoint: "LiteLLM"
+        model: "ollama/llama3.1:8b"
 
 # ── MCP-Werkzeuge, nativ ────────────────────────────────────────────────
 # Dieselben Dienste, die Open WebUI über mcpo erreicht - hier direkt.
