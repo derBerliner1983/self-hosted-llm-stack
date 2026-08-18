@@ -163,6 +163,44 @@ Square PNG or SVG from about 128×128 looks best.
 
 > Every change to the YAML needs a restart of `librechat` — the file is only read at startup.
 
+## Where MCP is configured — and what to do when tools are missing
+
+There's no MCP settings dialog in LibreChat: the servers live in [`librechat/librechat.yaml`](../../librechat/librechat.yaml) under `mcpServers`. What you pick in the UI is only *which* of the connected tools a conversation or an agent may use.
+
+**Important:** LibreChat connects its MCP servers **at startup**. If a service wasn't running then — or was recreated since, e.g. by `restart-mcp.sh` — it stays invisible to LibreChat until LibreChat itself restarts:
+
+```bash
+docker compose -f docker-compose.rocm.yml restart librechat
+```
+
+### Error: `AGENT_EXPECTED_MCP_TOOLS_UNAVAILABLE`
+
+An **agent** has MCP tools assigned, but LibreChat couldn't connect any MCP server. The diagnosis walks the whole chain:
+
+```bash
+./scripts/diagnose-mcp.sh
+```
+
+(Also in the [control center](control-center.md), on every MCP service under **Werkzeuge prüfen**.)
+
+It checks: are the services running, is `MCP_API_KEY` set **and did it reach the container**, do the services answer a real MCP `initialize` request from inside the LibreChat container, what does the log say, and is the `mcpServers` block in the config at all.
+
+The three most common causes:
+
+| Cause | Fix |
+|---|---|
+| LibreChat started before the MCP services | `docker compose -f docker-compose.rocm.yml restart librechat` |
+| `MCP_API_KEY` missing or empty in the container | `./scripts/wire-mcp.sh`, then `docker compose … up -d --force-recreate librechat` |
+| The agent itself has no tools selected | Agents → Edit → Tools |
+
+> That last one explains why it "works without MCP": with no tools assigned the model simply answers from its own knowledge.
+
+### Web search
+
+The MCP Gateway's tools include **fetch**, not search: fetch retrieves a page whose address is already known. A question like "search the web for …" can't be answered with it — there's no search engine behind it.
+
+Two routes: LibreChat's own web search (`webSearch` in the YAML, needs an account with a search provider) or your own MCP search server declared under `mcpServers`. Neither is set up in this stack yet.
+
 ## Adjusting the configuration
 
 Everything substantive lives in [`librechat/librechat.yaml`](../../librechat/librechat.yaml) — endpoints, MCP servers, UI options. After every change:
