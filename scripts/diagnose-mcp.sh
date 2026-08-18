@@ -216,6 +216,13 @@ for srv in mcp_gateway code_sandbox android_build; do
   # "Tools: undefined" heisst: verbunden, aber der Server bietet nichts an.
   # Das als ein Werkzeug zu zaehlen waere schlimmer als gar keine Zahl.
   tools="${line#*Tools: }"
+  # \r entfernen und Rand-Leerraum abschneiden: docker logs liefert Zeilen
+  # nicht immer sauber getrimmt, und schon ein einziges Leerzeichen vor
+  # "undefined" liesse den folgenden Vergleich ins Leere laufen — "undefined"
+  # zaehlte dann als ein echtes Werkzeug statt gar keins.
+  tools="${tools//$'\r'/}"
+  tools="${tools#"${tools%%[![:space:]]*}"}"
+  tools="${tools%"${tools##*[![:space:]]}"}"
   case "${tools:-}" in undefined|null|none|"") tools="" ;; esac
   if [ -n "$line" ] && [ -n "$tools" ]; then
     count="$(printf '%s' "$tools" | tr ',' '\n' | grep -c '[a-zA-Z]')"
