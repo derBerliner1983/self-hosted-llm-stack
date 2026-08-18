@@ -105,6 +105,64 @@ The three servers are the same ones Open WebUI uses:
 
 The descriptions the model sees for each server (`serverInstructions` in the YAML) also tell it what is **not** there — no network in the sandbox, `/work` persists, `/tmp` doesn't. That saves you the endless guessing loops that happen when a model doesn't know the limits of its own tools.
 
+## Model icons and names
+
+In Open WebUI you click a model and change its picture and name in the edit dialog. LibreChat has no such dialog — here it lives in [`librechat/librechat.yaml`](../../librechat/librechat.yaml). In exchange, it's the same for every user.
+
+Two levels:
+
+**The whole endpoint** — one icon for every model under it:
+
+```yaml
+endpoints:
+  custom:
+    - name: "LiteLLM"
+      iconURL: "/images/litellm.png"
+      modelDisplayLabel: "LiteLLM (lokal)"
+```
+
+**Individual models** — via `modelSpecs`. Each entry is a profile with its own name, icon and description; `preset` says which model is actually behind it:
+
+```yaml
+modelSpecs:
+  enforce: false      # the normal model list stays selectable too
+  prioritize: true    # profiles appear at the top of the picker
+  list:
+    - name: "gemma-lokal"
+      label: "Gemma 3 12B"
+      description: "All-rounder, runs on your own GPU"
+      iconURL: "/images/gemma.png"
+      showIconInMenu: true
+      showIconInHeader: true
+      order: 1
+      preset:
+        endpoint: "LiteLLM"
+        model: "ollama/gemma3:12b"
+```
+
+A commented-out example is already in the file — uncomment, adjust, restart.
+
+### Where the images go
+
+`iconURL` takes three kinds of value:
+
+| Value | Meaning |
+|---|---|
+| `/images/gemma.png` | Your own file from the `librechat-data` volume |
+| `https://…/logo.png` | Any address on the web |
+| `openAI`, `google`, `anthropic`, … | Reuse one of the built-in icons |
+
+Copy your own images into the volume — it's mounted at `/app/client/public/images` in the container, and LibreChat serves its contents under `/images/`:
+
+```bash
+docker cp gemma.png librechat:/app/client/public/images/gemma.png
+docker compose -f docker-compose.rocm.yml restart librechat
+```
+
+Square PNG or SVG from about 128×128 looks best.
+
+> Every change to the YAML needs a restart of `librechat` — the file is only read at startup.
+
 ## Adjusting the configuration
 
 Everything substantive lives in [`librechat/librechat.yaml`](../../librechat/librechat.yaml) — endpoints, MCP servers, UI options. After every change:
