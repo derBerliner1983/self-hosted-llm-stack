@@ -83,6 +83,43 @@ Wurde das Erstkonto beim Installieren nicht angelegt — etwa weil LibreChat noc
 ./scripts/librechat-user.sh
 ```
 
+## Eigenen Benutzer und eigenes Passwort festlegen
+
+Die erzeugten Standard-Zugangsdaten sind nur der Einstieg. Willst du eigene:
+
+```bash
+./scripts/set-credentials.sh librechat
+```
+
+(Im [Kontrollzentrum](kontrollzentrum.md): **LibreChat → Eigenen Benutzer und Passwort festlegen**.)
+
+Das Skript fragt E-Mail und Passwort ab — das Passwort ohne Bildschirmanzeige und zweimal zur Sicherheit. Existiert das Konto, wird das Passwort geändert (über LibreChats `reset-password`, wodurch alle bestehenden Anmeldungen ungültig werden); existiert es nicht, wird es angelegt.
+
+**Ein selbst gewähltes Passwort wird nicht gespeichert.** In der `.env` steht danach nur der Benutzername und die Notiz, wann du ein eigenes gesetzt hast:
+
+```
+LIBRECHAT_ADMIN_EMAIL=ich@example.com
+LIBRECHAT_ADMIN_PASSWORD=
+LIBRECHAT_ADMIN_PASSWORD_SET=2026-08-18T08:00
+```
+
+Die Zugangsdaten-Anzeige sagt dann genau das:
+
+```
+  E-Mail:      ich@example.com
+  Passwort:    (selbst gesetzt am 2026-08-18T08:00, nicht gespeichert)
+```
+
+Du kennst es ja — es zusätzlich im Klartext auf der Platte zu haben, brächte nur ein Risiko mehr. **Notier es dir**: anzeigen lässt es sich danach nicht mehr.
+
+Zurück auf ein erzeugtes Passwort (wird dann wieder angezeigt):
+
+```bash
+./scripts/set-credentials.sh librechat --reset
+```
+
+Dasselbe geht für **Syncthing** (Benutzername und Passwort der Oberfläche). Bei **Open WebUI** lässt sich nur festlegen, womit ein *neues* Konto angelegt wird — ein bestehendes änderst du dort in der Oberfläche selbst (Profil → Einstellungen → Konto). LiteLLM hat kein eigenes Passwort: der Master-Key *ist* die Anmeldung.
+
 ## Werkzeuge im Chat nutzen
 
 Anders als in Open WebUI gibt es **keine Konfiguration pro Modell**. Die MCP-Dienste stehen aus `librechat/librechat.yaml` heraus schon bereit; du wählst sie pro Unterhaltung aus:
