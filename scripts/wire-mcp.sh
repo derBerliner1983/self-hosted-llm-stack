@@ -87,6 +87,19 @@ if (!data.mcpServers.time) {
   };
   changed = true;
 }
+// Den eingebauten OAuth-Server von MCPHub abschalten: dieser Stack nutzt
+// den statischen Bearer-Key (MCP_API_KEY), keine dynamische Client-
+// Registrierung. Bleibt er an, meldet MCPHub den /mcp-Endpunkt als
+// "OAuth erforderlich" - LibreChats MCP-Client bricht die Aushandlung dann
+// vorzeitig ab (Capabilities/Tools bleiben "undefined"), obwohl der
+// Bearer-Key fuer echte Werkzeugaufrufe einwandfrei funktioniert. Ein
+// direkter Aufruf ohne OAuth-Handshake bekommt die Werkzeuge normal.
+data.systemConfig = data.systemConfig || {};
+data.systemConfig.oauthServer = data.systemConfig.oauthServer || {};
+if (data.systemConfig.oauthServer.enabled !== false) {
+  data.systemConfig.oauthServer.enabled = false;
+  changed = true;
+}
 if (changed) {
   fs.writeFileSync(path, JSON.stringify(data, null, 2));
   console.log("CHANGED");
@@ -96,15 +109,28 @@ if (changed) {
 ')"
 
 if [ "$PATCH_RESULT" = "CHANGED" ]; then
-  ok "Fehlende Server nachgetragen, starte mcp neu…"
+  ok "Konfiguration angepasst, starte mcp neu…"
   $DC -f "$COMPOSE_FILE" restart mcp >/dev/null
   for i in $(seq 1 40); do
     docker exec mcp mcp_manage --getkey >/dev/null 2>&1 && break
     sleep 3
     [ "$i" -eq 40 ] && die "mcp wurde nach dem Neustart nicht rechtzeitig bereit. Prüfe: docker logs mcp"
   done
+
+  # LibreChat verbindet seine MCP-Server nur beim eigenen Start und fragt
+  # danach nie wieder nach (siehe documentation/de/librechat.md). Ein
+  # mcp-Neustart eben - egal aus welchem der obigen Gruende - macht seinen
+  # zwischengespeicherten Stand (moeglicherweise "OAuth erforderlich" oder
+  # eine alte, unvollstaendige Werkzeugliste) ungueltig. Ohne diesen
+  # Neustart hier bliebe LibreChat auf dem alten Stand haengen, bis jemand
+  # von Hand draufkommt - genau das hat zuvor zu langer Fehlersuche gefuehrt.
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx librechat; then
+    info "LibreChat neu starten, damit es die aktualisierten MCP-Werkzeuge sieht…"
+    $DC -f "$COMPOSE_FILE" restart librechat >/dev/null
+    ok "LibreChat neu gestartet."
+  fi
 else
-  ok "'filesystem' und 'time' waren schon registriert, kein Neustart nötig."
+  ok "'filesystem', 'time' und die OAuth-Einstellung waren schon korrekt, kein Neustart nötig."
 fi
 
 MCP_KEY="$(docker exec mcp mcp_manage --getkey)"

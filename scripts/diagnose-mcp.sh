@@ -293,6 +293,10 @@ const parse = (t) => { for (const l of t.split("\n")) { const s = l.startsWith("
 })();
 '
   out="$(docker exec librechat node -e "$LIST_JS" "http://mcp:3000/mcp" "${MCP_API_KEY:-}" 2>&1)"
+  # War in LibreChats eigenem Log "OAuth Required: true" fuer den Gateway
+  # vermerkt? Dann ist NICHT ein einfacher Neustart die Loesung, sondern
+  # MCPHubs eingebauter OAuth-Server muss aus - siehe wire-mcp.sh.
+  GATEWAY_OAUTH="$(printf '%s' "$ALL_LOG" | grep -F "[MCP][mcp_gateway] OAuth Required:" | tail -1)"
   case "$out" in
     ANZAHL\ 0*)
       fail "Das Gateway selbst meldet 0 Werkzeuge"
@@ -303,7 +307,17 @@ const parse = (t) => { for (const l of t.split("\n")) { const s = l.startsWith("
     ANZAHL\ *)
       warn "Das Gateway bietet Werkzeuge an, LibreChat sieht sie aber nicht:"
       printf '%s\n' "$out" | tail -n +2 | sed 's/^/      /'
-      hint "Meist hilft: docker compose -f $COMPOSE_FILE restart librechat" ;;
+      case "$GATEWAY_OAUTH" in
+        *"OAuth Required: true"*)
+          hint "Ursache: MCPHubs eingebauter OAuth-Server ist an. LibreChats"
+          hint "MCP-Client bricht die Aushandlung dann ab, bevor er die"
+          hint "Werkzeugliste abholt - unabhaengig davon, dass der Bearer-Key"
+          hint "fuer echte Aufrufe funktioniert (wie eben, direkt getestet)."
+          hint "Behebung: ./scripts/wire-mcp.sh"
+          hint "(schaltet oauthServer.enabled ab und startet mcp + LibreChat neu)" ;;
+        *)
+          hint "Meist hilft: docker compose -f $COMPOSE_FILE restart librechat" ;;
+      esac ;;
     *)
       fail "Werkzeugliste nicht abrufbar"
       printf '%s\n' "$out" | head -3 | sed 's/^/      /' ;;

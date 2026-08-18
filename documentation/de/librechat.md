@@ -233,6 +233,7 @@ Die häufigsten Ursachen:
 | **SSRF-Schutz blockiert interne Adressen** | `Domain "http://mcp:3000" is not allowed` | `mcpSettings.allowedAddresses` (steht seit `git pull` drin), dann `restart librechat` |
 | LibreChat startete vor den MCP-Diensten | `Failed to initialize` / `ECONNREFUSED` | `docker compose -f docker-compose.rocm.yml restart librechat` |
 | `MCP_API_KEY` fehlt oder ist im Container leer | HTTP 401 beim Prüfen | `./scripts/wire-mcp.sh`, dann `up -d --force-recreate librechat` |
+| **MCPHubs OAuth-Server ist an** | `OAuth Required: true`, `Capabilities: undefined` | `./scripts/wire-mcp.sh` (siehe unten) |
 | Der Agent hat keine Werkzeuge ausgewählt | nur `[ResumableAgentController]`, sonst nichts | Agenten → Bearbeiten → Werkzeuge |
 
 ### „N Werkzeuge" heißt nicht „alle Server liefern"
@@ -246,15 +247,32 @@ Die häufigsten Ursachen:
   ✗ mcp_gateway liefert KEINE Werkzeuge
 ```
 
-Liefert ausgerechnet `mcp_gateway` nichts, ist es meist verbunden, hat aber in MCPHub keine aktiven Server. Nachtragen und nachsehen:
+Liefert ausgerechnet `mcp_gateway` nichts, kommen zwei Ursachen infrage — die Diagnose (`./scripts/diagnose-mcp.sh`) unterscheidet sie in Schritt 5b, indem sie das Gateway direkt und ohne LibreChat abfragt:
+
+**MCPHub hat keine aktiven Server.** Die direkte Abfrage meldet dann selbst 0 Werkzeuge:
 
 ```bash
 ./scripts/wire-mcp.sh
 docker exec mcp cat /var/lib/mcp/mcp_settings.json
-docker compose -f docker-compose.rocm.yml restart librechat
 ```
 
 Das trifft genau die Werkzeuge, die man am ehesten vermisst: Dateisystem (Vault), Web-Abruf und die Zeitzonen.
+
+**MCPHubs eingebauter OAuth-Server ist an.** Dann liefert die direkte Abfrage die Werkzeuge anstandslos — nur LibreChat selbst sieht sie nicht. Im Log steht dafür beim Verbinden:
+
+```
+[MCP][mcp_gateway] OAuth Required: true
+[MCP][mcp_gateway] Capabilities: undefined
+[MCP][mcp_gateway] Tools: undefined
+```
+
+MCPHub bringt einen eigenen OAuth-Server mit dynamischer Client-Registrierung mit (`mcp_settings.json` → `systemConfig.oauthServer.enabled`), standardmäßig an. Dieser Stack braucht ihn nicht — er sichert `/mcp` über den statischen `MCP_API_KEY` ab, den `wire-mcp.sh` einträgt. Meldet MCPHub den Endpunkt trotzdem als OAuth-pflichtig, bricht LibreChats MCP-Client die Aushandlung ab, bevor er die Werkzeugliste abholt — obwohl derselbe Bearer-Key für tatsächliche Werkzeugaufrufe einwandfrei funktioniert. Behebung:
+
+```bash
+./scripts/wire-mcp.sh
+```
+
+Das Skript schaltet `oauthServer.enabled` ab und startet `mcp` sowie (falls es läuft) `librechat` automatisch neu — von Hand ist dabei nichts mehr zu tun. Wichtig zu wissen für später: **jeder** Neustart von `mcp` — auch aus anderem Anlass — macht LibreChats zwischengespeicherten Stand ungültig, weil LibreChat seine MCP-Server nur beim eigenen Start abfragt und danach nie wieder nachsieht (siehe unten). `wire-mcp.sh` stößt den nötigen LibreChat-Neustart deshalb selbst an; nach einem MANUELLEN `docker restart mcp` bleibt das dir überlassen.
 
 ### Warum der SSRF-Schutz zuschlägt
 
