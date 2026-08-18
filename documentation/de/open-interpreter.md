@@ -102,6 +102,21 @@ docker exec litellm curl -s http://127.0.0.1:4000/v1/models \
 - **Kleinere Modelle scheitern hier häufiger** als im Chat: Open Interpreter verlangt sauberes, mehrstufiges Werkzeug-Verhalten. Wenn es im Kreis läuft, hilft ein größeres Modell mehr als ein besserer Prompt.
 - **`-y` heißt wirklich ohne Rückfrage.** Im Container ist der Schaden auf `/work` begrenzt — genau deshalb steht es hier so.
 
+## Wenn der Start abbricht
+
+**`ModuleNotFoundError: No module named 'pkg_resources'`**
+
+Ein zu früh gebautes Abbild. Open Interpreter importiert `pkg_resources`, und das steckt in `setuptools` — das bringt Python seit 3.12 nicht mehr von sich aus mit. Im Dockerfile steht `setuptools` inzwischen ausdrücklich drin; das Abbild muss nur neu gebaut werden:
+
+```bash
+git pull
+docker compose -f docker-compose.rocm.yml --profile cli build interpreter
+```
+
+Im [Kontrollzentrum](kontrollzentrum.md) macht das **Open Interpreter → Image neu bauen**. `--no-cache` braucht es nicht: die geänderte Zeile im Dockerfile verwirft den Zwischenstand von dort an ohnehin.
+
+Der Bau prüft am Ende selbst, ob sich Open Interpreter importieren lässt — schlägt das fehl, entsteht gar kein Abbild, statt dass es dir erst beim Benutzen um die Ohren fliegt.
+
 ## Entfernen
 
 Im [Kontrollzentrum](kontrollzentrum.md): **Open Interpreter → Entfernen**. Oder:

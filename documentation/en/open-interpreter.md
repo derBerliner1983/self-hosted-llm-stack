@@ -102,6 +102,21 @@ docker exec litellm curl -s http://127.0.0.1:4000/v1/models \
 - **Small models fail here more often** than in chat: Open Interpreter demands clean, multi-step tool behaviour. If it loops, a bigger model helps more than a better prompt.
 - **`-y` really does mean no confirmation.** Inside the container the blast radius is `/work` — which is exactly why it's offered here.
 
+## If it fails to start
+
+**`ModuleNotFoundError: No module named 'pkg_resources'`**
+
+An image built too early. Open Interpreter imports `pkg_resources`, which lives in `setuptools` — and Python has not shipped that by default since 3.12. The Dockerfile now installs it explicitly; the image just needs rebuilding:
+
+```bash
+git pull
+docker compose -f docker-compose.rocm.yml --profile cli build interpreter
+```
+
+In the [control center](control-center.md): **Open Interpreter → Image neu bauen**. No `--no-cache` needed: the changed Dockerfile line invalidates everything from there on by itself.
+
+The build now checks that Open Interpreter can actually be imported. If that fails, no image is produced at all — better than finding out the moment you want to use the thing.
+
 ## Removing it
 
 In the [control center](control-center.md): **Open Interpreter → Entfernen**. Or:
