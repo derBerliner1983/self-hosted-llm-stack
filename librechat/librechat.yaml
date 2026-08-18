@@ -150,6 +150,16 @@ mcpServers:
     url: "http://mcp:3000/mcp"
     headers:
       Authorization: "Bearer ${MCP_API_KEY}"
+    # Ohne dieses Flag prueft LibreChat beim Start selbst, ob der Server
+    # OAuth braucht - OHNE den obigen Header, weil es ja erst herausfinden
+    # will, ob er noetig ist. Der Reverse Proxy vor MCPHub (Caddy) sichert
+    # ausnahmslos ALLE Pfade unter Port 3000 mit dem Bearer-Key ab, auch die
+    # .well-known-OAuth-Erkennungspfade - die unauthentifizierte Prüfung
+    # bekommt dort also ein 401 statt eines sauberen 404 und haelt den
+    # Server faelschlich fuer OAuth-pflichtig. Ergebnis ohne dieses Flag:
+    # "OAuth Required: true", Capabilities/Tools bleiben "undefined" - der
+    # Bearer-Key selbst funktioniert einwandfrei, nur die Erkennung irrt.
+    requiresOAuth: false
     timeout: 60000
     serverInstructions: |
       Werkzeuge für Dateisystem (/vault = Wissensdatenbank, /workspace =
