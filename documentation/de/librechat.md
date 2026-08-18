@@ -95,6 +95,8 @@ Die erzeugten Standard-Zugangsdaten sind nur der Einstieg. Willst du eigene:
 
 Das Skript fragt E-Mail und Passwort ab — das Passwort ohne Bildschirmanzeige und zweimal zur Sicherheit. Existiert das Konto, wird das Passwort geändert (über LibreChats `reset-password`, wodurch alle bestehenden Anmeldungen ungültig werden); existiert es nicht, wird es angelegt.
 
+Den *Benutzernamen* — in LibreChat etwas anderes als die E-Mail — leitet das Skript beim Anlegen aus dem Teil vor dem `@` ab und hängt eine Ziffer an, falls er schon vergeben ist. LibreChat verlangt eindeutige Benutzernamen; würde stur `admin` übergeben, scheiterte jedes zweite Konto. Der gewählte Name wird angezeigt und als `LIBRECHAT_ADMIN_USERNAME` in der `.env` vermerkt.
+
 **Ein selbst gewähltes Passwort wird nicht gespeichert.** In der `.env` steht danach nur der Benutzername und die Notiz, wann du ein eigenes gesetzt hast:
 
 ```

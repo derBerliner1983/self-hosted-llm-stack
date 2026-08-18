@@ -95,6 +95,8 @@ The generated defaults are just a starting point. For your own:
 
 The script asks for email and password — the password without echo and twice, to catch typos. If the account exists, the password is changed (via LibreChat's `reset-password`, which invalidates all existing sessions); if not, the account is created.
 
+When creating an account, the *username* — a separate thing from the email in LibreChat — is derived from the part before the `@`, with a digit appended if it is already taken. LibreChat requires unique usernames; passing a fixed `admin` would make every second account fail. The chosen name is printed and recorded as `LIBRECHAT_ADMIN_USERNAME` in `.env`.
+
 **A password you choose yourself is not stored.** All `.env` keeps afterwards is the username and a note of when you set your own:
 
 ```

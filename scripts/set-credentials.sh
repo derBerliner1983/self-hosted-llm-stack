@@ -104,6 +104,25 @@ reset_to_generated() {
   info "Neues Passwort erzeugt — es steht danach in der .env und in den Zugangsdaten."
 }
 
+# Freien Benutzernamen aus dem E-Mail-Teil vor dem @ ableiten.
+# Warum nicht einfach LIBRECHAT_ADMIN_USERNAME nehmen: der ist beim ersten
+# Konto schon vergeben, und LibreChat verlangt eindeutige Benutzernamen —
+# ein zweites Konto mit demselben Namen scheitert stillschweigend.
+# $1 = E-Mail, $2 = bereits vergebene Namen (Ausgabe von list-users).
+pick_username() {
+  local base cand i
+  # Alles ausserhalb von a-z0-9._- wird zum Unterstrich — LibreChat-Benutzer-
+  # namen bleiben so garantiert ASCII, egal was in der E-Mail steht.
+  base="${1%%@*}"; base="${base,,}"; base="${base//[!a-z0-9._-]/_}"
+  base="${base:-user}"
+  cand="$base"
+  for i in 2 3 4 5 6 7 8 9; do
+    printf '%s\n' "$2" | grep -qw -- "$cand" || break
+    cand="${base}${i}"
+  done
+  printf '%s' "$cand"
+}
+
 # ── LibreChat ───────────────────────────────────────────────────────────────
 do_librechat() {
   running librechat || { err "Der Container 'librechat' läuft nicht."; return 1; }
@@ -117,27 +136,42 @@ do_librechat() {
     case "$NEWUSER" in *@*) ;; *) err "Die E-Mail braucht ein @: $NEWUSER"; return 1 ;; esac
   fi
 
+  local users
+  users="$(docker exec librechat npm run list-users --silent 2>/dev/null)"
+
   # Gibt es das Konto? Wenn nein, anlegen statt Passwort zu ändern.
-  if docker exec librechat npm run list-users --silent 2>/dev/null | grep -qF "$NEWUSER"; then
+  if printf '%s\n' "$users" | grep -qF -- "$NEWUSER"; then
     # reset-password fragt interaktiv nach E-Mail, Passwort und Wiederholung
     # (config/reset-password.js) — genau diese drei Zeilen bekommt es.
     info "Ändere das Passwort für $NEWUSER…"
+    # mktemp statt eines festen Namens in /tmp: den könnte auf einem Rechner
+    # mit mehreren Nutzern jemand vorher als Symlink anlegen.
+    local out; out="$(mktemp)" || { err "Kein Platz für eine Zwischendatei."; return 1; }
     printf '%s\n%s\n%s\n' "$NEWUSER" "$NEWPASS" "$NEWPASS" \
-      | docker exec -i librechat npm run reset-password --silent >/tmp/lc-pw.out 2>&1
-    if grep -q "successfully reset" /tmp/lc-pw.out; then
+      | docker exec -i librechat npm run reset-password --silent >"$out" 2>&1
+    if grep -q "successfully reset" "$out"; then
       ok "Passwort geändert. Alle bestehenden Anmeldungen sind ungültig."
+      rm -f "$out"
     else
-      err "Ändern fehlgeschlagen:"; sed 's/^/    /' /tmp/lc-pw.out | tail -5; rm -f /tmp/lc-pw.out; return 1
+      err "Ändern fehlgeschlagen:"; sed 's/^/    /' "$out" | tail -5; rm -f "$out"; return 1
     fi
-    rm -f /tmp/lc-pw.out
   else
-    info "Konto $NEWUSER existiert nicht — lege es an…"
-    if docker exec librechat npm run create-user --silent -- \
-         "$NEWUSER" "${LIBRECHAT_ADMIN_NAME:-Admin}" "${LIBRECHAT_ADMIN_USERNAME:-admin}" \
-         "$NEWPASS" --email-verified=true >/dev/null 2>&1; then
+    local uname
+    uname="$(pick_username "$NEWUSER" "$users")"
+    info "Konto $NEWUSER existiert nicht — lege es an (Benutzername: $uname)…"
+    # Ausgabe stehen lassen: bei einem Fehler ist die Meldung von create-user
+    # das Einzige, woran sich die Ursache erkennen lässt.
+    # PIPESTATUS, weil sonst der Rückgabewert von sed käme und immer 0 wäre.
+    docker exec librechat npm run create-user --silent -- \
+      "$NEWUSER" "${LIBRECHAT_ADMIN_NAME:-Admin}" "$uname" \
+      "$NEWPASS" --email-verified=true 2>&1 | sed 's/^/    /'
+    if [ "${PIPESTATUS[0]}" -eq 0 ]; then
       ok "Konto angelegt."
+      env_set LIBRECHAT_ADMIN_USERNAME "$uname"
     else
-      err "Anlegen fehlgeschlagen."; return 1
+      err "Anlegen fehlgeschlagen — die Meldung von LibreChat steht oben."
+      info "Vorhandene Konten:  docker exec librechat npm run list-users"
+      return 1
     fi
   fi
 
