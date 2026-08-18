@@ -187,13 +187,32 @@ Ein **Agent** hat MCP-Werkzeuge zugewiesen, LibreChat konnte aber keinen MCP-Ser
 
 Geprüft wird: laufen die Dienste, ist `MCP_API_KEY` gesetzt **und im Container angekommen**, antworten die Dienste auf eine echte MCP-`initialize`-Anfrage aus dem LibreChat-Container heraus, was steht im Log, und ist der `mcpServers`-Block überhaupt in der Konfiguration.
 
-Die häufigsten drei Ursachen:
+Die häufigsten Ursachen:
 
-| Ursache | Behebung |
-|---|---|
-| LibreChat startete vor den MCP-Diensten | `docker compose -f docker-compose.rocm.yml restart librechat` |
-| `MCP_API_KEY` fehlt oder ist im Container leer | `./scripts/wire-mcp.sh`, dann `docker compose … up -d --force-recreate librechat` |
-| Der Agent selbst hat keine Werkzeuge ausgewählt | Agenten → Bearbeiten → Werkzeuge |
+| Ursache | Erkennungszeichen im Log | Behebung |
+|---|---|---|
+| **SSRF-Schutz blockiert interne Adressen** | `Domain "http://mcp:3000" is not allowed` | `mcpSettings.allowedAddresses` (steht seit `git pull` drin), dann `restart librechat` |
+| LibreChat startete vor den MCP-Diensten | `Failed to initialize` / `ECONNREFUSED` | `docker compose -f docker-compose.rocm.yml restart librechat` |
+| `MCP_API_KEY` fehlt oder ist im Container leer | HTTP 401 beim Prüfen | `./scripts/wire-mcp.sh`, dann `up -d --force-recreate librechat` |
+| Der Agent hat keine Werkzeuge ausgewählt | nur `[ResumableAgentController]`, sonst nichts | Agenten → Bearbeiten → Werkzeuge |
+
+### Warum der SSRF-Schutz zuschlägt
+
+Ist in LibreChat **keine** Positivliste gesetzt, blockiert es vorsorglich jedes Ziel, das auf eine **private IP** zeigt — ein Standardschutz gegen SSRF (dass jemand den Server dazu bringt, interne Adressen abzufragen). Docker-interne Namen wie `mcp` oder `sandbox-mcp` lösen genau dorthin auf, nach `172.x`. Damit fallen ausgerechnet die eigenen Dienste unter diesen Schutz.
+
+Die Lösung steht in `librechat/librechat.yaml`:
+
+```yaml
+mcpSettings:
+  allowedAddresses:
+    - "mcp:3000"
+    - "sandbox-mcp:8000"
+    - "android-mcp:8000"
+```
+
+`allowedAddresses` ist die dafür vorgesehene Ausnahmeliste: sie gilt nur für privaten IP-Raum und verlangt `host:port`, damit die Ausnahme auf genau einen Dienstport begrenzt bleibt statt auf den ganzen Rechner.
+
+> Bewusst `allowedAddresses` und **nicht** `allowedDomains`: eine gesetzte `allowedDomains`-Liste schaltet den SSRF-Schutz vollständig ab. So bleibt er aktiv, und ausgenommen sind exakt diese drei Ports. Kommt ein MCP-Dienst dazu, muss er hier mit eingetragen werden.
 
 > Der letzte Punkt erklärt, warum es „ohne MCP" funktioniert: ohne zugewiesene Werkzeuge antwortet das Modell einfach aus sich heraus.
 
