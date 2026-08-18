@@ -163,6 +163,44 @@ Quadratische PNG oder SVG ab etwa 128×128 sehen am besten aus.
 
 > Nach jeder Änderung an der YAML ist ein Neustart von `librechat` nötig — die Datei wird nur beim Start gelesen.
 
+## Wo MCP konfiguriert wird — und was tun, wenn Werkzeuge fehlen
+
+Ein Suchfeld für MCP gibt es in LibreChat nicht: die Server stehen in [`librechat/librechat.yaml`](../../librechat/librechat.yaml) unter `mcpServers`. Was du in der Oberfläche wählst, ist nur, *welche* der dort verbundenen Werkzeuge eine Unterhaltung oder ein Agent benutzen darf.
+
+**Wichtig:** LibreChat verbindet die MCP-Server **beim Start**. Lief ein Dienst damals noch nicht — oder wurde er seither neu erzeugt, etwa durch `restart-mcp.sh` —, bleibt er für LibreChat verschwunden, bis LibreChat selbst neu startet:
+
+```bash
+docker compose -f docker-compose.rocm.yml restart librechat
+```
+
+### Fehler: `AGENT_EXPECTED_MCP_TOOLS_UNAVAILABLE`
+
+Ein **Agent** hat MCP-Werkzeuge zugewiesen, LibreChat konnte aber keinen MCP-Server verbinden. Die Fehlersuche geht die ganze Kette durch:
+
+```bash
+./scripts/diagnose-mcp.sh
+```
+
+(Auch im [Kontrollzentrum](kontrollzentrum.md) an jedem MCP-Dienst unter **Werkzeuge prüfen**.)
+
+Geprüft wird: laufen die Dienste, ist `MCP_API_KEY` gesetzt **und im Container angekommen**, antworten die Dienste auf eine echte MCP-`initialize`-Anfrage aus dem LibreChat-Container heraus, was steht im Log, und ist der `mcpServers`-Block überhaupt in der Konfiguration.
+
+Die häufigsten drei Ursachen:
+
+| Ursache | Behebung |
+|---|---|
+| LibreChat startete vor den MCP-Diensten | `docker compose -f docker-compose.rocm.yml restart librechat` |
+| `MCP_API_KEY` fehlt oder ist im Container leer | `./scripts/wire-mcp.sh`, dann `docker compose … up -d --force-recreate librechat` |
+| Der Agent selbst hat keine Werkzeuge ausgewählt | Agenten → Bearbeiten → Werkzeuge |
+
+> Der letzte Punkt erklärt, warum es „ohne MCP" funktioniert: ohne zugewiesene Werkzeuge antwortet das Modell einfach aus sich heraus.
+
+### Web-Suche
+
+Die Werkzeuge des MCP Gateways enthalten **Fetch**, nicht Suche: Fetch holt eine Seite, deren Adresse schon bekannt ist. Eine Frage wie „such im Netz nach …" kann es damit nicht beantworten — dafür fehlt eine Suchmaschine.
+
+Zwei Wege: LibreChats eigene Web-Suche (`webSearch` in der YAML, braucht einen Zugang bei einem Suchanbieter) oder ein eigener MCP-Suchserver, den du unter `mcpServers` einträgst. Beides ist in diesem Stack noch nicht eingerichtet.
+
 ## Konfiguration anpassen
 
 Alles Inhaltliche steht in [`librechat/librechat.yaml`](../../librechat/librechat.yaml) — Endpunkte, MCP-Server, Oberflächenoptionen. Nach jeder Änderung:

@@ -172,6 +172,7 @@ check_shell() {
     "$ROOT_DIR/scripts/librechat-user.sh"
     "$ROOT_DIR/scripts/service-credentials.sh"
     "$ROOT_DIR/scripts/env-repair.sh"
+    "$ROOT_DIR/scripts/diagnose-mcp.sh"
     "$ROOT_DIR/scripts/env-lib.sh"
     "$ROOT_DIR/scripts/interpreter.sh"
     "$ROOT_DIR/stack-menu.sh"

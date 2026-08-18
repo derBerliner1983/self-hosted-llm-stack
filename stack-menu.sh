@@ -814,6 +814,9 @@ open_item() {
         mitem url    "Adresse anzeigen (zum Anklicken)"
         mitem seturl "Adresse festlegen (eigene Domain / anderer Host)"
       fi
+      case "$id" in
+        mcp|mcpo|sandbox-mcp|android-mcp|librechat) mitem mcpdiag "Werkzeuge prüfen (Fehlersuche MCP)" ;;
+      esac
       mitem creds "Zugangsdaten anzeigen"
       case "$id" in
         librechat|open-webui|syncthing) mitem mkacct "Standard-Konto anlegen (Skript)" ;;
@@ -827,6 +830,7 @@ open_item() {
         logs) svc_logs "$id" ;; build) svc_build "$id" ;;
         url) show_url "$id" "$label" ;;
         seturl) set_url "$id" "$label" ;;
+        mcpdiag) run_cmd "MCP-Fehlersuche" bash -c "cd '$ROOT_DIR' && bash scripts/diagnose-mcp.sh" ;;
         creds)  run_cmd "$label $G_ARROW Zugangsdaten" bash -c "cd '$ROOT_DIR' && bash scripts/service-credentials.sh '$id'" ;;
         mkacct) confirm "Standard-Konto für $label anlegen?" \
                   && run_cmd "$label $G_ARROW Konto anlegen" bash -c "cd '$ROOT_DIR' && bash scripts/service-credentials.sh '$id' --create" ;;
