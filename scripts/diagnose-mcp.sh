@@ -57,6 +57,17 @@ for c in mcp sandbox-mcp android-mcp librechat; do
   esac
 done
 
+# Läuft LibreChat? Davon hängen alle Prüfungen ab, die im Container
+# stattfinden. Ohne diese Unterscheidung meldet die Fehlersuche lauter
+# Folgefehler ("Schlüssel leer", "Konfiguration fehlt") und verdeckt damit
+# die eine echte Ursache.
+case "$RUNNING" in *" librechat "*) LC_UP=1 ;; *) LC_UP=0 ;; esac
+if [ "$LC_UP" -eq 0 ]; then
+  printf '\n  %sLibreChat läuft nicht — die Prüfungen 2, 3 und 5/6 finden IM\n' "$c_yellow"
+  printf '  Container statt und werden deshalb übersprungen. Erst starten:%s\n' "$c_reset"
+  printf '    docker compose -f %s up -d librechat\n' "$COMPOSE_FILE"
+fi
+
 # ── 2) Schlüssel vorhanden? ─────────────────────────────────────────────────
 step "2/6 · MCP-Schlüssel"
 if [ -z "${MCP_API_KEY:-}" ]; then
@@ -66,6 +77,9 @@ if [ -z "${MCP_API_KEY:-}" ]; then
   hint "Erzeugen und eintragen: ./scripts/wire-mcp.sh"
 else
   ok "MCP_API_KEY steht in der .env"
+  if [ "$LC_UP" -eq 0 ]; then
+    printf '    %s(ob er im Container ankommt, ist erst nach dem Start prüfbar)%s\n' "$c_dim" "$c_reset"
+  else
   # Entscheidend ist nicht die .env, sondern was IM Container ankommt:
   # Compose reicht Variablen nur beim (Neu-)Erzeugen des Containers durch.
   IN_LC="$(docker exec librechat printenv MCP_API_KEY 2>/dev/null)"
@@ -78,6 +92,7 @@ else
     hint "Beheben: docker compose -f $COMPOSE_FILE up -d --force-recreate librechat"
   else
     ok "Derselbe Schlüssel ist im librechat-Container angekommen"
+  fi
   fi
 fi
 
@@ -147,14 +162,14 @@ case "$RUNNING" in
     probe "mcp_gateway"  "http://mcp:3000/mcp"          "${MCP_API_KEY:-}"
     probe "code_sandbox" "http://sandbox-mcp:8000/mcp"  ""
     case "$RUNNING" in *" android-mcp "*) probe "android_build" "http://android-mcp:8000/mcp" "" ;; esac ;;
-  *) fail "Ohne laufenden librechat-Container nicht prüfbar" ;;
+  *) printf '  %s—%s übersprungen: LibreChat läuft nicht\n' "$c_dim" "$c_reset" ;;
 esac
 
 # ── 3b) SSRF-Ausnahme vorhanden? ────────────────────────────────────────────
 # Ohne mcpSettings.allowedAddresses blockiert LibreChat jedes Ziel mit privater
 # IP — und Docker-interne Namen zeigen genau dorthin. Der Fehler im Log lautet
 # dann: Domain "http://mcp:3000" is not allowed
-if ! docker exec librechat sh -c 'grep -q "allowedAddresses" /app/librechat.yaml' 2>/dev/null; then
+if [ "$LC_UP" -eq 1 ] && ! docker exec librechat sh -c 'grep -q "allowedAddresses" /app/librechat.yaml' 2>/dev/null; then
   fail "mcpSettings.allowedAddresses fehlt in der Konfiguration"
   hint "Ohne diese Ausnahme lehnt LibreChat interne Adressen ab:"
   hint '  Domain "http://mcp:3000" is not allowed'
@@ -164,7 +179,9 @@ fi
 # ── 4) Was sagt LibreChat beim Start? ───────────────────────────────────────
 step "4/6 · Meldungen von LibreChat"
 LOG="$(docker logs librechat 2>&1 | grep -iE 'mcp' | tail -15)"
-if [ -z "$LOG" ]; then
+if [ -z "$LOG" ] && [ "$LC_UP" -eq 0 ]; then
+  printf '  %s—%s kein Log: LibreChat läuft nicht\n' "$c_dim" "$c_reset"
+elif [ -z "$LOG" ]; then
   warn "Keine MCP-Meldungen im Log — wird die librechat.yaml überhaupt gelesen?"
   hint "Prüfen: docker exec librechat sh -c 'head -5 /app/librechat.yaml'"
   hint "CONFIG_PATH muss auf /app/librechat.yaml zeigen."
@@ -186,16 +203,27 @@ fi
 # bedeuten, dass ein Server gar nichts beigesteuert hat. LibreChat protokolliert
 # die Werkzeuge pro Server — das ist die verlaessliche Quelle, nicht die Summe.
 step "5/6 · Werkzeuge je Server"
+if [ "$LC_UP" -eq 0 ]; then
+  printf '  %s—%s übersprungen: LibreChat läuft nicht\n' "$c_dim" "$c_reset"
+fi
 ALL_LOG="$(docker logs librechat 2>&1)"
+GATEWAY_EMPTY=0
 for srv in mcp_gateway code_sandbox android_build; do
+  [ "$LC_UP" -eq 1 ] || break
   # Ist der Server ueberhaupt konfiguriert?
   docker exec librechat sh -c "grep -q '^  ${srv}:' /app/librechat.yaml" 2>/dev/null || continue
   line="$(printf '%s' "$ALL_LOG" | grep -F "[MCP][$srv] Tools:" | tail -1)"
-  if [ -n "$line" ]; then
-    tools="${line#*Tools: }"
+  # "Tools: undefined" heisst: verbunden, aber der Server bietet nichts an.
+  # Das als ein Werkzeug zu zaehlen waere schlimmer als gar keine Zahl.
+  tools="${line#*Tools: }"
+  case "${tools:-}" in undefined|null|none|"") tools="" ;; esac
+  if [ -n "$line" ] && [ -n "$tools" ]; then
     count="$(printf '%s' "$tools" | tr ',' '\n' | grep -c '[a-zA-Z]')"
     ok "$srv: $count Werkzeuge"
     printf '      %s%s%s\n' "$c_dim" "$tools" "$c_reset"
+  elif [ -n "$line" ]; then
+    fail "$srv ist verbunden, bietet aber KEINE Werkzeuge an (Tools: undefined)"
+    [ "$srv" = "mcp_gateway" ] && GATEWAY_EMPTY=1
   else
     fail "$srv liefert KEINE Werkzeuge"
     if [ "$srv" = "mcp_gateway" ]; then
@@ -211,8 +239,68 @@ for srv in mcp_gateway code_sandbox android_build; do
 done
 
 # ── 5) Konfiguration im Container ───────────────────────────────────────────
+# Das Gateway direkt fragen, wenn es LibreChat gegenüber nichts anbietet:
+# so unterscheidet sich "MCPHub hat keine Server aktiv" von "LibreChat holt
+# die Liste nicht ab". Dafür der vollständige MCP-Ablauf — initialize, dann
+# notifications/initialized mit der Sitzungskennung, dann tools/list.
+if [ "${GATEWAY_EMPTY:-0}" -eq 1 ]; then
+  step "5b/6 · Was bietet das Gateway selbst an?"
+  LIST_JS='
+const [url, auth] = [process.argv[1], process.argv[2]];
+const http = require("http");
+const base = { "Content-Type": "application/json", "Accept": "application/json, text/event-stream" };
+if (auth) base["Authorization"] = "Bearer " + auth;
+const post = (payload, sid) => new Promise((res) => {
+  const body = JSON.stringify(payload);
+  const headers = { ...base, "Content-Length": Buffer.byteLength(body) };
+  if (sid) headers["mcp-session-id"] = sid;
+  const req = http.request(url, { method: "POST", headers, timeout: 15000 }, (r) => {
+    let d = ""; r.on("data", (c) => (d += c));
+    r.on("end", () => res({ status: r.statusCode, sid: r.headers["mcp-session-id"], body: d }));
+  });
+  req.on("error", (e) => res({ status: 0, body: e.message }));
+  req.on("timeout", () => { req.destroy(); res({ status: 0, body: "Zeitüberschreitung" }); });
+  req.end(body);
+});
+// SSE-Antworten ("data: {...}") wie einfaches JSON behandeln
+const parse = (t) => { for (const l of t.split("\n")) { const s = l.startsWith("data:") ? l.slice(5).trim() : l.trim();
+  if (s.startsWith("{")) { try { return JSON.parse(s); } catch (e) {} } } return null; };
+(async () => {
+  const init = await post({ jsonrpc: "2.0", id: 1, method: "initialize",
+    params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "diagnose", version: "1" } } });
+  if (init.status !== 200) return console.log("FEHLER initialize: " + init.status + " " + init.body.slice(0, 120));
+  const sid = init.sid;
+  await post({ jsonrpc: "2.0", method: "notifications/initialized" }, sid);
+  const list = await post({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }, sid);
+  const j = parse(list.body);
+  const tools = j && j.result && j.result.tools;
+  if (!tools) return console.log("KEINE_LISTE " + list.status + " " + list.body.slice(0, 160));
+  console.log("ANZAHL " + tools.length);
+  console.log(tools.map((t) => t.name).join(", "));
+})();
+'
+  out="$(docker exec librechat node -e "$LIST_JS" "http://mcp:3000/mcp" "${MCP_API_KEY:-}" 2>&1)"
+  case "$out" in
+    ANZAHL\ 0*)
+      fail "Das Gateway selbst meldet 0 Werkzeuge"
+      hint "In MCPHub ist kein Server aktiv. Nachtragen und ansehen:"
+      hint "  ./scripts/wire-mcp.sh"
+      hint "  docker exec mcp cat /var/lib/mcp/mcp_settings.json"
+      hint "Danach: docker compose -f $COMPOSE_FILE restart librechat" ;;
+    ANZAHL\ *)
+      warn "Das Gateway bietet Werkzeuge an, LibreChat sieht sie aber nicht:"
+      printf '%s\n' "$out" | tail -n +2 | sed 's/^/      /'
+      hint "Meist hilft: docker compose -f $COMPOSE_FILE restart librechat" ;;
+    *)
+      fail "Werkzeugliste nicht abrufbar"
+      printf '%s\n' "$out" | head -3 | sed 's/^/      /' ;;
+  esac
+fi
+
 step "6/6 · Konfiguration im Container"
-if docker exec librechat sh -c 'grep -q "^mcpServers:" /app/librechat.yaml' 2>/dev/null; then
+if [ "$LC_UP" -eq 0 ]; then
+  printf '  %s—%s übersprungen: LibreChat läuft nicht\n' "$c_dim" "$c_reset"
+elif docker exec librechat sh -c 'grep -q "^mcpServers:" /app/librechat.yaml' 2>/dev/null; then
   ok "mcpServers steht in der Konfiguration"
   docker exec librechat sh -c "sed -n '/^mcpServers:/,\$p' /app/librechat.yaml | grep -E '^  [a-z_]+:|url:'" 2>/dev/null | sed 's/^/    /'
 else
@@ -228,6 +316,9 @@ if [ "$PROBLEMS" -eq 0 ]; then
   printf '  Agenten selbst: In LibreChat unter Agenten -> Bearbeiten -> Werkzeuge\n'
   printf '  müssen die MCP-Werkzeuge ausgewählt sein. Ein Agent mit abgewählten\n'
   printf '  oder umbenannten Werkzeugen meldet genau diesen Fehler.%s\n' "$c_reset"
+elif [ "$LC_UP" -eq 0 ]; then
+  printf '  %sLibreChat läuft nicht — das ist die Ursache. Starten und erneut prüfen:%s\n' "$c_yellow" "$c_reset"
+  printf '    docker compose -f %s up -d librechat && ./scripts/diagnose-mcp.sh\n' "$COMPOSE_FILE"
 else
   printf '  %s%d Punkt(e) zu klären — siehe oben.%s\n' "$c_yellow" "$PROBLEMS" "$c_reset"
 fi

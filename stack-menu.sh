@@ -819,7 +819,10 @@ open_item() {
       esac
       mitem creds "Zugangsdaten anzeigen"
       case "$id" in
-        librechat|open-webui|syncthing) mitem mkacct "Standard-Konto anlegen (Skript)" ;;
+        librechat|open-webui|syncthing)
+          mitem mkacct "Standard-Konto anlegen (Skript)"
+          mitem setcred "Eigenen Benutzer und Passwort festlegen"
+          mitem rstcred "Zurück auf erzeugtes Standard-Passwort" ;;
       esac
       mitem logs  "Logs ansehen"
       mitem build "Neu bauen und starten"
@@ -832,6 +835,9 @@ open_item() {
         seturl) set_url "$id" "$label" ;;
         mcpdiag) run_cmd "MCP-Fehlersuche" bash -c "cd '$ROOT_DIR' && bash scripts/diagnose-mcp.sh" ;;
         creds)  run_cmd "$label $G_ARROW Zugangsdaten" bash -c "cd '$ROOT_DIR' && bash scripts/service-credentials.sh '$id'" ;;
+        setcred) run_cmd "$label $G_ARROW eigene Zugangsdaten" bash -c "cd '$ROOT_DIR' && bash scripts/set-credentials.sh '$id'" ;;
+        rstcred) confirm "Erzeugtes Standard-Passwort wiederherstellen? Dein eigenes gilt danach nicht mehr." \
+                   && run_cmd "$label $G_ARROW Standard-Passwort" bash -c "cd '$ROOT_DIR' && bash scripts/set-credentials.sh '$id' --reset" ;;
         mkacct) confirm "Standard-Konto für $label anlegen?" \
                   && run_cmd "$label $G_ARROW Konto anlegen" bash -c "cd '$ROOT_DIR' && bash scripts/service-credentials.sh '$id' --create" ;;
         rm) confirm "$label entfernen? Daten-Volumes bleiben erhalten." && svc_rm "$id" ;;

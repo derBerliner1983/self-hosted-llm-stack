@@ -23,9 +23,16 @@ env_rand() { LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c "$
 # Wert eines Schlüssels AUS DER DATEI lesen (nicht aus der Umgebung — dort
 # könnte ein alter Wert von einem früheren source stehen).
 env_get() {
-  local key="$1"
+  local key="$1" v
   [ -f "$ENV_FILE" ] || return 1
-  sed -n "s/^${key}=//p" "$ENV_FILE" | tail -1
+  v="$(sed -n "s/^${key}=//p" "$ENV_FILE" | tail -1)"
+  # Umschliessende Anfuehrungszeichen und die Maskierung wieder entfernen,
+  # damit der Aufrufer denselben Wert zurueckbekommt, den er gesetzt hat.
+  case "$v" in
+    \'*\') v="${v#\'}"; v="${v%\'}"; v="${v//\'\\\'\'/\'}" ;;
+    \"*\") v="${v#\"}"; v="${v%\"}" ;;
+  esac
+  printf '%s' "$v"
 }
 
 # KEY=WERT schreiben: vorhandene Zeile ersetzen, sonst anhängen.
@@ -33,6 +40,14 @@ env_get() {
 # wie & oder / im Wert als Ersetzungsmuster gedeutet und ihn verstümmeln.
 env_set() {
   local key="$1" val="$2" tmp
+  # Werte mit Leerzeichen oder Shell-Sonderzeichen kommen in einfache
+  # Anfuehrungszeichen: die .env wird gesourct, und bei FOO=a b wuerde die
+  # Shell 'b' als Befehl ausfuehren wollen. Einfache Anfuehrungszeichen im
+  # Wert werden dabei als '\'' maskiert — das uebliche Verfahren.
+  case "$val" in
+    *[\ \	\"\'\$\`\#\&\|\;\<\>\(\)]*)
+      val="'${val//\'/\'\\\'\'}'" ;;
+  esac
   if [ ! -f "$ENV_FILE" ]; then
     printf '%s=%s\n' "$key" "$val" > "$ENV_FILE" || return 1
     chmod 600 "$ENV_FILE" 2>/dev/null || true

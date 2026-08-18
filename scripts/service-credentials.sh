@@ -45,7 +45,7 @@ set -a
 . "$ENV_FILE"
 set +a
 
-# shellcheck source=scripts/env-lib.sh
+# shellcheck disable=SC1091
 . "$SCRIPT_DIR/env-lib.sh"
 
 # Zugangsdaten, die noch nicht in der .env stehen, hier nachtragen statt
@@ -53,16 +53,24 @@ set +a
 # nicht — sie kamen erst später dazu, und install.sh schreibt sie nur beim
 # eigenen Lauf. Ohne das Nachtragen stünde man vor leeren Feldern und wüsste
 # nicht, warum.
+# Wurde für einen Dienst ein EIGENES Passwort gesetzt, steht es bewusst nicht
+# in der .env. Dann darf hier auch keines nacherzeugt werden — sonst stünde ein
+# Wert da, mit dem sich niemand anmelden kann.
+own_password() {
+  local mark="$1"
+  [ -n "${!mark:-}" ]
+}
+
 ensure_credentials() {
   env_ensure LIBRECHAT_ADMIN_EMAIL    "admin@stack.local" || true
   env_ensure LIBRECHAT_ADMIN_NAME     "Admin"             || true
   env_ensure LIBRECHAT_ADMIN_USERNAME "admin"             || true
-  env_ensure LIBRECHAT_ADMIN_PASSWORD "$(env_rand 20)"    || true
+  own_password LIBRECHAT_ADMIN_PASSWORD_SET || env_ensure LIBRECHAT_ADMIN_PASSWORD "$(env_rand 20)" || true
   env_ensure OPENWEBUI_ADMIN_EMAIL    "admin@stack.local" || true
   env_ensure OPENWEBUI_ADMIN_NAME     "Admin"             || true
-  env_ensure OPENWEBUI_ADMIN_PASSWORD "$(env_rand 20)"    || true
+  own_password OPENWEBUI_ADMIN_PASSWORD_SET || env_ensure OPENWEBUI_ADMIN_PASSWORD "$(env_rand 20)" || true
   env_ensure SYNCTHING_GUI_USER       "admin"             || true
-  env_ensure SYNCTHING_GUI_PASSWORD   "$(env_rand 20)"    || true
+  own_password SYNCTHING_GUI_PASSWORD_SET || env_ensure SYNCTHING_GUI_PASSWORD "$(env_rand 20)" || true
 }
 ensure_credentials
 NEWLY_ADDED="$ENV_ADDED"
@@ -83,6 +91,21 @@ running() { docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$1"; }
 
 head_of() { printf '\n%s%s%s\n' "$c_bold" "$1" "$c_reset"; }
 row()     { printf '  %-12s %s\n' "$1" "$2"; }
+
+# Passwortzeile: entweder der erzeugte Wert, oder — bei selbst gesetztem
+# Passwort — der Hinweis darauf. Der Wert selbst wird bewusst nicht
+# gespeichert und kann deshalb auch nicht angezeigt werden.
+pwrow() {
+  local value="$1" mark="$2"
+  if [ -n "${!mark:-}" ]; then
+    printf '  %-12s %s(%s, nicht gespeichert)%s\n' \
+      "Passwort:" "$c_dim" "selbst gesetzt am ${!mark}" "$c_reset"
+    printf '  %sZurück zum erzeugten Standard: ./scripts/set-credentials.sh <dienst> --reset%s\n' \
+      "$c_dim" "$c_reset"
+  else
+    printf '  %-12s %s\n' "Passwort:" "${value:-<nicht gesetzt>}"
+  fi
+}
 note()    { printf '  %s%s%s\n' "$c_dim" "$1" "$c_reset"; }
 
 # ── Anzeigen ────────────────────────────────────────────────────────────────
@@ -91,7 +114,7 @@ show_open_webui() {
   row "Adresse:"  "$(addr open-webui "${PORT_WEBUI:-3001}")"
   if [ -n "${OPENWEBUI_ADMIN_EMAIL:-}" ]; then
     row "E-Mail:"   "$OPENWEBUI_ADMIN_EMAIL"
-    row "Passwort:" "${OPENWEBUI_ADMIN_PASSWORD:-<nicht gesetzt>}"
+    pwrow "${OPENWEBUI_ADMIN_PASSWORD:-}" OPENWEBUI_ADMIN_PASSWORD_SET
     note "Konto anlegen (falls noch nicht geschehen): --create"
     fresh_note OPENWEBUI_ADMIN_PASSWORD
   else
@@ -112,7 +135,7 @@ show_librechat() {
   head_of "LibreChat"
   row "Adresse:"  "$(addr librechat "${PORT_LIBRECHAT:-3080}")"
   row "E-Mail:"   "${LIBRECHAT_ADMIN_EMAIL:-<nicht gesetzt>}"
-  row "Passwort:" "${LIBRECHAT_ADMIN_PASSWORD:-<nicht gesetzt>}"
+  pwrow "${LIBRECHAT_ADMIN_PASSWORD:-}" LIBRECHAT_ADMIN_PASSWORD_SET
   note "Registrierung ist zu (LIBRECHAT_ALLOW_REGISTRATION=false)."
   fresh_note LIBRECHAT_ADMIN_PASSWORD
 }
@@ -155,7 +178,7 @@ show_syncthing() {
   head_of "Syncthing"
   row "Adresse:" "$(addr syncthing "${PORT_SYNCTHING_GUI:-8384}")"
   row "Benutzer:" "${SYNCTHING_GUI_USER:-admin}"
-  row "Passwort:" "${SYNCTHING_GUI_PASSWORD:-<nicht gesetzt>}"
+  pwrow "${SYNCTHING_GUI_PASSWORD:-}" SYNCTHING_GUI_PASSWORD_SET
 
   # Ob das Passwort WIRKLICH gilt, steht nicht in der .env, sondern in
   # Syncthings eigener Konfiguration — die .env hält nur den Wunschwert.
