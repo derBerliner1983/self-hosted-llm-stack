@@ -290,6 +290,12 @@ services:
     volumes:
       - ./librechat/librechat.yaml:/app/librechat.yaml:ro
       - librechat-data:/app/client/public/images
+      # Eigene Bilder fuer Modell-Symbole: einfach ins Verzeichnis ./images
+      # legen, LibreChat liefert sie dann unter /images/custom/<datei> aus.
+      # Read-only und als Unterverzeichnis des Bilder-Volumes eingehaengt -
+      # so bleiben sie beim Neuerzeugen des Containers erhalten und koennen
+      # von LibreChat nicht ueberschrieben werden.
+      - ./images:/app/client/public/images/custom:ro
       - librechat-uploads:/app/uploads
     depends_on:
       librechat-mongo:

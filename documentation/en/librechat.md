@@ -148,16 +148,18 @@ A commented-out example is already in the file — uncomment, adjust, restart.
 
 | Value | Meaning |
 |---|---|
-| `/images/gemma.png` | Your own file from the `librechat-data` volume |
+| `/images/custom/gemma.png` | Your own file from the `images/` folder |
 | `https://…/logo.png` | Any address on the web |
 | `openAI`, `google`, `anthropic`, … | Reuse one of the built-in icons |
 
-Copy your own images into the volume — it's mounted at `/app/client/public/images` in the container, and LibreChat serves its contents under `/images/`:
+Your own images belong in the **`images/`** folder in the project directory. It's mounted read-only into the container, and LibreChat serves everything in it under `/images/custom/`:
 
 ```bash
-docker cp gemma.png librechat:/app/client/public/images/gemma.png
-docker compose -f docker-compose.rocm.yml restart librechat
+cp my-logo.png ~/self-hosted-llm-stack/images/
+# then in the YAML:  iconURL: "/images/custom/my-logo.png"
 ```
+
+No `docker cp` needed, and the images survive recreating the container. A **new image** is available immediately (reload the page); only a change to the YAML needs a restart.
 
 Square PNG or SVG from about 128×128 looks best.
 
