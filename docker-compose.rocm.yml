@@ -85,7 +85,7 @@ services:
     restart: always
     environment:
       - MCP_SERVERS=${MCP_SERVERS:-fetch,filesystem}
-      - MCP_FILESYSTEM_DIRS=${MCP_FILESYSTEM_DIRS:-/vault,/workspace}
+      - MCP_FILESYSTEM_DIRS=${MCP_FILESYSTEM_DIRS:-/vault,/workspace,/exchange}
     # Port 3000 bedient zweierlei:
     #   1. die MCPHub-Weboberfläche - dort lassen sich MCP-Server ansehen,
     #      ein-/ausschalten und neue hinzufügen (Hot-Reload, kein Neustart
@@ -104,6 +104,10 @@ services:
       # Damit der filesystem-Server dieses Verzeichnis auch tatsächlich
       # freigibt, trägt scripts/wire-mcp.sh es mit ein.
       - android-workspace:/workspace
+      # Austausch-Ordner: dasselbe Volume wie beim exchange-bridge-Dienst,
+      # damit das Dateisystem-Werkzeug dort ablegen/abholen kann, was du im
+      # Browser hoch- bzw. herunterlädst.
+      - exchange-data:/exchange
       - ./mcp-tools:/opt/mcp-tools:ro
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:3000/health"]
@@ -132,6 +136,34 @@ services:
     volumes:
       - vault-bridge-data:/data
       - vault-data:/vault
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # ── Austausch-Ablage (Exchange-Bridge) ───────────────────────────────────
+  # Ein Ordner, den zwei Seiten gleichzeitig sehen: du im Browser (hoch-/
+  # runterladen), das LLM über das Dateisystem-Werkzeug (mcp_gateway,
+  # MCP_FILESYSTEM_DIRS enthält denselben Pfad). Bewusst NICHT der Vault -
+  # der bleibt Wissensdatenbank, keine Ablage für Bau-Ergebnisse (z. B. eine
+  # fertig gebaute APK) oder Testskripte.
+  # Mit Passwort abgesichert (anders als das nur lesende Dashboard): hier
+  # lässt sich auch schreiben/hochladen. Zugangsdaten erzeugt install.sh;
+  # anzeigen/ändern über scripts/service-credentials.sh bzw.
+  # scripts/set-credentials.sh.
+  exchange-bridge:
+    build: ./exchange-bridge
+    container_name: exchange-bridge
+    restart: always
+    environment:
+      - EXCHANGE_USER=${EXCHANGE_USER:-admin}
+      - EXCHANGE_PASSWORD=${EXCHANGE_PASSWORD:-}
+    ports:
+      - "${PORT_EXCHANGE_BRIDGE:-8900}:8080/tcp"
+    volumes:
+      - exchange-data:/exchange
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz')\" || exit 1"]
       interval: 15s
@@ -540,6 +572,8 @@ volumes:
     name: vault-data
   vault-bridge-data:
     name: vault-bridge-data
+  exchange-data:
+    name: exchange-data
   syncthing-config:
     name: syncthing-config
   sandbox-work:

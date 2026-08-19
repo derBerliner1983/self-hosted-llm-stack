@@ -27,6 +27,7 @@ PORT_WEBUI="${PORT_WEBUI:-3001}"
 PORT_LITELLM="${PORT_LITELLM:-4000}"
 PORT_DASHBOARD="${PORT_DASHBOARD:-8600}"
 PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
+PORT_EXCHANGE_BRIDGE="${PORT_EXCHANGE_BRIDGE:-8900}"
 PORT_SYNCTHING_GUI="${PORT_SYNCTHING_GUI:-8384}"
 PORT_MCPO="${PORT_MCPO:-8800}"
 PORT_MCP="${PORT_MCP:-3000}"
@@ -57,6 +58,7 @@ printf '  Chat (WebUI)     %s\n' "$(addr "${URL_OPEN_WEBUI:-}"   "$PORT_WEBUI")"
 printf '  Chat (LibreChat) %s\n' "$(addr "${URL_LIBRECHAT:-}"    "$PORT_LIBRECHAT")"
 printf '  LiteLLM-UI       %s\n' "$(addr "${URL_LITELLM:-}"      "$PORT_LITELLM" "/ui")"
 printf '  Vault-Bridge     %s\n' "$(addr "${URL_VAULT_BRIDGE:-}" "$PORT_VAULT_BRIDGE")"
+printf '  Austausch-Ablage %s\n' "$(addr "${URL_EXCHANGE_BRIDGE:-}" "$PORT_EXCHANGE_BRIDGE")"
 printf '  Syncthing        %s\n' "$(addr "${URL_SYNCTHING:-}"    "$PORT_SYNCTHING_GUI")"
 printf '  Werkzeuge        %s\n' "$(addr "${URL_MCPO:-}"         "$PORT_MCPO" "/mcp_gateway/docs")"
 printf '  MCP-Verwaltung   %s\n' "$(addr "${URL_MCP:-}"          "$PORT_MCP")"
@@ -87,6 +89,11 @@ if [ -n "${LIBRECHAT_ADMIN_EMAIL:-}" ]; then
 else
   printf '  %sKein Erstkonto hinterlegt — ./scripts/librechat-user.sh anlegen.%s\n' "$c_dim" "$c_reset"
 fi
+echo
+
+printf '%sAustausch-Ablage%s\n' "$c_bold" "$c_reset"
+printf '  Benutzer:   %s\n' "${EXCHANGE_USER:-admin}"
+printf '  Passwort:   %s\n' "${EXCHANGE_PASSWORD:-<nicht gesetzt>}"
 echo
 
 printf '%sMCP Gateway%s\n' "$c_bold" "$c_reset"

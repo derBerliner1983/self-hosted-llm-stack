@@ -89,6 +89,7 @@ svc_port_path() {
     litellm)      printf '%s %s' "${PORT_LITELLM:-4000}"        "/ui" ;;
     dashboard)    printf '%s %s' "${PORT_DASHBOARD:-8600}"      "/" ;;
     vault-bridge) printf '%s %s' "${PORT_VAULT_BRIDGE:-8700}"   "/" ;;
+    exchange-bridge) printf '%s %s' "${PORT_EXCHANGE_BRIDGE:-8900}" "/" ;;
     syncthing)    printf '%s %s' "${PORT_SYNCTHING_GUI:-8384}"  "/" ;;
     mcpo)         printf '%s %s' "${PORT_MCPO:-8800}"           "/mcp_gateway/docs" ;;
     mcp)          printf '%s %s' "${PORT_MCP:-3000}"            "/" ;;
@@ -173,6 +174,7 @@ build_items() {
 
   add head "" "Zusatzdienste" "" ""
   add svc  dashboard  "Dashboard"  "Status aller Dienste im Browser" "ai-stack-dashboard"
+  add svc  exchange-bridge "Austausch-Ablage" "Dateien hoch-/runterladen ↔ LLM" "exchange-bridge"
   add svc  whisper    "Whisper"    "Sprache zu Text"                 "whisper"
   add svc  embeddings "Embeddings" "Text zu Vektoren"                "embeddings"
 

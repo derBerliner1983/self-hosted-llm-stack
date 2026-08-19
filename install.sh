@@ -39,6 +39,7 @@ PORT_WEBUI="${PORT_WEBUI:-3001}"
 PORT_LITELLM="${PORT_LITELLM:-4000}"
 PORT_DASHBOARD="${PORT_DASHBOARD:-8600}"
 PORT_VAULT_BRIDGE="${PORT_VAULT_BRIDGE:-8700}"
+PORT_EXCHANGE_BRIDGE="${PORT_EXCHANGE_BRIDGE:-8900}"
 PORT_SYNCTHING_GUI="${PORT_SYNCTHING_GUI:-8384}"
 PORT_MCPO="${PORT_MCPO:-8800}"
 PORT_MCP="${PORT_MCP:-3000}"
@@ -234,7 +235,7 @@ BANNER
 
   # Übrig gebliebene Container (auch aus manuellem 'docker run') gezielt entfernen.
   local containers="ollama open-webui anythingllm litellm litellm-db db mcp \
-sandbox-mcp mcpo vault-bridge embeddings whisper whisper-live kokoro docling ai-stack-init \
+sandbox-mcp mcpo vault-bridge exchange-bridge embeddings whisper whisper-live kokoro docling ai-stack-init \
 ai-stack-dashboard ai-stack-caddy"
   info "Entferne evtl. verbliebene Container…"
   for c in $containers; do
@@ -246,7 +247,7 @@ ai-stack-dashboard ai-stack-caddy"
     local volumes="ollama-data ollama-shared litellm-data litellm-db litellm-shared \
 ai-stack-shared open-webui-data anythingllm-data embeddings-data whisper-data \
 whisper-live-data kokoro-data mcp-data mcp-shared vault-data vault-bridge-data \
-docling-data caddy-data caddy-config"
+exchange-data docling-data caddy-data caddy-config"
     info "Lösche Daten-Volumes…"
     for v in $volumes; do
       docker volume rm "$v" >/dev/null 2>&1 && ok "Volume gelöscht: $v" || true
@@ -509,15 +510,15 @@ else
     $SUDO ufw allow from "$LAN_SUBNET" to any port "$PORT_MCP" proto tcp >/dev/null 2>&1 || true
 
     if [ "$FIREWALL_MODE" = "lan" ]; then
-      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI" "$PORT_LIBRECHAT"; do
+      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_EXCHANGE_BRIDGE" "$PORT_SYNCTHING_GUI" "$PORT_LIBRECHAT"; do
         $SUDO ufw allow from "$LAN_SUBNET" to any port "$p" proto tcp >/dev/null 2>&1 || true
       done
-      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI}/${PORT_LIBRECHAT} nur aus ${LAN_SUBNET} (Syncthing-Sync/-Erkennung und mcpo immer nur LAN)."
+      ok "Firewall: SSH offen; Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_EXCHANGE_BRIDGE}/${PORT_SYNCTHING_GUI}/${PORT_LIBRECHAT} nur aus ${LAN_SUBNET} (Syncthing-Sync/-Erkennung und mcpo immer nur LAN)."
     else
-      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_SYNCTHING_GUI" "$PORT_LIBRECHAT"; do
+      for p in "$PORT_WEBUI" "$PORT_LITELLM" "$PORT_DASHBOARD" "$PORT_VAULT_BRIDGE" "$PORT_EXCHANGE_BRIDGE" "$PORT_SYNCTHING_GUI" "$PORT_LIBRECHAT"; do
         $SUDO ufw allow "$p"/tcp >/dev/null 2>&1 || true
       done
-      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_SYNCTHING_GUI}/${PORT_LIBRECHAT} für ALLE offen (nur mit HTTPS davor empfohlen). Syncthing-Sync/-Erkennung und mcpo bleiben LAN-only."
+      note_warn "Firewall: Ports ${PORT_WEBUI}/${PORT_LITELLM}/${PORT_DASHBOARD}/${PORT_VAULT_BRIDGE}/${PORT_EXCHANGE_BRIDGE}/${PORT_SYNCTHING_GUI}/${PORT_LIBRECHAT} für ALLE offen (nur mit HTTPS davor empfohlen). Syncthing-Sync/-Erkennung und mcpo bleiben LAN-only."
     fi
     $SUDO ufw --force enable >/dev/null 2>&1 || true
   else
@@ -566,6 +567,8 @@ LIBRECHAT_JWT_REFRESH_SECRET="${LIBRECHAT_JWT_REFRESH_SECRET:-$(hexrand 32)}"
 LIBRECHAT_ADMIN_PASSWORD="${LIBRECHAT_ADMIN_PASSWORD:-$(rand 20)}"
 OPENWEBUI_ADMIN_PASSWORD="${OPENWEBUI_ADMIN_PASSWORD:-$(rand 20)}"
 SYNCTHING_GUI_PASSWORD="${SYNCTHING_GUI_PASSWORD:-$(rand 20)}"
+EXCHANGE_USER="${EXCHANGE_USER:-admin}"
+EXCHANGE_PASSWORD="${EXCHANGE_PASSWORD:-$(rand 20)}"
 
 # Host-MTU der Standardroute ermitteln und die Container-MTU daran anpassen.
 # Verhindert TLS-Timeouts ("i/o timeout") aus Containern hinter VPN/Cloud-Overlays.
@@ -696,6 +699,13 @@ OPENWEBUI_ADMIN_PASSWORD=${OPENWEBUI_ADMIN_PASSWORD}
 SYNCTHING_GUI_USER=${SYNCTHING_GUI_USER}
 SYNCTHING_GUI_PASSWORD=${SYNCTHING_GUI_PASSWORD}
 
+# Austausch-Ablage: Ordner, den du im Browser UND das LLM ueber das
+# Dateisystem-Werkzeug sehen - zum Hoch-/Runterladen von Dateien wie einer
+# fertig gebauten APK oder Testskripten. Eigenes Passwort setzen mit
+#   ./scripts/set-credentials.sh exchange-bridge
+EXCHANGE_USER=${EXCHANGE_USER}
+EXCHANGE_PASSWORD=${EXCHANGE_PASSWORD}
+
 # Eigene Adressen der Dienste (optional). Leer = aus IP und Port dieses
 # Rechners gebildet. Trag hier den Namen ein, unter dem ein Dienst von
 # aussen erreichbar ist - etwa hinter einem Reverse-Proxy. Das Menue
@@ -706,6 +716,7 @@ URL_LIBRECHAT=
 URL_LITELLM=
 URL_DASHBOARD=
 URL_VAULT_BRIDGE=
+URL_EXCHANGE_BRIDGE=
 URL_SYNCTHING=
 URL_MCPO=
 URL_MCP=

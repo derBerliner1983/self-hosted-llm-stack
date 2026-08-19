@@ -320,6 +320,12 @@ def gradle(project: str, args: str = "assembleDebug", timeout_seconds: int = DEF
     Der erste Lauf dauert lange, weil Gradle und alle Abhängigkeiten
     heruntergeladen werden; danach greift der persistente Cache.
 
+    Nach 'assembleDebug' liegt die APK unter
+    <projekt>/app/build/outputs/apk/debug/app-debug.apk. Damit der Nutzer sie
+    herunterladen kann, verschiebe sie mit dem Dateisystem-Werkzeug
+    move_file nach /exchange (z. B. /exchange/<projekt>.apk) - das ist der
+    Ordner, den er direkt im Browser sieht, nicht /workspace.
+
     :param project: Name des Projekts im Arbeitsbereich (siehe list_projects).
     :param args: Gradle-Argumente, z. B. "assembleDebug" oder "test --info".
     :param timeout_seconds: Zeitlimit in Sekunden (Standard 600, maximal 1800).

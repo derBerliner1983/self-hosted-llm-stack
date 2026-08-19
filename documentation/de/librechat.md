@@ -4,7 +4,7 @@ Alternative zu Open WebUI — spricht MCP direkt, ohne den Umweg über mcpo.
 
 [← Zur Übersicht](../../README.md) &nbsp;|&nbsp; [English version](../en/librechat.md)
 
-**Dokumentation:** [Installation & Erste Schritte](installation.md) · [Kontrollzentrum (Menü)](kontrollzentrum.md) · [Architektur & Dienste](architektur.md) · [Werkzeuge fürs LLM (MCP)](werkzeuge.md) · **LibreChat (zweite Oberfläche)** · [Code-Sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android-Entwicklung](android.md) · [Wissensdatenbank (Vault)](wissensdatenbank.md) · [Modelle verwalten](modelle.md) · [Betrieb & Wartung](betrieb.md) · [Sicherheit & Fernzugriff](sicherheit.md) · [Weitere Stacks](weitere-stacks.md)
+**Dokumentation:** [Installation & Erste Schritte](installation.md) · [Kontrollzentrum (Menü)](kontrollzentrum.md) · [Architektur & Dienste](architektur.md) · [Werkzeuge fürs LLM (MCP)](werkzeuge.md) · **LibreChat (zweite Oberfläche)** · [Code-Sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android-Entwicklung](android.md) · [Austausch-Ablage](austausch-ablage.md) · [Wissensdatenbank (Vault)](wissensdatenbank.md) · [Modelle verwalten](modelle.md) · [Betrieb & Wartung](betrieb.md) · [Sicherheit & Fernzugriff](sicherheit.md) · [Weitere Stacks](weitere-stacks.md)
 
 ---
 
@@ -138,7 +138,7 @@ Die drei Server sind dieselben wie in Open WebUI:
 
 | Server | Was er kann | Doku |
 |---|---|---|
-| `mcp_gateway` | Dateisystem (`/vault`, `/workspace`), Web-Abruf, Zeitzonen, GitHub, Suche, DB | [Werkzeuge fürs LLM](werkzeuge.md) |
+| `mcp_gateway` | Dateisystem (`/vault`, `/workspace`, `/exchange`), Web-Abruf, Zeitzonen, GitHub, Suche, DB | [Werkzeuge fürs LLM](werkzeuge.md) |
 | `code_sandbox` | Code ausführen und testen (Python, Shell, Java, Go, C++, optional PowerShell) | [Code-Sandbox](code-sandbox.md) |
 | `android_build` | Android-Projekte anlegen, bauen, testen | [Android-Entwicklung](android.md) |
 

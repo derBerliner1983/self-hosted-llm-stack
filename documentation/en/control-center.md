@@ -4,7 +4,7 @@ One menu for everything: see what's already there, add what isn't, start it, rem
 
 [← Back to overview](../../README-en.md) &nbsp;|&nbsp; [Deutsche Fassung](../de/kontrollzentrum.md)
 
-**Documentation:** [Installation & getting started](installation.md) · **Control center (menu)** · [Architecture & services](architecture.md) · [Tools for the LLM (MCP)](tools.md) · [LibreChat (second UI)](librechat.md) · [Code sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android development](android.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · [Operations & maintenance](operations.md) · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
+**Documentation:** [Installation & getting started](installation.md) · **Control center (menu)** · [Architecture & services](architecture.md) · [Tools for the LLM (MCP)](tools.md) · [LibreChat (second UI)](librechat.md) · [Code sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android development](android.md) · [Exchange Bridge](exchange-bridge.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · [Operations & maintenance](operations.md) · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
 
 ---
 

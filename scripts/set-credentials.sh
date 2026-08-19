@@ -12,6 +12,7 @@
 #   ./scripts/set-credentials.sh librechat
 #   ./scripts/set-credentials.sh syncthing
 #   ./scripts/set-credentials.sh open-webui
+#   ./scripts/set-credentials.sh exchange-bridge
 #
 # Zurück zum erzeugten Standard-Passwort:
 #   ./scripts/set-credentials.sh <dienst> --reset
@@ -41,7 +42,7 @@ for a in "$@"; do
     *)  SERVICE="$a" ;;
   esac
 done
-[ -n "$SERVICE" ] || { err "Kein Dienst angegeben. Möglich: librechat, syncthing, open-webui"; exit 2; }
+[ -n "$SERVICE" ] || { err "Kein Dienst angegeben. Möglich: librechat, syncthing, open-webui, exchange-bridge"; exit 2; }
 
 cd "$ROOT_DIR" || exit 1
 [ -f "$ENV_FILE" ] || { err "Keine .env gefunden — erst ./install.sh ausführen."; exit 1; }
@@ -236,10 +237,42 @@ do_open_webui() {
   fi
 }
 
+# ── Austausch-Ablage ────────────────────────────────────────────────────────
+do_exchange_bridge() {
+  if [ "$RESET" -eq 1 ]; then
+    reset_to_generated EXCHANGE_PASSWORD EXCHANGE_PASSWORD_SET
+    NEWUSER="${EXCHANGE_USER:-admin}"
+  else
+    ask_credentials "Austausch-Ablage" "${EXCHANGE_USER:-admin}" 1 "Benutzername"
+  fi
+
+  env_set EXCHANGE_USER "$NEWUSER"
+  [ "$RESET" -eq 1 ] || mark_own_password EXCHANGE_PASSWORD EXCHANGE_PASSWORD_SET
+  export EXCHANGE_USER="$NEWUSER" EXCHANGE_PASSWORD="$NEWPASS"
+
+  # Anders als bei LibreChat/Syncthing gibt es hier kein "Konto" in einer
+  # eigenen Datenbank, das man per Befehl aendern koennte - Benutzername und
+  # Passwort sind schlicht die Umgebungsvariablen, mit denen der Container
+  # gestartet wurde. Ein reiner "restart" wuerde die ALTEN Werte nur erneut
+  # laden - der Container muss neu ERZEUGT werden, um die neuen zu bekommen.
+  local dc
+  if docker compose version >/dev/null 2>&1; then dc="docker compose"
+  elif command -v docker-compose >/dev/null 2>&1; then dc="docker-compose"
+  else err "Docker Compose nicht gefunden."; return 1; fi
+
+  info "Erzeuge die Austausch-Ablage neu, damit sie die neuen Zugangsdaten übernimmt…"
+  if $dc -f "$COMPOSE_FILE" up -d --force-recreate exchange-bridge >/dev/null 2>&1; then
+    ok "Neu erzeugt."
+  else
+    err "Neuerzeugen fehlgeschlagen — ist der Dienst in $COMPOSE_FILE vorhanden?"; return 1
+  fi
+}
+
 case "$SERVICE" in
   librechat)  do_librechat  || exit 1 ;;
   syncthing)  do_syncthing  || exit 1 ;;
   open-webui) do_open_webui || exit 1 ;;
+  exchange-bridge) do_exchange_bridge || exit 1 ;;
   litellm)
     err "LiteLLM hat kein eigenes Passwort — der Master-Key IST die Anmeldung."
     info "Ihn zu tauschen trifft alle Clients (Open WebUI, LibreChat, Claude Code)."
@@ -249,7 +282,7 @@ case "$SERVICE" in
     exit 1 ;;
   *)
     err "Für '$SERVICE' gibt es nichts einzustellen."
-    info "Möglich: librechat, syncthing, open-webui"
+    info "Möglich: librechat, syncthing, open-webui, exchange-bridge"
     exit 2 ;;
 esac
 

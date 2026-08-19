@@ -71,6 +71,8 @@ ensure_credentials() {
   own_password OPENWEBUI_ADMIN_PASSWORD_SET || env_ensure OPENWEBUI_ADMIN_PASSWORD "$(env_rand 20)" || true
   env_ensure SYNCTHING_GUI_USER       "admin"             || true
   own_password SYNCTHING_GUI_PASSWORD_SET || env_ensure SYNCTHING_GUI_PASSWORD "$(env_rand 20)" || true
+  env_ensure EXCHANGE_USER            "admin"             || true
+  own_password EXCHANGE_PASSWORD_SET || env_ensure EXCHANGE_PASSWORD "$(env_rand 20)" || true
 }
 ensure_credentials
 NEWLY_ADDED="$ENV_ADDED"
@@ -203,6 +205,13 @@ show_syncthing() {
 
 show_dashboard()    { head_of "Dashboard";    row "Adresse:" "$(addr dashboard "${PORT_DASHBOARD:-8600}")";       note "Keine Anmeldung — nur im LAN erreichbar halten."; }
 show_vault_bridge() { head_of "Vault-Bridge"; row "Adresse:" "$(addr vault-bridge "${PORT_VAULT_BRIDGE:-8700}")"; note "Keine Anmeldung; Nextcloud-Zugang wird in der Oberfläche selbst hinterlegt."; }
+
+show_exchange_bridge() {
+  head_of "Austausch-Ablage"
+  row "Adresse:"  "$(addr exchange-bridge "${PORT_EXCHANGE_BRIDGE:-8900}")"
+  row "Benutzer:" "${EXCHANGE_USER:-admin}"
+  pwrow "${EXCHANGE_PASSWORD:-}" EXCHANGE_PASSWORD_SET
+}
 show_plain()        { head_of "$2";           row "Zugriff:" "nur containerintern, keine Anmeldung"; }
 
 # ── Anlegen ─────────────────────────────────────────────────────────────────
@@ -281,6 +290,7 @@ dispatch_show() {
     syncthing)    show_syncthing ;;
     dashboard)    show_dashboard ;;
     vault-bridge) show_vault_bridge ;;
+    exchange-bridge) show_exchange_bridge ;;
     ollama)       show_plain "$1" "Ollama" ;;
     sandbox-mcp)  show_plain "$1" "Code-Sandbox" ;;
     android-mcp)  show_plain "$1" "Android-Build" ;;
@@ -310,7 +320,7 @@ else
 ╚══════════════════════════════════════════════════════╝
 BANNER
   printf '%s' "$c_reset"
-  for s in open-webui librechat litellm db mcp mcpo syncthing dashboard vault-bridge; do
+  for s in open-webui librechat litellm db mcp mcpo syncthing dashboard vault-bridge exchange-bridge; do
     dispatch_show "$s"
   done
   printf '\n%s%sHinweis:%s Diese Werte stehen im Klartext in %s.env%s — nicht committen/teilen.\n' \

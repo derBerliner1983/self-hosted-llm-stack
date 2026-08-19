@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Austausch-Ablage</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --surface: #ffffff; --border: #e2e5ea; --border-strong: #d3d8df;
+    --text: #1f2328; --text-muted: #616a75; --accent: #1f6feb;
+    --danger: #cf222e; --danger-bg: #ffebe9;
+    --shadow: 0 1px 2px rgba(16, 22, 26, 0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #262c36; --border-strong: #333b47;
+      --text: #e6edf3; --text-muted: #8b949e; --accent: #4493f8;
+      --danger: #f85149; --danger-bg: #3d1210; --shadow: none;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f5f7; --surface: #ffffff; --border: #e2e5ea; --border-strong: #d3d8df;
+    --text: #1f2328; --text-muted: #616a75; --accent: #1f6feb;
+    --danger: #cf222e; --danger-bg: #ffebe9; --shadow: 0 1px 2px rgba(16,22,26,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --surface: #161b22; --border: #262c36; --border-strong: #333b47;
+    --text: #e6edf3; --text-muted: #8b949e; --accent: #4493f8;
+    --danger: #f85149; --danger-bg: #3d1210; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text);
+    -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.5;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--text-muted); margin: 0 0 24px; }
+
+  #drop {
+    border: 2px dashed var(--border-strong);
+    border-radius: 12px;
+    padding: 28px;
+    text-align: center;
+    color: var(--text-muted);
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+  #drop strong { color: var(--text); }
+  #file-input { display: none; }
+
+  #progress { margin-top: 10px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; display: none; }
+  #progress > div { height: 100%; width: 0%; background: var(--accent); transition: width .1s; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th { color: var(--text-muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td.name { word-break: break-all; }
+  td.actions { text-align: right; white-space: nowrap; }
+  a.dl { color: var(--accent); text-decoration: none; margin-right: 14px; }
+  a.dl:hover { text-decoration: underline; }
+  button.del {
+    background: none; border: 1px solid var(--border-strong); color: var(--danger);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px;
+  }
+  button.del:hover { background: var(--danger-bg); }
+  #empty { color: var(--text-muted); padding: 20px; text-align: center; }
+  #msg { margin-top: 12px; font-size: 13px; }
+  #msg.err { color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📂 Austausch-Ablage</h1>
+  <p class="sub">Dateien hier hochladen — das LLM sieht denselben Ordner über das Dateisystem-Werkzeug (mcp_gateway) und kann dort ablegen, was du herunterladen sollst.</p>
+
+  <div id="drop">
+    <div><strong>Datei hierher ziehen</strong> oder klicken zum Auswählen</div>
+    <input id="file-input" type="file">
+  </div>
+  <div id="progress"><div></div></div>
+  <div id="msg"></div>
+
+  <table id="table" style="display:none">
+    <thead><tr><th>Name</th><th>Größe</th><th>Geändert</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div id="empty" style="display:none">Noch keine Dateien in der Ablage.</div>
+</div>
+
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file-input');
+const rows = document.getElementById('rows');
+const table = document.getElementById('table');
+const empty = document.getElementById('empty');
+const msg = document.getElementById('msg');
+const progress = document.getElementById('progress');
+const progressBar = progress.querySelector('div');
+
+function showMsg(text, isErr) {
+  msg.textContent = text;
+  msg.className = isErr ? 'err' : '';
+  if (text) setTimeout(() => { if (msg.textContent === text) msg.textContent = ''; }, 5000);
+}
+
+function fmtDate(iso) {
+  try { return new Date(iso).toLocaleString('de-DE'); } catch (e) { return iso; }
+}
+
+async function loadList() {
+  const res = await fetch('/api/list');
+  if (!res.ok) { showMsg('Liste konnte nicht geladen werden.', true); return; }
+  const data = await res.json();
+  rows.innerHTML = '';
+  if (!data.files.length) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  table.style.display = 'table';
+  empty.style.display = 'none';
+  for (const f of data.files) {
+    const tr = document.createElement('tr');
+    const nameCell = document.createElement('td');
+    nameCell.className = 'name';
+    nameCell.textContent = f.name;
+    const sizeCell = document.createElement('td');
+    sizeCell.textContent = f.size_human;
+    const dateCell = document.createElement('td');
+    dateCell.textContent = fmtDate(f.modified);
+    const actionsCell = document.createElement('td');
+    actionsCell.className = 'actions';
+    const dl = document.createElement('a');
+    dl.className = 'dl';
+    dl.href = '/api/download/' + encodeURIComponent(f.name);
+    dl.textContent = 'Herunterladen';
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = 'Löschen';
+    del.onclick = () => deleteFile(f.name);
+    actionsCell.append(dl, del);
+    tr.append(nameCell, sizeCell, dateCell, actionsCell);
+    rows.appendChild(tr);
+  }
+}
+
+async function deleteFile(name) {
+  if (!confirm('„' + name + '“ wirklich löschen?')) return;
+  const res = await fetch('/api/file/' + encodeURIComponent(name), { method: 'DELETE' });
+  if (res.ok) { showMsg('Gelöscht: ' + name); loadList(); }
+  else { showMsg('Löschen fehlgeschlagen.', true); }
+}
+
+function uploadFile(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/upload');
+  xhr.upload.onprogress = (e) => {
+    if (!e.lengthComputable) return;
+    progress.style.display = 'block';
+    progressBar.style.width = Math.round((e.loaded / e.total) * 100) + '%';
+  };
+  xhr.onload = () => {
+    progress.style.display = 'none';
+    progressBar.style.width = '0%';
+    if (xhr.status === 200) {
+      showMsg('Hochgeladen: ' + file.name);
+      loadList();
+    } else {
+      let text = 'Hochladen fehlgeschlagen.';
+      try { text = JSON.parse(xhr.responseText).error || text; } catch (e) {}
+      showMsg(text, true);
+    }
+  };
+  xhr.onerror = () => { progress.style.display = 'none'; showMsg('Hochladen fehlgeschlagen.', true); };
+  xhr.send(form);
+}
+
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) uploadFile(fileInput.files[0]);
+  fileInput.value = '';
+});
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => {
+  e.preventDefault(); drop.classList.add('over');
+}));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => {
+  e.preventDefault(); drop.classList.remove('over');
+}));
+drop.addEventListener('drop', (e) => {
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+});
+
+loadList();
+setInterval(loadList, 10000);
+</script>
+</body>
+</html>
