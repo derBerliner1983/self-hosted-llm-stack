@@ -355,6 +355,7 @@ docker logs librechat-mongo --tail 20
 | Can't sign in, registration disabled | That's intended — sign in with the credentials from `show-credentials.sh`, or set `LIBRECHAT_ALLOW_REGISTRATION=true` for self-registration |
 | Credentials don't work | Was the account created? `docker exec librechat npm run list-users`. Create it: `./scripts/librechat-user.sh` |
 | Logged out constantly (every few minutes) | See below — session cookie over plain HTTP |
+| "Recursion limit of N reached without hitting a stop condition" on an agent | See below — agent step limit |
 
 ### Logged out constantly: the session cookie over HTTP
 
@@ -373,6 +374,25 @@ docker compose -f docker-compose.rocm.yml up -d --force-recreate librechat
 ```
 
 If TLS ends up in front of LibreChat (e.g. via [Pangolin](security.md) for outside access), remove this line again — the safer default then applies once more.
+
+### "Recursion limit reached": the agent step limit
+
+An agent counts every tool call as one step — creating a file, running a shell command, a Gradle build, each single action. Something as involved as "build me an Android app" adds up to several dozen quickly. LibreChat's built-in limit for this is on the tight side; once it's hit, the task stops mid-way:
+
+```
+Recursion limit of 58 reached without hitting a stop condition.
+```
+
+`librechat.yaml` now sets a more generous limit, since your last `git pull`:
+
+```yaml
+endpoints:
+  agents:
+    recursionLimit: 100
+    maxRecursionLimit: 200
+```
+
+`recursionLimit` applies to new conversations; `maxRecursionLimit` is the ceiling you can raise it to **per conversation** right in the UI (under the agent's advanced parameters), without touching the file. If even 200 isn't enough — which can happen for genuinely long, multi-stage tasks — raise both values further in `librechat.yaml` and `docker compose -f docker-compose.rocm.yml restart librechat`.
 
 ## Security
 
