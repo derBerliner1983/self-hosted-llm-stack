@@ -206,6 +206,19 @@ def build_status():
     services = []
     for svc in SERVICES:
         st = _state_for(index.get(svc["container"]))
+        # "absent" heisst: der Container existiert nicht (auch nicht gestoppt) -
+        # der Dienst wurde nie installiert, oder wieder entfernt. Den dann in
+        # der Liste zu zeigen ("Nicht vorhanden") ist mehr Verwirrung als
+        # Information; sobald er installiert wird, taucht der Container in
+        # 'docker ps -a' auf und ist damit automatisch wieder dabei - kein
+        # Neustart des Dashboards noetig, das passiert beim naechsten Poll.
+        # Ausnahme: ist Docker selbst nicht erreichbar (docker_ok=False), sieht
+        # JEDER Dienst "absent" aus, ohne wirklich entfernt zu sein - dann
+        # nichts herausfiltern, sonst wuerde ein echtes Docker-Problem eine
+        # leere statt eine erklaerende Anzeige ergeben (siehe docker_error-
+        # Banner weiter unten).
+        if st["state"] == "absent" and docker_ok:
+            continue
         running = st["state"] == "running"
         online = running and st["health"] in (None, "healthy")
         services.append(
