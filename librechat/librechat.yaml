@@ -78,7 +78,7 @@ modelSpecs:
   list:
     - name: "gemma4"
       label: "Gemma 4 12B"
-      description: "Allrounder fuer den Alltag"
+      description: "Allrounder fuer den Alltag · versteht auch Bilder"
       iconURL: "/images/custom/gemma-color.png"
       showIconInMenu: true
       showIconInHeader: true
@@ -89,7 +89,7 @@ modelSpecs:
 
     - name: "gemma3"
       label: "Gemma 3 12B"
-      description: "Vorgaenger, etwas genuegsamer"
+      description: "Vorgaenger, etwas genuegsamer · versteht auch Bilder"
       iconURL: "/images/custom/gemma-color.png"
       showIconInMenu: true
       showIconInHeader: true
@@ -100,7 +100,7 @@ modelSpecs:
 
     - name: "qwen-coder"
       label: "Qwen Coder"
-      description: "Fuer Code und Werkzeugaufrufe"
+      description: "Fuer Code und Werkzeugaufrufe · KEIN Bildverstaendnis"
       iconURL: "/images/custom/qwen-color.png"
       showIconInMenu: true
       showIconInHeader: true
@@ -111,7 +111,7 @@ modelSpecs:
 
     - name: "llama31"
       label: "Llama 3.1 8B"
-      description: "Klein und schnell"
+      description: "Klein und schnell · KEIN Bildverstaendnis"
       iconURL: "/images/custom/llama.png"
       showIconInMenu: true
       showIconInHeader: true

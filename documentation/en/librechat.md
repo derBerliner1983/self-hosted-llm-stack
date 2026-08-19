@@ -354,6 +354,25 @@ docker logs librechat-mongo --tail 20
 | `mcp_gateway` won't connect | Is `MCP_API_KEY` set in `.env`? If not, run `./scripts/wire-mcp.sh` |
 | Can't sign in, registration disabled | That's intended — sign in with the credentials from `show-credentials.sh`, or set `LIBRECHAT_ALLOW_REGISTRATION=true` for self-registration |
 | Credentials don't work | Was the account created? `docker exec librechat npm run list-users`. Create it: `./scripts/librechat-user.sh` |
+| Logged out constantly (every few minutes) | See below — session cookie over plain HTTP |
+
+### Logged out constantly: the session cookie over HTTP
+
+LibreChat logs you out after 15 minutes, but normally renews the session silently in the background via a refresh token valid for 7 days. For that to work, the browser has to actually store the session cookie in the first place — and it won't, for a cookie marked "Secure", over plain HTTP (no `https://`). Without `DOMAIN_CLIENT`/`DOMAIN_SERVER` set, LibreChat marks its cookie that way by default, and this stack runs over plain HTTP in LAN mode.
+
+That's why `docker-compose.rocm.yml` now sets, for LibreChat, since your last `git pull`:
+
+```yaml
+- SESSION_COOKIE_SECURE=false
+```
+
+This is LibreChat's own documented fix specifically for "HTTP-only deployments". After pulling:
+
+```bash
+docker compose -f docker-compose.rocm.yml up -d --force-recreate librechat
+```
+
+If TLS ends up in front of LibreChat (e.g. via [Pangolin](security.md) for outside access), remove this line again — the safer default then applies once more.
 
 ## Security
 

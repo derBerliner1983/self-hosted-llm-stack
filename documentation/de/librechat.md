@@ -354,6 +354,25 @@ docker logs librechat-mongo --tail 20
 | `mcp_gateway` verbindet nicht | `MCP_API_KEY` in der `.env` gesetzt? Sonst `./scripts/wire-mcp.sh` ausführen |
 | Anmeldung nicht möglich, Meldung „registration disabled“ | So gewollt — melde dich mit den Zugangsdaten aus `show-credentials.sh` an, oder setz `LIBRECHAT_ALLOW_REGISTRATION=true` |
 | Zugangsdaten funktionieren nicht | Wurde das Konto angelegt? `docker exec librechat npm run list-users`. Nachholen: `./scripts/librechat-user.sh` |
+| Ständig abgemeldet (alle paar Minuten neu anmelden) | Siehe unten — Sitzungs-Cookie über reines HTTP |
+
+### Ständig abgemeldet: das Sitzungs-Cookie über HTTP
+
+LibreChat meldet dich nach 15 Minuten ab, erneuert die Sitzung aber normalerweise unbemerkt im Hintergrund über einen Refresh-Token, der 7 Tage gilt. Damit das funktioniert, muss der Browser das Sitzungs-Cookie überhaupt erst speichern — und das lässt er bei einem als „Secure" markierten Cookie über reines HTTP (kein `https://`) grundsätzlich bleiben. Ohne `DOMAIN_CLIENT`/`DOMAIN_SERVER` markiert LibreChat sein Cookie standardmäßig so, und dieser Stack läuft im LAN-Modus über reines HTTP.
+
+Deshalb steht seit `git pull` in `docker-compose.rocm.yml` bei LibreChat:
+
+```yaml
+- SESSION_COOKIE_SECURE=false
+```
+
+Das ist LibreChats eigene, dokumentierte Lösung genau für „reine HTTP-Installationen". Nach dem Pull:
+
+```bash
+docker compose -f docker-compose.rocm.yml up -d --force-recreate librechat
+```
+
+Steht am Ende TLS vor LibreChat (z. B. über [Pangolin](sicherheit.md) für den Zugriff von außen), kann die Zeile wieder raus — dann greift wieder die sichere Standardeinstellung.
 
 ## Sicherheit
 

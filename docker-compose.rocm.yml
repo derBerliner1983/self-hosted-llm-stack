@@ -278,6 +278,17 @@ services:
       - CREDS_IV=${LIBRECHAT_CREDS_IV:-}
       - JWT_SECRET=${LIBRECHAT_JWT_SECRET:-}
       - JWT_REFRESH_SECRET=${LIBRECHAT_JWT_REFRESH_SECRET:-}
+      # Dieser Stack läuft standardmäßig über reines HTTP im LAN (kein TLS
+      # vor LibreChat, DOMAIN_CLIENT/DOMAIN_SERVER unkonfiguriert). Ohne
+      # diese Zeile markiert LibreChat sein Sitzungs-Cookie als "Secure" -
+      # das speichert der Browser über HTTP gar nicht erst. Der eigentlich
+      # 7 Tage gültige Refresh-Token kommt dann nie an, und aus dem
+      # unauffälligen Verlängern im Hintergrund (Standard: alle 15 Minuten)
+      # wird eine echte Abmeldung. Genau für diesen Fall dokumentiert
+      # LibreChat selbst diese Variable ("nur für reine HTTP-Installationen
+      # setzen"). Sitzt am Ende TLS davor (z. B. über Pangolin), kann diese
+      # Zeile wieder raus.
+      - SESSION_COOKIE_SECURE=false
       # Meilisearch ist nicht Teil dieses Stacks - Suche daher aus, sonst
       # protokolliert LibreChat dauerhaft Verbindungsfehler.
       - SEARCH=false
