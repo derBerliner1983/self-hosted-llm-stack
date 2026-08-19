@@ -54,6 +54,21 @@ endpoints:
       #   docker cp logo.png librechat:/app/client/public/images/logo.png
       # iconURL: "/images/litellm.png"
 
+  # Schritte, die ein Agent (android_build, code_sandbox, mcp_gateway...) in
+  # einem Durchlauf machen darf, bevor LibreChat abbricht. Der eingebaute
+  # Standard (25, je nach Version teils hoeher) reicht fuer etwas wie "baue
+  # mir eine Android-App" nicht - jeder Werkzeugaufruf zaehlt als Schritt,
+  # und ein Android-Projekt anlegen + mehrere Dateien schreiben + Gradle
+  # bauen kommt schnell auf mehrere Dutzend. Ohne diese Zeile bricht so ein
+  # Auftrag mittendrin ab: "Recursion limit of N reached without hitting a
+  # stop condition." recursionLimit ist der Wert, mit dem ein neuer Chat
+  # startet; maxRecursionLimit die Obergrenze, bis zu der du ihn in der
+  # Oberflaeche selbst (pro Unterhaltung, unter den erweiterten Parametern
+  # des Agenten) noch hochstellen kannst, ohne diese Datei zu aendern.
+  agents:
+    recursionLimit: 100
+    maxRecursionLimit: 200
+
 # ── Symbole und Namen je MODELL ─────────────────────────────────────────
 # Anders als Open WebUI kennt LibreChat kein Bearbeiten-Fenster pro Modell -
 # es steht hier. Jeder Eintrag unter "list" ist ein Steckbrief mit eigenem

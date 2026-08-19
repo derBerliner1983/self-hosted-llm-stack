@@ -355,6 +355,7 @@ docker logs librechat-mongo --tail 20
 | Anmeldung nicht möglich, Meldung „registration disabled“ | So gewollt — melde dich mit den Zugangsdaten aus `show-credentials.sh` an, oder setz `LIBRECHAT_ALLOW_REGISTRATION=true` |
 | Zugangsdaten funktionieren nicht | Wurde das Konto angelegt? `docker exec librechat npm run list-users`. Nachholen: `./scripts/librechat-user.sh` |
 | Ständig abgemeldet (alle paar Minuten neu anmelden) | Siehe unten — Sitzungs-Cookie über reines HTTP |
+| „Recursion limit of N reached without hitting a stop condition" bei einem Agenten | Siehe unten — Schrittgrenze für Agenten |
 
 ### Ständig abgemeldet: das Sitzungs-Cookie über HTTP
 
@@ -373,6 +374,25 @@ docker compose -f docker-compose.rocm.yml up -d --force-recreate librechat
 ```
 
 Steht am Ende TLS vor LibreChat (z. B. über [Pangolin](sicherheit.md) für den Zugriff von außen), kann die Zeile wieder raus — dann greift wieder die sichere Standardeinstellung.
+
+### „Recursion limit reached": Schrittgrenze für Agenten
+
+Ein Agent zählt jeden Werkzeugaufruf als einen Schritt — Datei anlegen, Shell-Befehl, Gradle-Lauf, jede einzelne Aktion. Bei etwas Umfangreichem wie „baue mir eine Android-App" kommen da schnell mehrere Dutzend zusammen. LibreChats eingebaute Grenze dafür ist knapp bemessen; ist sie erreicht, bricht der Auftrag mitten drin ab:
+
+```
+Recursion limit of 58 reached without hitting a stop condition.
+```
+
+`librechat.yaml` setzt seit `git pull` eine großzügigere Grenze:
+
+```yaml
+endpoints:
+  agents:
+    recursionLimit: 100
+    maxRecursionLimit: 200
+```
+
+`recursionLimit` gilt für neue Unterhaltungen; `maxRecursionLimit` ist die Obergrenze, bis zu der du sie **pro Unterhaltung** in der Oberfläche selbst hochstellen kannst (beim Agenten unter den erweiterten Parametern), ohne die Datei anzufassen. Reicht auch 200 nicht — bei wirklich langen, mehrstufigen Aufträgen kann das vorkommen —, beide Werte in `librechat.yaml` weiter hochsetzen und `docker compose -f docker-compose.rocm.yml restart librechat`.
 
 ## Sicherheit
 
