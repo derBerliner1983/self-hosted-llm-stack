@@ -4,7 +4,7 @@ An alternative to Open WebUI — speaks MCP directly, without the mcpo detour.
 
 [← Back to overview](../../README-en.md) &nbsp;|&nbsp; [Deutsche Fassung](../de/librechat.md)
 
-**Documentation:** [Installation & getting started](installation.md) · [Control center (menu)](control-center.md) · [Architecture & services](architecture.md) · [Tools for the LLM (MCP)](tools.md) · **LibreChat (second UI)** · [Code sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android development](android.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · [Operations & maintenance](operations.md) · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
+**Documentation:** [Installation & getting started](installation.md) · [Control center (menu)](control-center.md) · [Architecture & services](architecture.md) · [Tools for the LLM (MCP)](tools.md) · **LibreChat (second UI)** · [Code sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android development](android.md) · [Exchange Bridge](exchange-bridge.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · [Operations & maintenance](operations.md) · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
 
 ---
 
@@ -138,7 +138,7 @@ The three servers are the same ones Open WebUI uses:
 
 | Server | What it does | Docs |
 |---|---|---|
-| `mcp_gateway` | Filesystem (`/vault`, `/workspace`), web fetch, timezones, GitHub, search, DB | [Tools for the LLM](tools.md) |
+| `mcp_gateway` | Filesystem (`/vault`, `/workspace`, `/exchange`), web fetch, timezones, GitHub, search, DB | [Tools for the LLM](tools.md) |
 | `code_sandbox` | Run and test code (Python, shell, Java, Go, C++, optionally PowerShell) | [Code sandbox](code-sandbox.md) |
 | `android_build` | Create, build and test Android projects | [Android development](android.md) |
 

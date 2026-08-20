@@ -62,6 +62,7 @@ PORT_LIBRECHAT=3080
 PORT_LITELLM=4000
 PORT_DASHBOARD=8600
 PORT_VAULT_BRIDGE=8700
+PORT_EXCHANGE_BRIDGE=8900
 PORT_SYNCTHING_GUI=8384
 PORT_MCPO=8800
 PORT_MCP=3000
@@ -75,7 +76,7 @@ MCP_API_KEY=@keep
 #S Wissensdatenbank
 #K ro = die KI darf nur lesen, rw = auch schreiben.
 MCP_VAULT_MOUNT_MODE=ro
-MCP_FILESYSTEM_DIRS=/vault,/workspace
+MCP_FILESYSTEM_DIRS=/vault,/workspace,/exchange
 
 #S LibreChat
 #K CREDS_KEY braucht 64 Hex-Zeichen, CREDS_IV genau 32 - LibreChat prueft das
@@ -104,6 +105,13 @@ OPENWEBUI_ADMIN_PASSWORD=@rand20
 SYNCTHING_GUI_USER=admin
 SYNCTHING_GUI_PASSWORD=@rand20
 
+#S Austausch-Ablage
+#K Ordner zum Hoch-/Runterladen im Browser, den auch das LLM ueber das
+#K Dateisystem-Werkzeug sieht. Eigenes Passwort setzen mit
+#K   ./scripts/set-credentials.sh exchange-bridge
+EXCHANGE_USER=admin
+EXCHANGE_PASSWORD=@rand20
+
 #S Open Interpreter (CLI, optional)
 INSTALL_OPEN_INTERPRETER=no
 INTERPRETER_MODEL=ollama/gemma3:12b
@@ -121,6 +129,7 @@ URL_LIBRECHAT=
 URL_LITELLM=
 URL_DASHBOARD=
 URL_VAULT_BRIDGE=
+URL_EXCHANGE_BRIDGE=
 URL_SYNCTHING=
 URL_MCPO=
 URL_MCP=

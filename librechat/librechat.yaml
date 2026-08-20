@@ -178,8 +178,14 @@ mcpServers:
     timeout: 60000
     serverInstructions: |
       Werkzeuge für Dateisystem (/vault = Wissensdatenbank, /workspace =
-      Android-Projekte), Web-Abruf und exakte Zeitzonen. Nutze das
-      Zeit-Werkzeug statt selbst zu rechnen.
+      Android-Projekte, /exchange = Austausch-Ablage), Web-Abruf und exakte
+      Zeitzonen. Nutze das Zeit-Werkzeug statt selbst zu rechnen.
+
+      /exchange ist der Ordner, den der Nutzer auch direkt im Browser sieht
+      (hoch-/runterladen). Lege Dinge, die der Nutzer herunterladen soll -
+      eine fertig gebaute APK, ein Skript, ein Ergebnis - dort ab, statt sie
+      nur im Chat zu beschreiben. Hochgeladene Dateien vom Nutzer liegen
+      ebenfalls dort.
 
   code_sandbox:
     type: "streamable-http"

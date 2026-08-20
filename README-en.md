@@ -53,6 +53,7 @@ The full walkthrough — requirements, GPU setup and troubleshooting — is in t
 | **[Open Interpreter (CLI)](documentation/en/open-interpreter.md)** | Terminal assistant, optional at install time |
 | **[Code sandbox](documentation/en/code-sandbox.md)** | Running and testing code, workspace, more languages |
 | **[Android development](documentation/en/android.md)** | Creating, building and testing projects |
+| **[Exchange Bridge](documentation/en/exchange-bridge.md)** | Upload/download files with the LLM (e.g. a built APK) |
 | **[Knowledge base (vault)](documentation/en/knowledge-base.md)** | Wiring an Obsidian vault in via Syncthing or Vault-Bridge |
 | **[Managing models](documentation/en/models.md)** | Pulling, unloading, registering with LiteLLM |
 | **[Operations & maintenance](documentation/en/operations.md)** | Everyday commands, updates, backups, credentials |

@@ -53,6 +53,7 @@ Die ausführliche Anleitung samt Voraussetzungen, GPU-Einrichtung und Fehlersuch
 | **[Code-Sandbox](documentation/de/code-sandbox.md)** | Code ausführen und testen lassen, Arbeitsbereich, weitere Sprachen |
 | **[Open Interpreter (CLI)](documentation/de/open-interpreter.md)** | Assistent fürs Terminal, optional mitinstallierbar |
 | **[Android-Entwicklung](documentation/de/android.md)** | Projekte anlegen, bauen, testen |
+| **[Austausch-Ablage](documentation/de/austausch-ablage.md)** | Dateien mit dem LLM hoch-/runterladen (z. B. eine gebaute APK) |
 | **[Wissensdatenbank (Vault)](documentation/de/wissensdatenbank.md)** | Obsidian-Vault per Syncthing oder Vault-Bridge anbinden |
 | **[Modelle verwalten](documentation/de/modelle.md)** | Modelle laden, entladen, bei LiteLLM registrieren |
 | **[Betrieb & Wartung](documentation/de/betrieb.md)** | Alltagsbefehle, Updates, Sicherung, Zugangsdaten |

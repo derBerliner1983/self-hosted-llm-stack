@@ -43,6 +43,44 @@ for i in $(seq 1 40); do
   [ "$i" -eq 40 ] && die "MCP Gateway wurde nicht rechtzeitig bereit. Prüfe: docker logs mcp"
 done
 
+# ── Austausch-Ordner in der .env nachtragen ─────────────────────────────────
+#
+# MCP_FILESYSTEM_DIRS steht als konkreter Wert in der .env (install.sh
+# schreibt ihn dort hinein) - der Vorgabewert im Compose-File
+# (MCP_FILESYSTEM_DIRS:-...) greift also nur bei einer .env, die den
+# Schlüssel noch gar nicht kennt. Bei einer bestehenden Installation muss
+# "/exchange" hier von Hand nachgetragen werden, sonst sieht der
+# mcp-Container ihn nie - und der Patch weiter unten (der genau diese
+# Variable ausliest) würde ihn ebenfalls nicht eintragen.
+# shellcheck source=scripts/env-lib.sh
+. "$SCRIPT_DIR/env-lib.sh"
+ENV_DIRS_CHANGED=0
+if [ -f "$ENV_FILE" ]; then
+  CUR_DIRS="$(env_get MCP_FILESYSTEM_DIRS)"
+  case ",${CUR_DIRS}," in
+    *,/exchange,*) ;;  # schon drin
+    *)
+      NEW_DIRS="${CUR_DIRS:-/vault,/workspace},/exchange"
+      env_set MCP_FILESYSTEM_DIRS "$NEW_DIRS"
+      ENV_DIRS_CHANGED=1
+      ok "MCP_FILESYSTEM_DIRS in der .env um /exchange ergänzt."
+      ;;
+  esac
+fi
+
+if [ "$ENV_DIRS_CHANGED" -eq 1 ]; then
+  # Eine neue Umgebungsvariable erreicht einen LAUFENDEN Container nicht -
+  # "restart" allein wuerde die alte, alte env(!) nur erneut starten. Es
+  # muss neu ERZEUGT werden, damit mcp den aktualisierten Wert bekommt.
+  info "mcp neu erzeugen, damit es den neuen Ordner sieht…"
+  $DC -f "$COMPOSE_FILE" up -d --force-recreate mcp >/dev/null
+  for i in $(seq 1 40); do
+    docker exec mcp mcp_manage --getkey >/dev/null 2>&1 && break
+    sleep 3
+    [ "$i" -eq 40 ] && die "mcp wurde nach dem Neuerzeugen nicht rechtzeitig bereit. Prüfe: docker logs mcp"
+  done
+fi
+
 # ── Eigene/nicht automatisch registrierte MCP-Server nachtragen ────────────
 #
 # Bei manchen Installationen registriert hwdsl2/mcp-gateway "filesystem"

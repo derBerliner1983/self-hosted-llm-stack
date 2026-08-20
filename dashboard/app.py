@@ -132,6 +132,14 @@ SERVICES = [
         "path": "/",
     },
     {
+        "container": "exchange-bridge",
+        "label": "Austausch-Ablage",
+        "desc": "Dateien hoch-/runterladen ↔ LLM",
+        "icon": "📂",
+        "port": int(os.environ.get("PORT_EXCHANGE_BRIDGE", "8900")),
+        "path": "/",
+    },
+    {
         "container": "syncthing",
         "label": "Syncthing",
         "desc": "Zwei-Wege-Sync · Alternative zur Vault-Bridge",
