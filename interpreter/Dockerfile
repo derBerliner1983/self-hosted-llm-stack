@@ -20,8 +20,11 @@ RUN apt-get update \
 # in core/utils/system_debug_info.py noch pkg_resources — das steckt in
 # setuptools. Ohne diese Zeile startet 'interpreter' gar nicht:
 #   ModuleNotFoundError: No module named 'pkg_resources'
-# Die Grenze <81 ist Absicht: ab 81 warnt setuptools bei jedem Import von
-# pkg_resources, und diese Warnung stünde bei jedem Start im Terminal.
+# Die Grenze <81 ist trotzdem Absicht: ab 81 aendert sich pkg_resources'
+# Verhalten nochmal deutlicher. Die Deprecation-Warnung selbst bleibt davon
+# unberuehrt - die kommt unabhaengig von der genauen Version und wird darum
+# im Entrypoint gezielt ausgeblendet (an einer echten Installation
+# beobachtet: <81 haelt sie NICHT fern, anders als hier zuvor vermerkt).
 # Beides in einem Aufruf, damit pip die Grenze bei der Auflösung kennt — in
 # zwei Schritten könnte die zweite Installation setuptools wieder hochziehen.
 RUN pip install --no-cache-dir \
