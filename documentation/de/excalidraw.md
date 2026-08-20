@@ -1,6 +1,6 @@
 # Excalidraw
 
-Das LLM baut Diagramme (Formen, Text, Pfeile) als `.excalidraw`-Dateien — du öffnest sie in deinem eigenen Excalidraw.
+Das LLM baut Diagramme (Formen, Text, Pfeile) als `.excalidraw`-Datei oder direkt als PNG-Bild.
 
 [← Zur Übersicht](../../README.md) &nbsp;|&nbsp; [English version](../en/excalidraw.md)
 
@@ -12,19 +12,19 @@ Das LLM baut Diagramme (Formen, Text, Pfeile) als `.excalidraw`-Dateien — du �
 
 `excalidraw-mcp` ist ein eigener, optionaler MCP-Dienst, mit dem das Modell Diagramme bauen kann — ein Flussdiagramm, eine Architekturskizze, eine Mindmap — ohne dass du selbst klicken musst.
 
-**Wichtig zu wissen, bevor du es benutzt:** Dein laufender Excalidraw-Container (`excalidraw/excalidraw`, das offizielle Image) ist reine Frontend-Software ohne eigene Speicher- oder Sync-API. Das Modell zeichnet deshalb **nicht live** in eine offene Browser-Tab hinein — das bräuchte einen zusätzlichen Kollaborations-Server und wäre ein deutlich größerer, fragilerer Umbau. Stattdessen erzeugt das Modell `.excalidraw`-Dateien (das offene, standardisierte Excalidraw-Dateiformat) und legt sie auf Wunsch nach [`/exchange`](austausch-ablage.md) — von dort lädst du sie herunter und öffnest sie in deinem Excalidraw über **Datei → Öffnen**.
+**Wichtig zu wissen, bevor du es benutzt:** Dein laufender Excalidraw-Container (`excalidraw/excalidraw`, das offizielle Image) ist reine Frontend-Software ohne eigene Speicher- oder Sync-API. Das Modell zeichnet deshalb **nicht live** in eine offene Browser-Tab hinein — das bräuchte einen zusätzlichen Kollaborations-Server und wäre ein deutlich größerer, fragilerer Umbau. Stattdessen erzeugt das Modell Dateien und legt sie auf Wunsch nach [`/exchange`](austausch-ablage.md) — entweder als `.excalidraw` (zum Weiterbearbeiten in deinem Excalidraw über **Datei → Öffnen**) oder direkt als fertiges **PNG-Bild**.
 
 ## Im Chat nutzen
 
-> Zeichne mir ein Flussdiagramm für einen Login-Prozess: Start, Eingabe prüfen, bei Fehler zurück zu Eingabe, bei Erfolg Ende. Leg es danach in /exchange ab.
+> Zeichne mir ein Flussdiagramm für einen Login-Prozess: Start, Eingabe prüfen, bei Fehler zurück zu Eingabe, bei Erfolg Ende. Exportier es als PNG nach /exchange.
 
 Das Modell ruft dafür der Reihe nach auf:
 
 1. `use_diagram(name)` — legt das Diagramm an (oder wählt ein bestehendes) und macht es zum **aktuellen** Diagramm.
 2. `add_element(spec)` — mehrfach, je Aufruf ein Rechteck/Ellipse/Text/Pfeil.
-3. `export_diagram()` — kopiert die Datei nach `/exchange`.
+3. `export_png()` — rendert die aktuelle Ansicht als PNG und kopiert es nach `/exchange`. Willst du stattdessen die Rohdatei zum Weiterbearbeiten, nutze `export_diagram()`.
 
-Danach: `/exchange` im Browser öffnen (siehe [Austausch-Ablage](austausch-ablage.md)), Datei herunterladen, in Excalidraw über **Datei → Öffnen** laden.
+Danach: `/exchange` im Browser öffnen (siehe [Austausch-Ablage](austausch-ablage.md)) und die Datei herunterladen.
 
 ## Werkzeuge
 
@@ -35,7 +35,10 @@ Danach: `/exchange` im Browser öffnen (siehe [Austausch-Ablage](austausch-ablag
 | `add_element(spec)` | Ein Element zum aktuellen Diagramm hinzufügen |
 | `remove_last_element()` | Letztes Element rückgängig machen |
 | `get_diagram(name)` | Elemente eines Diagramms anzeigen (leerer Name = aktuelles) |
-| `export_diagram(name)` | Nach `/exchange` kopieren (leerer Name = aktuelles) |
+| `export_diagram(name)` | Als `.excalidraw`-Rohdatei nach `/exchange` kopieren (leerer Name = aktuelles) |
+| `export_png(name)` | Als PNG-Bild nach `/exchange` rendern (leerer Name = aktuelles) |
+
+`export_png` rendert mit demselben Code, den Excalidraw selbst im Browser für "Bild exportieren" benutzt (echte Handschrift-Schrift, echte Formen) — nur headless über ein eingebautes Chromium (Playwright), ganz ohne deinen laufenden Excalidraw-Container oder Internet zur Laufzeit zu brauchen. Der erste Export nach dem Start des Dienstes dauert etwas länger (Chromium startet neu), danach ist jeder weitere in wenigen Sekunden fertig.
 
 `spec` bei `add_element` ist **ein JSON-Objekt als Text**, z. B.:
 
@@ -52,10 +55,12 @@ An diesem Stack wurde beim Android-Werkzeug beobachtet, dass ein lokales Modell 
 ## Wie es funktioniert
 
 ```
-LLM → excalidraw-mcp (eigenes Volume) → export_diagram() → /exchange → Browser (Download) → Excalidraw (Datei öffnen)
+LLM → excalidraw-mcp (eigenes Volume) → export_diagram()/export_png() → /exchange → Browser (Download)
 ```
 
-Ein schlanker, abhängigkeitsfreier Python-Dienst (dasselbe Muster wie [android-mcp](android.md) und die Code-Sandbox), der `.excalidraw`-JSON-Dateien in einem eigenen Docker-Volume verwaltet. `export_diagram()` kopiert in dasselbe geteilte Volume, das auch [Austausch-Ablage](austausch-ablage.md) und `android-mcp` benutzen — kein zusätzlicher Zugangsdaten-Kram nötig, es ist nur ein Kopierziel.
+Ein Python-Dienst (Grundmuster wie [android-mcp](android.md) und die Code-Sandbox), der `.excalidraw`-JSON-Dateien in einem eigenen Docker-Volume verwaltet. `export_diagram()`/`export_png()` kopieren in dasselbe geteilte Volume, das auch [Austausch-Ablage](austausch-ablage.md) und `android-mcp` benutzen — kein zusätzlicher Zugangsdaten-Kram nötig, es ist nur ein Kopierziel.
+
+Für `export_png()` steckt im Image zusätzlich Excalidraws eigener Bild-Renderer (einmalig beim Bauen des Images mit esbuild zu einer einzigen Datei gebündelt, keine Internetverbindung zur Laufzeit nötig) plus ein headless Chromium (Playwright) - deshalb ist dieses Image deutlich größer als die anderen MCP-Werkzeuge in diesem Stack, ähnlich wie bei [android-mcp](android.md).
 
 ## Konfiguration
 

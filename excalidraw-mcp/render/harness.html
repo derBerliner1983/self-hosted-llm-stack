@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>excalidraw-mcp render</title></head>
+<body>
+<script>
+  // Auf denselben lokalen Server zeigen, der diese Seite ausliefert - dort
+  // liegt auch fonts/ (aus dem npm-Paket kopiert, siehe Dockerfile). Ohne
+  // das versucht Excalidraw, Schriften von einem CDN (esm.sh) im Internet
+  // zu laden - klappt nicht offline und widerspricht dem Grundsatz dieses
+  // Stacks, ohne externe Dienste zur Laufzeit auszukommen.
+  window.EXCALIDRAW_ASSET_PATH = window.location.origin + "/";
+</script>
+<script src="./bundle.js"></script>
+</body>
+</html>

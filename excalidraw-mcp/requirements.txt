@@ -1,1 +1,5 @@
 mcp>=2.0.0
+# Für export_png(): rendert Diagramme headless mit Chromium - Browser
+# selbst kommt aus dem Playwright-Basisimage (siehe Dockerfile), hier nur
+# die Python-Steuerung dafür.
+playwright>=1.62.0
