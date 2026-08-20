@@ -30,11 +30,16 @@ case "$MODEL" in
 esac
 
 # Die pkg_resources-Deprecation-Warnung taucht trotz "setuptools<81" im
-# Dockerfile weiterhin auf (das haelt sie NICHT fern, anders als dort lange
-# vermerkt - an einer echten Installation beobachtet) und ist rein
-# kosmetisch, kein Fehler. Gezielt nur diese eine Warnung ausblenden, damit
-# echte Warnungen von anderswo weiter sichtbar bleiben.
-export PYTHONWARNINGS="${PYTHONWARNINGS:-}${PYTHONWARNINGS:+,}ignore::UserWarning:pkg_resources"
+# Dockerfile weiterhin auf und ist rein kosmetisch, kein Fehler - gezielt
+# ausblenden, damit echte Warnungen von anderswo weiter sichtbar bleiben.
+#
+# WICHTIG - warum nach Nachrichtentext statt nach Modul gefiltert wird:
+# pkg_resources ruft warnings.warn(..., stacklevel=2) auf. Das laesst die
+# Warnung auf die AUFRUFENDE Datei zeigen (system_debug_info.py), nicht auf
+# pkg_resources selbst - ein Filter nach Modul "pkg_resources" greift dann
+# ins Leere (an einer echten Installation beobachtet: blieb trotz Filter
+# sichtbar). Der Nachrichtentext bleibt unabhaengig vom stacklevel gleich.
+export PYTHONWARNINGS="${PYTHONWARNINGS:-}${PYTHONWARNINGS:+,}ignore:pkg_resources is deprecated as an API:UserWarning"
 
 if [ -z "$API_KEY" ]; then
   echo "LITELLM_MASTER_KEY ist nicht gesetzt — Open Interpreter kommt so nicht an LiteLLM." >&2

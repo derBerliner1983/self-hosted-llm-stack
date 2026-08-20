@@ -54,6 +54,18 @@ done
 # Variable ausliest) würde ihn ebenfalls nicht eintragen.
 # shellcheck source=scripts/env-lib.sh
 . "$SCRIPT_DIR/env-lib.sh"
+# Sammelt ueber beide moeglichen mcp-Neuerzeugungen hinweg (dieser Block UND
+# der Filesystem/Time/OAuth-Patch weiter unten), ob LibreChat am Ende neu
+# gestartet werden muss. War das hier NICHT so gesammelt, sondern nur lokal
+# im Patch-Block unten geprueft: wurde /exchange gerade erst ergaenzt (mcp
+# also gerade force-recreated), der Patch-Block darunter findet aber nichts
+# mehr zu aendern (filesystem/time/oauth waren schon korrekt) - dann wuerde
+# LibreChat NIE neu gestartet und haengt an seiner alten MCP-Verbindung zum
+# inzwischen ersetzten mcp-Container fest. Genau das fuehrt dort zu "MCP
+# server was deleted" / "MCP gateway deleted or no tools available", weil
+# LibreChat seine MCP-Server nur beim eigenen Start verbindet und danach nie
+# wieder nachfragt (siehe Kommentar beim eigentlichen Neustart unten).
+NEED_LIBRECHAT_RESTART=0
 ENV_DIRS_CHANGED=0
 if [ -f "$ENV_FILE" ]; then
   CUR_DIRS="$(env_get MCP_FILESYSTEM_DIRS)"
@@ -79,6 +91,7 @@ if [ "$ENV_DIRS_CHANGED" -eq 1 ]; then
     sleep 3
     [ "$i" -eq 40 ] && die "mcp wurde nach dem Neuerzeugen nicht rechtzeitig bereit. Prüfe: docker logs mcp"
   done
+  NEED_LIBRECHAT_RESTART=1
 fi
 
 # ── Eigene/nicht automatisch registrierte MCP-Server nachtragen ────────────
@@ -154,21 +167,29 @@ if [ "$PATCH_RESULT" = "CHANGED" ]; then
     sleep 3
     [ "$i" -eq 40 ] && die "mcp wurde nach dem Neustart nicht rechtzeitig bereit. Prüfe: docker logs mcp"
   done
+  NEED_LIBRECHAT_RESTART=1
+else
+  ok "'filesystem', 'time' und die OAuth-Einstellung waren schon korrekt."
+fi
 
-  # LibreChat verbindet seine MCP-Server nur beim eigenen Start und fragt
-  # danach nie wieder nach (siehe documentation/de/librechat.md). Ein
-  # mcp-Neustart eben - egal aus welchem der obigen Gruende - macht seinen
-  # zwischengespeicherten Stand (moeglicherweise "OAuth erforderlich" oder
-  # eine alte, unvollstaendige Werkzeugliste) ungueltig. Ohne diesen
-  # Neustart hier bliebe LibreChat auf dem alten Stand haengen, bis jemand
-  # von Hand draufkommt - genau das hat zuvor zu langer Fehlersuche gefuehrt.
+# LibreChat verbindet seine MCP-Server nur beim eigenen Start und fragt
+# danach nie wieder nach (siehe documentation/de/librechat.md). Ein
+# mcp-Neustart bzw. eine mcp-Neuerzeugung - egal aus welchem der beiden
+# obigen Gruende - macht LibreChats zwischengespeicherten Stand ungueltig
+# (moeglicherweise "OAuth erforderlich", eine alte/unvollstaendige
+# Werkzeugliste, oder bei einer Neuerzeugung sogar eine tote Verbindung zum
+# inzwischen ersetzten Container). Deshalb hier EINMAL, gesammelt ueber
+# beide moeglichen Aenderungen oben, statt lokal in nur einem der beiden
+# Blocks - sonst bliebe LibreChat nach der jeweils anderen Aenderung auf dem
+# alten Stand haengen, bis jemand von Hand draufkommt.
+if [ "$NEED_LIBRECHAT_RESTART" -eq 1 ]; then
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx librechat; then
     info "LibreChat neu starten, damit es die aktualisierten MCP-Werkzeuge sieht…"
     $DC -f "$COMPOSE_FILE" restart librechat >/dev/null
     ok "LibreChat neu gestartet."
   fi
 else
-  ok "'filesystem', 'time' und die OAuth-Einstellung waren schon korrekt, kein Neustart nötig."
+  ok "Kein LibreChat-Neustart nötig."
 fi
 
 MCP_KEY="$(docker exec mcp mcp_manage --getkey)"
