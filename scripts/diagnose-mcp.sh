@@ -168,15 +168,37 @@ case "$RUNNING" in
   *) printf '  %s—%s übersprungen: LibreChat läuft nicht\n' "$c_dim" "$c_reset" ;;
 esac
 
-# ── 3b) SSRF-Ausnahme vorhanden? ────────────────────────────────────────────
+# ── 3b) SSRF-Ausnahme deckt ALLE konfigurierten Server ab? ─────────────────
 # Ohne mcpSettings.allowedAddresses blockiert LibreChat jedes Ziel mit privater
 # IP — und Docker-interne Namen zeigen genau dorthin. Der Fehler im Log lautet
 # dann: Domain "http://mcp:3000" is not allowed
-if [ "$LC_UP" -eq 1 ] && ! docker exec librechat sh -c 'grep -q "allowedAddresses" /app/librechat.yaml' 2>/dev/null; then
-  fail "mcpSettings.allowedAddresses fehlt in der Konfiguration"
-  hint "Ohne diese Ausnahme lehnt LibreChat interne Adressen ab:"
-  hint '  Domain "http://mcp:3000" is not allowed'
-  hint "Beheben: git pull, dann docker compose -f $COMPOSE_FILE restart librechat"
+#
+# Nur zu prüfen, OB der Schlüssel allowedAddresses existiert, reicht nicht -
+# live beobachtet: die Liste war da, aber ein neu hinzugekommener Server
+# (excalidraw-mcp:8000) fehlte darin. Der alte Check hätte das als "in
+# Ordnung" gemeldet. Deshalb hier stattdessen JEDEN in mcpServers
+# konfigurierten host:port gegen die tatsächliche allowedAddresses-Liste
+# abgleichen und fehlende einzeln benennen.
+if [ "$LC_UP" -eq 1 ]; then
+  MISSING_ADDR="$(docker exec librechat sh -c 'cat /app/librechat.yaml' 2>/dev/null | python3 -c '
+import re, sys
+text = sys.stdin.read()
+hostports = sorted(set(re.findall(r"url:\s*\"http://([^/\"]+)", text)))
+m = re.search(r"allowedAddresses:\s*\n((?:\s*-\s*\"[^\"]+\"\s*\n?)*)", text)
+allowed = set(re.findall(r"\"([^\"]+)\"", m.group(1))) if m else set()
+print("\n".join(hp for hp in hostports if hp not in allowed))
+' 2>/dev/null)"
+  if [ -z "$MISSING_ADDR" ]; then
+    ok "mcpSettings.allowedAddresses deckt alle konfigurierten Server ab"
+  else
+    fail "mcpSettings.allowedAddresses deckt nicht alle konfigurierten Server ab"
+    printf '%s\n' "$MISSING_ADDR" | while IFS= read -r addr; do
+      hint "Fehlt: \"$addr\"  ->  Domain \"http://$addr\" is not allowed"
+    done
+    hint "Beheben: fehlende(n) Eintrag/Einträge in librechat.yaml unter"
+    hint "mcpSettings.allowedAddresses ergänzen, dann:"
+    hint "  docker compose -f $COMPOSE_FILE restart librechat"
+  fi
 fi
 
 # ── 4) Was sagt LibreChat beim Start? ───────────────────────────────────────
