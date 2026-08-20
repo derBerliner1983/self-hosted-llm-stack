@@ -18,6 +18,7 @@ Werkzeuge für das Modell:
   - get_diagram(name)        Elemente eines Diagramms anzeigen
   - export_diagram(name)     Nach /exchange kopieren, zum Herunterladen (.excalidraw)
   - export_png(name)         Als PNG-Bild nach /exchange rendern
+  - export_bundle(name)      PNG + .excalidraw zusammen als .zip nach /exchange
 
 export_png()/add_mermaid() rendern bzw. layouten mit demselben Code, den
 Excalidraw selbst im Browser benutzt (exportToBlob bzw. der offizielle
@@ -65,6 +66,7 @@ import re
 import threading
 import time
 import uuid
+import zipfile
 
 from mcp.server.mcpserver import MCPServer
 from playwright.sync_api import sync_playwright
@@ -565,12 +567,29 @@ def add_mermaid(text: str) -> dict:
     entscheiden, wo jede Box hinkommt - keine Koordinaten nötig, nur
     Knoten und Kanten als Text beschreiben.
 
-    Beispiel für 'text' (Flussdiagramm, oben nach unten):
+    Beispiel für 'text' (Flussdiagramm, oben nach unten, MIT Farbe):
         flowchart TD
-            A[Start] --> B{Eingabe gueltig?}
-            B -->|Nein| C[Fehler anzeigen]
+            A["Start"] --> B{"Eingabe gueltig?"}
+            B -->|Nein| C["Fehler anzeigen"]
             C --> A
-            B -->|Ja| D[Fertig]
+            B -->|Ja| D["Fertig"]
+            classDef ok fill:#b2f2bb,stroke:#2f9e44
+            classDef bad fill:#ffc9c9,stroke:#e03131
+            class A,D ok
+            class C bad
+
+    Färbung: OHNE classDef/class (oder "style KnotenId fill:#hex,stroke:#hex")
+    bleiben alle Formen farblos/transparent - das ist Mermaids eigener
+    Standard, kein Fehler. Für farbige Diagramme classDef/class wie oben
+    verwenden, oder pro Knoten "style A fill:#a5d8ff,stroke:#1e1e1e".
+
+    Zeilenumbrüche in Beschriftungen: NIE "\\n" oder "<br/>" in ein Label
+    schreiben - beides bleibt als buchstäblicher Text stehen und wird vom
+    Renderer zusätzlich an zufälligen Zeichen-Positionen umgebrochen,
+    Ergebnis ist wirres Text-Kauderwelsch (an einem echten Lauf so
+    beobachtet). Einfach normalen Text mit Leerzeichen schreiben ("Telefon
+    oder Drittanbieter") - Excalidraw bricht lange Labels von selbst sauber
+    an Wortgrenzen um.
 
     Am zuverlässigsten unterstützt: flowchart, sequenceDiagram,
     classDiagram. Andere Mermaid-Diagrammarten können unvollständig
@@ -598,8 +617,22 @@ def add_mermaid(text: str) -> dict:
     return {
         "diagram": name,
         "elements_total": len(elements),
-        "next_step": "Mit export_png() oder export_diagram() nach /exchange exportieren.",
+        "next_step": "Mit export_png(), export_diagram() oder export_bundle() (beides als .zip) nach /exchange exportieren.",
     }
+
+
+def _resolve_named_or_current(name):
+    """Löst 'name' (oder - falls leer - das aktuelle Diagramm) zu
+    (name, path, scene) auf. Gemeinsame Logik für export_png/
+    export_diagram/export_bundle, die das vorher dreifach einzeln
+    gemacht haben.
+    """
+    if not name:
+        return _require_current()
+    path = _diagram_path(name)
+    if not os.path.exists(path):
+        raise ValueError(f"Diagramm '{name}' nicht gefunden. Siehe list_diagrams().")
+    return name, path, _load_scene(path)
 
 
 @mcp.tool()
@@ -615,19 +648,10 @@ def export_png(name: str = "") -> dict:
 
     :param name: Diagrammname. Leer = aktuelles Diagramm (siehe use_diagram).
     """
-    if not name:
-        try:
-            name, path, scene = _require_current()
-        except ValueError as exc:
-            return {"error": str(exc)}
-    else:
-        try:
-            path = _diagram_path(name)
-        except ValueError as exc:
-            return {"error": str(exc)}
-        if not os.path.exists(path):
-            return {"error": f"Diagramm '{name}' nicht gefunden. Siehe list_diagrams()."}
-        scene = _load_scene(path)
+    try:
+        name, path, scene = _resolve_named_or_current(name)
+    except ValueError as exc:
+        return {"error": str(exc)}
 
     if not scene.get("elements"):
         return {"error": f"'{name}' hat keine Elemente - erst mit add_element etwas hinzufügen."}
@@ -660,18 +684,10 @@ def export_diagram(name: str = "") -> dict:
 
     :param name: Diagrammname. Leer = aktuelles Diagramm (siehe use_diagram).
     """
-    if not name:
-        try:
-            name, path, _ = _require_current()
-        except ValueError as exc:
-            return {"error": str(exc)}
-    else:
-        try:
-            path = _diagram_path(name)
-        except ValueError as exc:
-            return {"error": str(exc)}
-        if not os.path.exists(path):
-            return {"error": f"Diagramm '{name}' nicht gefunden. Siehe list_diagrams()."}
+    try:
+        name, path, _ = _resolve_named_or_current(name)
+    except ValueError as exc:
+        return {"error": str(exc)}
 
     try:
         os.makedirs(EXCHANGE_DIR, exist_ok=True)
@@ -688,6 +704,55 @@ def export_diagram(name: str = "") -> dict:
             f"'{name}.excalidraw' liegt jetzt in /exchange. Der Nutzer lädt "
             "es dort herunter und öffnet es in Excalidraw über "
             "\"Datei\" -> \"Öffnen\"."
+        ),
+    }
+
+
+@mcp.tool()
+def export_bundle(name: str = "") -> dict:
+    """Legt PNG UND .excalidraw zusammen als EINE .zip-Datei nach /exchange
+    - für den Fall, dass der Nutzer das fertige Bild UND die Möglichkeit
+    will, das Diagramm später selbst in Excalidraw weiterzubearbeiten,
+    ohne zwei einzelne Dateien herunterladen zu müssen.
+
+    Nutze export_png oder export_diagram stattdessen, wenn nur EINE der
+    beiden Formen gebraucht wird - das spart bei export_png() das
+    Zip-Packen, bei export_diagram() sogar das Rendern.
+
+    :param name: Diagrammname. Leer = aktuelles Diagramm (siehe use_diagram).
+    """
+    try:
+        name, path, scene = _resolve_named_or_current(name)
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+    if not scene.get("elements"):
+        return {"error": f"'{name}' hat keine Elemente - erst mit add_element etwas hinzufügen."}
+
+    try:
+        png_bytes = _render_png_bytes(scene)
+    except Exception as exc:  # noqa: BLE001 - Playwright kann diverse Fehlerarten werfen
+        return {"error": f"Rendern fehlgeschlagen: {exc}"}
+
+    with open(path, "r", encoding="utf-8") as fh:
+        excalidraw_text = fh.read()
+
+    try:
+        os.makedirs(EXCHANGE_DIR, exist_ok=True)
+        dest = os.path.join(EXCHANGE_DIR, f"{name}.zip")
+        with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f"{name}.png", png_bytes)
+            zf.writestr(f"{name}.excalidraw", excalidraw_text)
+    except OSError as exc:
+        return {"error": f"Konnte nicht nach {EXCHANGE_DIR} kopieren: {exc}"}
+
+    return {
+        "diagram": name,
+        "exchange_path": dest,
+        "next_step": (
+            f"'{name}.zip' liegt jetzt in /exchange (enthält {name}.png "
+            f"und {name}.excalidraw) - der Nutzer kann es dort herunterladen "
+            "und entpacken."
         ),
     }
 

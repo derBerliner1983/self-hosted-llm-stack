@@ -22,7 +22,7 @@ The model calls, in order:
 
 1. `use_diagram(name)` — creates the diagram (or picks an existing one) and makes it the **current** diagram.
 2. `add_mermaid(text)` — builds the whole diagram in one shot from Mermaid text (see below for why this is the recommended way).
-3. `export_png()` — renders the current diagram as PNG and copies it to `/exchange`. Want the raw file to keep editing instead? Use `export_diagram()`.
+3. `export_png()` — renders the current diagram as PNG and copies it to `/exchange`. Want both (the image AND the raw file to keep editing in Excalidraw later)? Use `export_bundle()` instead — packs both into one `.zip`.
 
 Afterwards: open `/exchange` in your browser (see [Exchange Bridge](exchange-bridge.md)) and download the file.
 
@@ -44,6 +44,18 @@ Positioning is then handled by **Mermaid's own layout engine** (the same code Ex
 
 `add_element` is still useful for single, standalone additions — for anything with multiple connected boxes, `add_mermaid` is the reliable choice.
 
+**Color:** without any styling, Mermaid diagrams come out black-and-white (Mermaid's own default, not a bug). For color, use `classDef`/`class`:
+
+```
+flowchart TD
+    A["Start"] --> B{"Input valid?"}
+    B -->|Yes| C["Done"]
+    classDef ok fill:#b2f2bb,stroke:#2f9e44
+    class A,C ok
+```
+
+**Line breaks in labels:** never write `\n` or `<br/>` inside a label — both stay in as literal text and additionally get wrapped at random spots by the renderer, producing garbled output (observed live). Just write plain text with spaces ("Phone number or third party") — Excalidraw wraps long labels cleanly on word boundaries by itself.
+
 ## Tools
 
 | Tool | Purpose |
@@ -56,6 +68,7 @@ Positioning is then handled by **Mermaid's own layout engine** (the same code Ex
 | `get_diagram(name)` | Show a diagram's elements (empty name = current) |
 | `export_diagram(name)` | Copy the raw `.excalidraw` file to `/exchange` (empty name = current) |
 | `export_png(name)` | Render as a PNG image to `/exchange` (empty name = current) |
+| `export_bundle(name)` | PNG + `.excalidraw` together as a `.zip` to `/exchange` (empty name = current) |
 
 `export_png` renders with the exact same code Excalidraw itself uses in the browser for "Export image" (real hand-drawn font, real shapes) — just headless, via a bundled Chromium (Playwright), with no dependency on your running Excalidraw container or the internet at runtime. The first export after the service starts takes a little longer (Chromium has to launch), every export after that finishes in a few seconds. `add_mermaid` supports flowcharts (`flowchart`), sequence diagrams (`sequenceDiagram`) and class diagrams (`classDiagram`) most reliably — other Mermaid diagram types may render incompletely.
 
