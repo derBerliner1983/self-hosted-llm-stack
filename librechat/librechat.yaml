@@ -235,7 +235,14 @@ mcpServers:
       Boxen und Linien - das NIEMALS für mehr als 1-2 Boxen versuchen.
       add_element bleibt nur für einzelne, freistehende Ergänzungen.
 
-      Zum Schluss export_diagram (.excalidraw-Datei) oder export_png
-      (fertiges PNG-Bild), damit die Datei in /exchange landet und der
-      Nutzer sie herunterladen kann. Live in eine offene Excalidraw-Tab
-      zeichnen geht NICHT - nur Dateien erzeugen.
+      Farbe: OHNE classDef/class (oder "style Knoten fill:#hex,stroke:#hex")
+      bleiben Formen farblos - das ist Standard, kein Fehler. Für Farbe
+      classDef/class im Mermaid-Text verwenden. NIE "\n" oder "<br/>" in
+      einem Label - bleibt als Text stehen und wird zusätzlich wirr
+      umgebrochen. Einfach normalen Text mit Leerzeichen schreiben, lange
+      Labels brechen von selbst sauber um.
+
+      Zum Schluss export_diagram (.excalidraw-Datei), export_png
+      (PNG-Bild) oder export_bundle (beides als .zip), damit die Datei in
+      /exchange landet und der Nutzer sie herunterladen kann. Live in eine
+      offene Excalidraw-Tab zeichnen geht NICHT - nur Dateien erzeugen.
