@@ -150,12 +150,13 @@ modelSpecs:
 #
 # Bewusst allowedAddresses und nicht allowedDomains: eine gesetzte
 # allowedDomains-Liste schaltet den SSRF-Schutz komplett ab. So bleibt er
-# aktiv und es sind exakt diese drei Ports ausgenommen.
+# aktiv und es sind exakt diese Ports ausgenommen.
 mcpSettings:
   allowedAddresses:
     - "mcp:3000"
     - "sandbox-mcp:8000"
     - "android-mcp:8000"
+    - "excalidraw-mcp:8000"
 
 # ── MCP-Werkzeuge, nativ ────────────────────────────────────────────────
 # Dieselben Dienste, die Open WebUI über mcpo erreicht - hier direkt.
