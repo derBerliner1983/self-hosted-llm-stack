@@ -13,18 +13,30 @@ Werkzeuge für das Modell:
   - list_diagrams()          Vorhandene Diagramme auflisten
   - use_diagram(name)        Diagramm anlegen/auswählen (wird "aktuell")
   - add_element(spec)        Ein Element zum AKTUELLEN Diagramm hinzufügen
+  - add_mermaid(text)        AKTUELLES Diagramm aus Mermaid-Text aufbauen (ERSETZT Elemente)
   - remove_last_element()    Letztes Element rückgängig machen
   - get_diagram(name)        Elemente eines Diagramms anzeigen
   - export_diagram(name)     Nach /exchange kopieren, zum Herunterladen (.excalidraw)
   - export_png(name)         Als PNG-Bild nach /exchange rendern
 
-export_png() rendert mit demselben Code, den Excalidraw selbst im Browser
-benutzt (exportToBlob, siehe render/entry.js) - nur headless über
-Playwright/Chromium statt in einer sichtbaren Tab. Dafür startet dieser
-Dienst beim Hochfahren einen kleinen, rein lokalen HTTP-Server (127.0.0.1,
-EXCALIDRAW_RENDER_PORT), der render/bundle.js und die Schriftdateien
-ausliefert - Chromium braucht eine echte URL, kein file://, um Schriften
-per fetch() nachzuladen (siehe harness.html).
+export_png()/add_mermaid() rendern bzw. layouten mit demselben Code, den
+Excalidraw selbst im Browser benutzt (exportToBlob bzw. der offizielle
+Mermaid-Konverter @excalidraw/mermaid-to-excalidraw, siehe
+render/entry.js) - nur headless über Playwright/Chromium statt in einer
+sichtbaren Tab. Dafür startet dieser Dienst beim Hochfahren einen
+kleinen, rein lokalen HTTP-Server (127.0.0.1, EXCALIDRAW_RENDER_PORT),
+der render/bundle.js und die Schriftdateien ausliefert - Chromium
+braucht eine echte URL, kein file://, um Schriften per fetch()
+nachzuladen (siehe harness.html).
+
+WICHTIG zur Werkzeugwahl bei MEHREREN verbundenen Boxen: add_mermaid
+benutzen, NICHT mehrere add_element-Aufrufe. add_element verlangt x/y je
+Box von Hand - das führt bei mehr als ein paar Boxen zuverlässig zu
+Überlappungen, weil kein Sprachmodell ein ganzes Layout im Kopf plant
+(an einem echten Lauf beobachtet: Text und Linien übereinander, siehe
+add_mermaid()-Docstring für ein Beispiel). Mermaids eigene Layout-Engine
+übernimmt das Positionieren zuverlässig - das Modell beschreibt nur
+Knoten und Kanten als Text.
 
 WICHTIG zum Werkzeug-Zuschnitt: add_element() nimmt bewusst GENAU EINEN
 String-Parameter (ein JSON-Objekt als Text) statt vieler einzelner
@@ -501,6 +513,76 @@ def _render_png_bytes(scene, scale=2):
             finally:
                 browser.close()
     return base64.b64decode(b64)
+
+
+def _render_mermaid_elements(mermaid_text):
+    """Wandelt Mermaid-Text in fertig layoutete Excalidraw-Elemente um -
+    per Mermaids eigener Layout-Engine, im selben headless Chromium wie
+    _render_png_bytes()."""
+    _ensure_render_server()
+    with _render_lock:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(args=["--no-sandbox"])
+            try:
+                page = browser.new_page()
+                page.goto(f"http://127.0.0.1:{RENDER_PORT}/harness.html")
+                page.wait_for_function("window.__renderReady === true", timeout=15000)
+                result_json = page.evaluate(
+                    "(text) => window.mermaidToExcalidraw(text)", mermaid_text
+                )
+            finally:
+                browser.close()
+    return json.loads(result_json)
+
+
+@mcp.tool()
+def add_mermaid(text: str) -> dict:
+    """Baut das AKTUELLE Diagramm komplett aus Mermaid-Text auf - ERSETZT
+    dabei alle bisherigen Elemente (kein Hinzufügen wie add_element).
+
+    Für alles mit MEHREREN verbundenen Boxen/Pfeilen ist das der bessere
+    Weg als viele einzelne add_element-Aufrufe: bei add_element musst du
+    x/y für jede Box selbst festlegen - bei mehr als ein paar Boxen führt
+    das zuverlässig zu Überlappungen (an echten Läufen beobachtet).
+    add_mermaid lässt stattdessen Mermaids eigene Layout-Engine
+    entscheiden, wo jede Box hinkommt - keine Koordinaten nötig, nur
+    Knoten und Kanten als Text beschreiben.
+
+    Beispiel für 'text' (Flussdiagramm, oben nach unten):
+        flowchart TD
+            A[Start] --> B{Eingabe gueltig?}
+            B -->|Nein| C[Fehler anzeigen]
+            C --> A
+            B -->|Ja| D[Fertig]
+
+    Am zuverlässigsten unterstützt: flowchart, sequenceDiagram,
+    classDiagram. Andere Mermaid-Diagrammarten können unvollständig
+    umgesetzt werden.
+
+    :param text: Vollständiger Mermaid-Diagrammtext (siehe Beispiel).
+    """
+    try:
+        name, path, scene = _require_current()
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+    try:
+        result = _render_mermaid_elements(text)
+    except Exception as exc:  # noqa: BLE001 - Playwright/Mermaid können diverse Fehler werfen
+        return {"error": f"Mermaid-Text konnte nicht umgesetzt werden: {exc}"}
+
+    elements = result.get("elements", [])
+    if not elements:
+        return {"error": "Mermaid-Text ergab keine Elemente - Syntax prüfen."}
+
+    scene["elements"] = elements
+    scene["files"] = result.get("files", {})
+    _save_scene(path, scene)
+    return {
+        "diagram": name,
+        "elements_total": len(elements),
+        "next_step": "Mit export_png() oder export_diagram() nach /exchange exportieren.",
+    }
 
 
 @mcp.tool()

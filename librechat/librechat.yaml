@@ -223,10 +223,19 @@ mcpServers:
     url: "http://excalidraw-mcp:8000/mcp"
     timeout: 60000
     serverInstructions: |
-      Excalidraw-Diagramme bauen (Formen, Text, Pfeile). Erst use_diagram
-      aufrufen, dann add_element wiederholt - add_element nimmt EIN
-      JSON-Objekt als Text, keine einzelnen Koordinaten-Parameter. Zum
-      Schluss export_diagram (.excalidraw-Datei) oder export_png
+      Excalidraw-Diagramme bauen. Erst use_diagram aufrufen.
+
+      Für ALLES mit mehreren verbundenen Boxen (Flussdiagramm, Ablauf,
+      Prozess, Architektur, ...): add_mermaid(text) benutzen, NICHT
+      mehrere add_element-Aufrufe. add_mermaid nimmt den kompletten
+      Diagrammtext in Mermaid-Syntax (z. B. "flowchart TD\nA-->B") und
+      lässt Mermaids eigene Layout-Engine die Positionen berechnen -
+      überschneidungsfrei, garantiert. Von Hand mit add_element x/y für
+      mehrere Boxen zu vergeben führt praktisch immer zu überlappenden
+      Boxen und Linien - das NIEMALS für mehr als 1-2 Boxen versuchen.
+      add_element bleibt nur für einzelne, freistehende Ergänzungen.
+
+      Zum Schluss export_diagram (.excalidraw-Datei) oder export_png
       (fertiges PNG-Bild), damit die Datei in /exchange landet und der
       Nutzer sie herunterladen kann. Live in eine offene Excalidraw-Tab
       zeichnen geht NICHT - nur Dateien erzeugen.
