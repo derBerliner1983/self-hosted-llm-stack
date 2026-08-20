@@ -249,16 +249,12 @@ def create_project(name: str, package_name: str = "com.example.app") -> dict:
     Danach kannst du die Quelldateien mit den Dateisystem-Werkzeugen
     bearbeiten und mit dem Werkzeug 'gradle' bauen bzw. testen.
 
-    WICHTIG - die Parameter heißen 'name' und 'package_name' (NICHT
-    'project_name' o. Ä. - das wurde beobachtet und führt zu "Received
-    tool input did not match expected schema"). Bekommst du diesen
-    Schema-Fehler: korrigiere die Parameternamen und ruf create_project
-    einfach ERNEUT auf. Weiche NICHT auf code_sandbox/run_shell/run_python
-    aus, um das Projekt stattdessen von Hand anzulegen - die Code-Sandbox
-    hat keinerlei Zugriff auf /workspace (eigenes Volume, nur hier
-    eingehängt) und ihr Dateisystem ist bis auf /work und /tmp read-only;
-    jeder Versuch dort scheitert an "Read-only file system" oder
-    "Permission denied", unabhängig davon, wie oft du es versuchst.
+    Parameter heißen 'name' und 'package_name', beide einfache Strings.
+    Meldet der Aufruf einen Schema-Fehler: einfach mit denselben zwei
+    Strings erneut aufrufen, NICHT auf code_sandbox ausweichen - dort gibt
+    es keinen Zugriff auf /workspace und keine Schreibrechte außerhalb von
+    /work und /tmp, ein Projekt lässt sich dort unter keinen Umständen
+    anlegen.
 
     :param name: Projektname (Buchstaben, Ziffern, _ und -), wird auch der Verzeichnisname.
     :param package_name: Java-Paketname, z. B. "com.example.meineapp".
