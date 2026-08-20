@@ -29,6 +29,13 @@ case "$MODEL" in
   *) MODEL="openai/${MODEL}" ;;
 esac
 
+# Die pkg_resources-Deprecation-Warnung taucht trotz "setuptools<81" im
+# Dockerfile weiterhin auf (das haelt sie NICHT fern, anders als dort lange
+# vermerkt - an einer echten Installation beobachtet) und ist rein
+# kosmetisch, kein Fehler. Gezielt nur diese eine Warnung ausblenden, damit
+# echte Warnungen von anderswo weiter sichtbar bleiben.
+export PYTHONWARNINGS="${PYTHONWARNINGS:-}${PYTHONWARNINGS:+,}ignore::UserWarning:pkg_resources"
+
 if [ -z "$API_KEY" ]; then
   echo "LITELLM_MASTER_KEY ist nicht gesetzt — Open Interpreter kommt so nicht an LiteLLM." >&2
   echo "Prüfe die .env im Projektverzeichnis und starte erneut." >&2

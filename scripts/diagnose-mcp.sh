@@ -191,6 +191,17 @@ else
     fail "LibreChat blockiert die Adressen (SSRF-Schutz)"
     hint "mcpSettings.allowedAddresses fehlt oder deckt nicht alle Dienste ab."
     hint "Beheben: git pull, dann docker compose -f $COMPOSE_FILE restart librechat"
+  elif printf '%s' "$LOG" | grep -q 'Requested tool not found\|Tool definition not found'; then
+    # Kein Verbindungsproblem: das Modell hat den Werkzeugnamen selbst falsch
+    # geschrieben (z.B. "fetch_fetch" statt "fetch-fetch" mit Bindestrich).
+    # LibreChat erkennt das korrekt, verbindet zur Sicherheit einmal neu -
+    # findet den falschen Namen aber weiterhin nicht und meldet das sauber,
+    # statt abzustuerzen. Ein Neustart von librechat aendert daran nichts.
+    warn "Modell hat einen falschen/vertippten Werkzeugnamen aufgerufen"
+    hint "Kein Fehler in der Verdrahtung - der echte Name steht in Schritt 5"
+    hint "unten (meist mit Bindestrich, z.B. 'fetch-fetch'). Sag dem Modell"
+    hint "im Chat den korrekten Namen, oder beschreib die Aufgabe statt das"
+    hint "Werkzeug beim Namen zu nennen - dann waehlt es selbst richtig."
   elif printf '%s' "$LOG" | grep -qiE 'error|failed|unavailable|refused'; then
     fail "Das Log meldet Fehler (siehe oben)"
   else
