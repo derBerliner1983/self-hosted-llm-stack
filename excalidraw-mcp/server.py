@@ -55,6 +55,7 @@ This file is part of Self-Hosted AI Stack. MIT License.
 """
 
 import base64
+import errno
 import functools
 import http.server
 import json
@@ -471,7 +472,8 @@ _render_lock = threading.Lock()
 
 
 def _ensure_render_server():
-    """Startet den lokalen Datei-Server für render/ genau einmal.
+    """Startet den lokalen Datei-Server für render/ - idempotent, auch
+    prozessübergreifend.
 
     Playwright/Chromium braucht eine echte HTTP-URL, kein file:// - sonst
     scheitert das Nachladen der Schriften per fetch() (an einem echten Lauf
@@ -479,12 +481,27 @@ def _ensure_render_server():
     erlaubt keine file://-Ziele von einer file://-Seite aus). Der Server
     läuft nur auf 127.0.0.1, ist also von außerhalb dieses Containers
     ohnehin nicht erreichbar.
+
+    Das globale _render_server_started-Flag allein reicht nicht: FastMCP
+    kann parallele Werkzeugaufrufe in eigenen Worker-Prozessen bedienen,
+    von denen jeder mit einem frischen, eigenen False startet - an einem
+    echten Lauf beobachtet als "[Errno 98] Address already in use", weil
+    ein PARALLELER Aufruf den Port im selben Moment schon belegt hatte.
+    Ein bereits belegter Port ist hier kein Fehler: irgendein Worker
+    liefert render/ dann bereits aus - alle Worker liefern exakt denselben
+    Inhalt aus, es kommt nicht darauf an, welcher zuerst gebunden hat.
     """
     global _render_server_started
     if _render_server_started:
         return
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=RENDER_DIR)
-    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", RENDER_PORT), handler)
+    try:
+        httpd = http.server.ThreadingHTTPServer(("127.0.0.1", RENDER_PORT), handler)
+    except OSError as exc:
+        if exc.errno == errno.EADDRINUSE:
+            _render_server_started = True  # ein anderer Worker bedient den Port bereits
+            return
+        raise
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     _render_server_started = True
