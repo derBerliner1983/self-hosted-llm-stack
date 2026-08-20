@@ -1,0 +1,64 @@
+# Excalidraw
+
+Das LLM baut Diagramme (Formen, Text, Pfeile) als `.excalidraw`-Dateien — du öffnest sie in deinem eigenen Excalidraw.
+
+[← Zur Übersicht](../../README.md) &nbsp;|&nbsp; [English version](../en/excalidraw.md)
+
+**Dokumentation:** [Installation & Erste Schritte](installation.md) · [Kontrollzentrum (Menü)](kontrollzentrum.md) · [Architektur & Dienste](architektur.md) · [Werkzeuge fürs LLM (MCP)](werkzeuge.md) · [LibreChat (zweite Oberfläche)](librechat.md) · [Code-Sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android-Entwicklung](android.md) · **Excalidraw** · [Austausch-Ablage](austausch-ablage.md) · [Wissensdatenbank (Vault)](wissensdatenbank.md) · [Modelle verwalten](modelle.md) · [Betrieb & Wartung](betrieb.md) · [Sicherheit & Fernzugriff](sicherheit.md) · [Weitere Stacks](weitere-stacks.md)
+
+---
+
+## Wozu
+
+`excalidraw-mcp` ist ein eigener, optionaler MCP-Dienst, mit dem das Modell Diagramme bauen kann — ein Flussdiagramm, eine Architekturskizze, eine Mindmap — ohne dass du selbst klicken musst.
+
+**Wichtig zu wissen, bevor du es benutzt:** Dein laufender Excalidraw-Container (`excalidraw/excalidraw`, das offizielle Image) ist reine Frontend-Software ohne eigene Speicher- oder Sync-API. Das Modell zeichnet deshalb **nicht live** in eine offene Browser-Tab hinein — das bräuchte einen zusätzlichen Kollaborations-Server und wäre ein deutlich größerer, fragilerer Umbau. Stattdessen erzeugt das Modell `.excalidraw`-Dateien (das offene, standardisierte Excalidraw-Dateiformat) und legt sie auf Wunsch nach [`/exchange`](austausch-ablage.md) — von dort lädst du sie herunter und öffnest sie in deinem Excalidraw über **Datei → Öffnen**.
+
+## Im Chat nutzen
+
+> Zeichne mir ein Flussdiagramm für einen Login-Prozess: Start, Eingabe prüfen, bei Fehler zurück zu Eingabe, bei Erfolg Ende. Leg es danach in /exchange ab.
+
+Das Modell ruft dafür der Reihe nach auf:
+
+1. `use_diagram(name)` — legt das Diagramm an (oder wählt ein bestehendes) und macht es zum **aktuellen** Diagramm.
+2. `add_element(spec)` — mehrfach, je Aufruf ein Rechteck/Ellipse/Text/Pfeil.
+3. `export_diagram()` — kopiert die Datei nach `/exchange`.
+
+Danach: `/exchange` im Browser öffnen (siehe [Austausch-Ablage](austausch-ablage.md)), Datei herunterladen, in Excalidraw über **Datei → Öffnen** laden.
+
+## Werkzeuge
+
+| Werkzeug | Zweck |
+|---|---|
+| `list_diagrams()` | Vorhandene Diagramme auflisten, zeigt auch das aktuelle |
+| `use_diagram(name)` | Diagramm anlegen/auswählen — wird zum "aktuellen" Diagramm |
+| `add_element(spec)` | Ein Element zum aktuellen Diagramm hinzufügen |
+| `remove_last_element()` | Letztes Element rückgängig machen |
+| `get_diagram(name)` | Elemente eines Diagramms anzeigen (leerer Name = aktuelles) |
+| `export_diagram(name)` | Nach `/exchange` kopieren (leerer Name = aktuelles) |
+
+`spec` bei `add_element` ist **ein JSON-Objekt als Text**, z. B.:
+
+```json
+{"type":"rectangle","x":100,"y":100,"width":240,"height":120,"text":"Start","backgroundColor":"#a5d8ff"}
+```
+
+Unterstützte `type`-Werte: `rectangle`, `ellipse`, `diamond` (alle drei optional mit `text` — wird zentriert eingefügt), `text` (eigenständig, braucht `x`/`y`/`text`), `arrow` und `line` (brauchen `x1`/`y1`/`x2`/`y2`). Alle Formen akzeptieren optional `strokeColor` (Hex-Farbe).
+
+### Warum genau ein String-Parameter statt einzelner Koordinaten-Felder
+
+An diesem Stack wurde beim Android-Werkzeug beobachtet, dass ein lokales Modell schon bei **zwei** einfachen String-Parametern in einem Aufruf (`name` + `package_name`) zuverlässig an der Schema-Validierung scheiterte, mit nur einem Parameter aber nicht (siehe [Werkzeuge fürs LLM](werkzeuge.md) zur Fehlersuche bei "did not match expected schema"). `add_element` bekommt deshalb bewusst nur `spec` — ein JSON-Objekt als Text. Modelle, die Code schreiben können, sind im Formulieren von JSON als Text erfahrungsgemäß zuverlässiger als im Füllen mehrerer einzelner Funktionsargumente. Aus demselben Grund merkt sich der Dienst ein "aktuelles Diagramm" (`use_diagram`), statt den Namen bei jedem `add_element`-Aufruf erneut zu verlangen.
+
+## Wie es funktioniert
+
+```
+LLM → excalidraw-mcp (eigenes Volume) → export_diagram() → /exchange → Browser (Download) → Excalidraw (Datei öffnen)
+```
+
+Ein schlanker, abhängigkeitsfreier Python-Dienst (dasselbe Muster wie [android-mcp](android.md) und die Code-Sandbox), der `.excalidraw`-JSON-Dateien in einem eigenen Docker-Volume verwaltet. `export_diagram()` kopiert in dasselbe geteilte Volume, das auch [Austausch-Ablage](austausch-ablage.md) und `android-mcp` benutzen — kein zusätzlicher Zugangsdaten-Kram nötig, es ist nur ein Kopierziel.
+
+## Konfiguration
+
+Der Dienst ist optional. Wer keine Diagramme braucht, kann `excalidraw-mcp` aus `docker-compose.rocm.yml` ersatzlos streichen (dann auch den `excalidraw`-Eintrag in `librechat/librechat.yaml` und `mcpo/config.template.json` entfernen).
+
+Fehlersuche wie bei jedem anderen MCP-Werkzeug: `./scripts/diagnose-mcp.sh`.

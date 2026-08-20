@@ -167,6 +167,7 @@ build_items() {
   add svc  mcpo        "mcpo"          "MCP -> OpenAPI für Open WebUI"      "mcpo"
   add svc  sandbox-mcp "Code-Sandbox"  "Code ausführen und testen"          "sandbox-mcp"
   add svc  android-mcp "Android-Build" "Gradle und Android SDK"             "android-mcp"
+  add svc  excalidraw-mcp "Excalidraw" "Diagramme als .excalidraw-Dateien"  "excalidraw-mcp"
 
   add head "" "Wissensdatenbank" "" ""
   add svc  syncthing    "Syncthing"    "Vault zwischen deinen Geräten syncen" "syncthing"
@@ -817,7 +818,7 @@ open_item() {
         mitem seturl "Adresse festlegen (eigene Domain / anderer Host)"
       fi
       case "$id" in
-        mcp|mcpo|sandbox-mcp|android-mcp|librechat) mitem mcpdiag "Werkzeuge prüfen (Fehlersuche MCP)" ;;
+        mcp|mcpo|sandbox-mcp|android-mcp|excalidraw-mcp|librechat) mitem mcpdiag "Werkzeuge prüfen (Fehlersuche MCP)" ;;
       esac
       mitem creds "Zugangsdaten anzeigen"
       case "$id" in

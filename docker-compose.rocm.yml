@@ -401,6 +401,28 @@ services:
       start_period: 60s
       retries: 3
 
+  # ── Excalidraw-Diagramme als MCP-Werkzeuge ──────────────────────────────────
+  # Baut KEINE Live-Verbindung in eine offene Excalidraw-Browser-Tab (der
+  # Vanilla-Container excalidraw/excalidraw ist reine Frontend-Software ohne
+  # eigene Speicher-API dafür) - schreibt stattdessen .excalidraw-Dateien und
+  # legt sie auf Wunsch nach /exchange, von wo aus du sie in Excalidraw über
+  # "Datei -> Öffnen" lädst. Siehe excalidraw-mcp/server.py.
+  excalidraw-mcp:
+    build: ./excalidraw-mcp
+    container_name: excalidraw-mcp
+    restart: always
+    volumes:
+      - excalidraw-data:/diagrams
+      # Dasselbe geteilte Volume wie exchange-bridge/android-mcp/mcp - nur
+      # Kopierziel für export_diagram(), es wird nichts von dort gelesen.
+      - exchange-data:/exchange
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import socket; socket.create_connection(('127.0.0.1',8000),3)\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
   # ── mcpo (MCP → OpenAPI-Proxy) ──────────────────────────────────────────────
   # Open WebUI spricht kein rohes MCP, nur OpenAPI. mcpo übersetzt mcp und
   # sandbox-mcp dafür. mcpo/config.json wird von scripts/wire-mcp.sh mit dem
@@ -600,3 +622,5 @@ volumes:
     name: android-workspace
   android-gradle:
     name: android-gradle
+  excalidraw-data:
+    name: excalidraw-data

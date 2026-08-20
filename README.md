@@ -53,6 +53,7 @@ Die ausführliche Anleitung samt Voraussetzungen, GPU-Einrichtung und Fehlersuch
 | **[Code-Sandbox](documentation/de/code-sandbox.md)** | Code ausführen und testen lassen, Arbeitsbereich, weitere Sprachen |
 | **[Open Interpreter (CLI)](documentation/de/open-interpreter.md)** | Assistent fürs Terminal, optional mitinstallierbar |
 | **[Android-Entwicklung](documentation/de/android.md)** | Projekte anlegen, bauen, testen |
+| **[Excalidraw](documentation/de/excalidraw.md)** | Diagramme als .excalidraw-Dateien bauen lassen |
 | **[Austausch-Ablage](documentation/de/austausch-ablage.md)** | Dateien mit dem LLM hoch-/runterladen (z. B. eine gebaute APK) |
 | **[Wissensdatenbank (Vault)](documentation/de/wissensdatenbank.md)** | Obsidian-Vault per Syncthing oder Vault-Bridge anbinden |
 | **[Modelle verwalten](documentation/de/modelle.md)** | Modelle laden, entladen, bei LiteLLM registrieren |
@@ -75,6 +76,7 @@ Die ausführliche Anleitung samt Voraussetzungen, GPU-Einrichtung und Fehlersuch
 | **mcpo** | MCP → OpenAPI für Open WebUI, Werkzeug-Übersicht | `8800` |
 | **Code-Sandbox** | Code ausführen und testen | nur intern |
 | **Android-Build** | Gradle und Android SDK | nur intern |
+| **Excalidraw-MCP** | Diagramme als .excalidraw-Dateien (optional) | nur intern |
 | **Syncthing** | Vault-Sync zwischen deinen Geräten | `8384` |
 | **Open Interpreter** | CLI-Assistent, führt Code aus (optional) | kein Dienst |
 | **PostgreSQL** | Datenbank mit pgvector | nur intern |

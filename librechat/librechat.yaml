@@ -202,3 +202,15 @@ mcpServers:
     serverInstructions: |
       Android-Projekte anlegen, bauen und testen (Gradle, SDK). Der erste
       Build eines Projekts dauert mehrere Minuten.
+
+  excalidraw:
+    type: "streamable-http"
+    url: "http://excalidraw-mcp:8000/mcp"
+    timeout: 60000
+    serverInstructions: |
+      Excalidraw-Diagramme bauen (Formen, Text, Pfeile). Erst use_diagram
+      aufrufen, dann add_element wiederholt - add_element nimmt EIN
+      JSON-Objekt als Text, keine einzelnen Koordinaten-Parameter. Zum
+      Schluss export_diagram, damit die Datei in /exchange landet und der
+      Nutzer sie in seinem Excalidraw öffnen kann. Live in eine offene
+      Excalidraw-Tab zeichnen geht NICHT - nur Dateien erzeugen.

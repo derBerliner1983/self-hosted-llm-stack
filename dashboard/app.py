@@ -106,6 +106,14 @@ SERVICES = [
         "path": None,
     },
     {
+        "container": "excalidraw-mcp",
+        "label": "Excalidraw-MCP",
+        "desc": "Diagramme als .excalidraw-Dateien · nach /exchange",
+        "icon": "🖊️",
+        "port": None,
+        "path": None,
+    },
+    {
         "container": "mcpo",
         "label": "mcpo",
         "desc": "MCP → OpenAPI · Werkzeug-Übersicht",
