@@ -330,6 +330,17 @@ services:
       # Registrierung offen lassen, damit du den ersten Account anlegen
       # kannst; danach in der .env auf false setzen.
       - ALLOW_REGISTRATION=${LIBRECHAT_ALLOW_REGISTRATION:-false}
+      # Standardmäßig aus - LibreChats normales Log zeigt bei einem
+      # abgelehnten Werkzeugaufruf nur "did not match expected schema",
+      # nicht die tatsächlich vom Modell gesendeten Rohargumente. Für genau
+      # diesen Fall in der .env auf "true" setzen, den Container neu
+      # erzeugen (force-recreate, reiner "restart" reicht nicht, siehe
+      # wire-mcp.sh-Kommentare für den Grund), den fehlschlagenden Aufruf
+      # wiederholen und "docker logs librechat" erneut durchsuchen - danach
+      # wieder auf "false" zurückstellen, sonst wird jede Anfrage
+      # mitprotokolliert.
+      - DEBUG_LOGGING=${LIBRECHAT_DEBUG_LOGGING:-false}
+      - DEBUG_CONSOLE=${LIBRECHAT_DEBUG_LOGGING:-false}
     volumes:
       - ./librechat/librechat.yaml:/app/librechat.yaml:ro
       - librechat-data:/app/client/public/images
