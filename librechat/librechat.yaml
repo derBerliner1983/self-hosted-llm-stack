@@ -135,6 +135,20 @@ modelSpecs:
         endpoint: "LiteLLM"
         model: "ollama/llama3.1:8b"
 
+    - name: "qwen3-32b"
+      label: "Qwen3 32B"
+      description: "Groesser als Qwen Coder · zuverlaessiger bei mehreren Werkzeugaufrufen · KEIN Bildverstaendnis"
+      # Dasselbe Symbol wie "Qwen Coder" - schon als Datei im Volume
+      # vorhanden (siehe Kommentar zu iconURL weiter oben), kein erneuter
+      # "docker cp" noetig.
+      iconURL: "/images/custom/qwen-color.png"
+      showIconInMenu: true
+      showIconInHeader: true
+      order: 5
+      preset:
+        endpoint: "LiteLLM"
+        model: "ollama/qwen3:32b"
+
 # ── SSRF-Ausnahme für die eigenen Dienste ───────────────────────────────
 # Ohne diesen Block lehnt LibreChat die MCP-Server ab:
 #   Domain "http://mcp:3000" is not allowed
