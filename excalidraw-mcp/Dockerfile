@@ -21,10 +21,16 @@ WORKDIR /build
 
 # Feste Versionen statt "latest" - reproduzierbare Bilder, kein
 # überraschender Bruch durch ein neues Excalidraw-Release.
+#
+# @excalidraw/mermaid-to-excalidraw: derselbe Mermaid-Konverter, den
+# Excalidraw selbst für seinen "Mermaid zu Excalidraw"-Import benutzt -
+# siehe render/entry.js/add_mermaid() (server.py) für den Grund
+# (verlässliches Layout statt vom Modell frei erfundener x/y-Koordinaten).
 RUN npm install --no-audit --no-fund \
       react@18.3.1 \
       react-dom@18.3.1 \
       @excalidraw/excalidraw@0.18.1 \
+      @excalidraw/mermaid-to-excalidraw@2.2.2 \
       esbuild@0.28.2
 
 COPY render/entry.js .

@@ -21,10 +21,28 @@ Das LLM baut Diagramme (Formen, Text, Pfeile) als `.excalidraw`-Datei oder direk
 Das Modell ruft dafür der Reihe nach auf:
 
 1. `use_diagram(name)` — legt das Diagramm an (oder wählt ein bestehendes) und macht es zum **aktuellen** Diagramm.
-2. `add_element(spec)` — mehrfach, je Aufruf ein Rechteck/Ellipse/Text/Pfeil.
+2. `add_mermaid(text)` — baut das ganze Diagramm auf einen Schlag aus Mermaid-Text auf (siehe unten, warum das der empfohlene Weg ist).
 3. `export_png()` — rendert die aktuelle Ansicht als PNG und kopiert es nach `/exchange`. Willst du stattdessen die Rohdatei zum Weiterbearbeiten, nutze `export_diagram()`.
 
 Danach: `/exchange` im Browser öffnen (siehe [Austausch-Ablage](austausch-ablage.md)) und die Datei herunterladen.
+
+## Warum add_mermaid der empfohlene Weg ist
+
+Bei einem Diagramm mit mehreren verbundenen Boxen (Flussdiagramm, Ablauf, Architektur, …) müsste ein Modell, das jede Box einzeln per `add_element` mit festen `x`/`y`-Koordinaten platziert, das komplette Layout im Kopf durchplanen — das schafft kein Sprachmodell zuverlässig. Live beobachtetes Ergebnis: Boxen und Linien liegen übereinander, sobald es mehr als eine Handvoll Elemente werden.
+
+`add_mermaid(text)` umgeht das komplett: das Modell beschreibt nur noch **Knoten und Kanten als Text** (Mermaid-Syntax), zum Beispiel:
+
+```
+flowchart TD
+    A[Start] --> B{Eingabe gueltig?}
+    B -->|Nein| C[Fehler anzeigen]
+    C --> A
+    B -->|Ja| D[Fertig]
+```
+
+Die Positionierung übernimmt dann **Mermaids eigene Layout-Engine** (derselbe Code, den Excalidraw selbst für seinen "Mermaid importieren"-Knopf benutzt) — garantiert überschneidungsfrei, ganz ohne dass das Modell eine einzige Koordinate angeben muss. `add_mermaid` **ersetzt** dabei alle Elemente des aktuellen Diagramms (kein Hinzufügen wie bei `add_element`).
+
+`add_element` bleibt für einzelne, freistehende Ergänzungen sinnvoll — für alles mit mehreren verbundenen Boxen ist `add_mermaid` die zuverlässige Wahl.
 
 ## Werkzeuge
 
@@ -32,13 +50,14 @@ Danach: `/exchange` im Browser öffnen (siehe [Austausch-Ablage](austausch-ablag
 |---|---|
 | `list_diagrams()` | Vorhandene Diagramme auflisten, zeigt auch das aktuelle |
 | `use_diagram(name)` | Diagramm anlegen/auswählen — wird zum "aktuellen" Diagramm |
-| `add_element(spec)` | Ein Element zum aktuellen Diagramm hinzufügen |
+| `add_mermaid(text)` | Aktuelles Diagramm aus Mermaid-Text aufbauen — **ersetzt** alle Elemente, automatisches Layout |
+| `add_element(spec)` | Ein einzelnes Element zum aktuellen Diagramm hinzufügen |
 | `remove_last_element()` | Letztes Element rückgängig machen |
 | `get_diagram(name)` | Elemente eines Diagramms anzeigen (leerer Name = aktuelles) |
 | `export_diagram(name)` | Als `.excalidraw`-Rohdatei nach `/exchange` kopieren (leerer Name = aktuelles) |
 | `export_png(name)` | Als PNG-Bild nach `/exchange` rendern (leerer Name = aktuelles) |
 
-`export_png` rendert mit demselben Code, den Excalidraw selbst im Browser für "Bild exportieren" benutzt (echte Handschrift-Schrift, echte Formen) — nur headless über ein eingebautes Chromium (Playwright), ganz ohne deinen laufenden Excalidraw-Container oder Internet zur Laufzeit zu brauchen. Der erste Export nach dem Start des Dienstes dauert etwas länger (Chromium startet neu), danach ist jeder weitere in wenigen Sekunden fertig.
+`export_png` rendert mit demselben Code, den Excalidraw selbst im Browser für "Bild exportieren" benutzt (echte Handschrift-Schrift, echte Formen) — nur headless über ein eingebautes Chromium (Playwright), ganz ohne deinen laufenden Excalidraw-Container oder Internet zur Laufzeit zu brauchen. Der erste Export nach dem Start des Dienstes dauert etwas länger (Chromium startet neu), danach ist jeder weitere in wenigen Sekunden fertig. Am zuverlässigsten unterstützt `add_mermaid`: Flussdiagramme (`flowchart`), Sequenzdiagramme (`sequenceDiagram`) und Klassendiagramme (`classDiagram`) — andere Mermaid-Diagrammarten können unvollständig umgesetzt werden.
 
 `spec` bei `add_element` ist **ein JSON-Objekt als Text**, z. B.:
 
@@ -50,17 +69,17 @@ Unterstützte `type`-Werte: `rectangle`, `ellipse`, `diamond` (alle drei optiona
 
 ### Warum genau ein String-Parameter statt einzelner Koordinaten-Felder
 
-An diesem Stack wurde beim Android-Werkzeug beobachtet, dass ein lokales Modell schon bei **zwei** einfachen String-Parametern in einem Aufruf (`name` + `package_name`) zuverlässig an der Schema-Validierung scheiterte, mit nur einem Parameter aber nicht (siehe [Werkzeuge fürs LLM](werkzeuge.md) zur Fehlersuche bei "did not match expected schema"). `add_element` bekommt deshalb bewusst nur `spec` — ein JSON-Objekt als Text. Modelle, die Code schreiben können, sind im Formulieren von JSON als Text erfahrungsgemäß zuverlässiger als im Füllen mehrerer einzelner Funktionsargumente. Aus demselben Grund merkt sich der Dienst ein "aktuelles Diagramm" (`use_diagram`), statt den Namen bei jedem `add_element`-Aufruf erneut zu verlangen.
+An diesem Stack wurde beim Android-Werkzeug beobachtet, dass ein lokales Modell schon bei **zwei** einfachen String-Parametern in einem Aufruf (`name` + `package_name`) zuverlässig an der Schema-Validierung scheiterte, mit nur einem Parameter aber nicht (siehe [Werkzeuge fürs LLM](werkzeuge.md) zur Fehlersuche bei "did not match expected schema"). `add_element` und `add_mermaid` bekommen deshalb bewusst nur je einen String-Parameter. Modelle, die Code schreiben können, sind im Formulieren von Text (JSON oder Mermaid-Syntax) erfahrungsgemäß zuverlässiger als im Füllen mehrerer einzelner Funktionsargumente. Aus demselben Grund merkt sich der Dienst ein "aktuelles Diagramm" (`use_diagram`), statt den Namen bei jedem Aufruf erneut zu verlangen.
 
 ## Wie es funktioniert
 
 ```
-LLM → excalidraw-mcp (eigenes Volume) → export_diagram()/export_png() → /exchange → Browser (Download)
+LLM → add_mermaid()/add_element() → excalidraw-mcp (eigenes Volume) → export_diagram()/export_png() → /exchange → Browser (Download)
 ```
 
 Ein Python-Dienst (Grundmuster wie [android-mcp](android.md) und die Code-Sandbox), der `.excalidraw`-JSON-Dateien in einem eigenen Docker-Volume verwaltet. `export_diagram()`/`export_png()` kopieren in dasselbe geteilte Volume, das auch [Austausch-Ablage](austausch-ablage.md) und `android-mcp` benutzen — kein zusätzlicher Zugangsdaten-Kram nötig, es ist nur ein Kopierziel.
 
-Für `export_png()` steckt im Image zusätzlich Excalidraws eigener Bild-Renderer (einmalig beim Bauen des Images mit esbuild zu einer einzigen Datei gebündelt, keine Internetverbindung zur Laufzeit nötig) plus ein headless Chromium (Playwright) - deshalb ist dieses Image deutlich größer als die anderen MCP-Werkzeuge in diesem Stack, ähnlich wie bei [android-mcp](android.md).
+Für `export_png()` und `add_mermaid()` steckt im Image zusätzlich Excalidraws eigener Renderer und der offizielle Mermaid-Konverter (`@excalidraw/mermaid-to-excalidraw` - einmalig beim Bauen des Images mit esbuild zu einer einzigen Datei gebündelt, keine Internetverbindung zur Laufzeit nötig) plus ein headless Chromium (Playwright) - deshalb ist dieses Image deutlich größer als die anderen MCP-Werkzeuge in diesem Stack, ähnlich wie bei [android-mcp](android.md).
 
 ## Konfiguration
 
