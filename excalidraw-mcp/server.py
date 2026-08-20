@@ -15,7 +15,16 @@ Werkzeuge für das Modell:
   - add_element(spec)        Ein Element zum AKTUELLEN Diagramm hinzufügen
   - remove_last_element()    Letztes Element rückgängig machen
   - get_diagram(name)        Elemente eines Diagramms anzeigen
-  - export_diagram(name)     Nach /exchange kopieren, zum Herunterladen
+  - export_diagram(name)     Nach /exchange kopieren, zum Herunterladen (.excalidraw)
+  - export_png(name)         Als PNG-Bild nach /exchange rendern
+
+export_png() rendert mit demselben Code, den Excalidraw selbst im Browser
+benutzt (exportToBlob, siehe render/entry.js) - nur headless über
+Playwright/Chromium statt in einer sichtbaren Tab. Dafür startet dieser
+Dienst beim Hochfahren einen kleinen, rein lokalen HTTP-Server (127.0.0.1,
+EXCALIDRAW_RENDER_PORT), der render/bundle.js und die Schriftdateien
+ausliefert - Chromium braucht eine echte URL, kein file://, um Schriften
+per fetch() nachzuladen (siehe harness.html).
 
 WICHTIG zum Werkzeug-Zuschnitt: add_element() nimmt bewusst GENAU EINEN
 String-Parameter (ein JSON-Objekt als Text) statt vieler einzelner
@@ -33,18 +42,32 @@ Diagrammnamen bei jedem add_element-Aufruf erneut mitzugeben.
 This file is part of Self-Hosted AI Stack. MIT License.
 """
 
+import base64
+import functools
+import http.server
 import json
 import os
 import random
 import re
+import threading
 import time
 import uuid
 
 from mcp.server.mcpserver import MCPServer
+from playwright.sync_api import sync_playwright
 
 WORKSPACE = os.environ.get("EXCALIDRAW_WORKSPACE", "/diagrams")
 EXCHANGE_DIR = os.environ.get("EXCALIDRAW_EXCHANGE_DIR", "/exchange")
 CURRENT_FILE = os.path.join(WORKSPACE, ".current")
+
+# Für export_png(): Verzeichnis mit dem gebündelten Renderer (bundle.js,
+# harness.html, fonts/), von einem lokalen HTTP-Server ausgeliefert -
+# siehe Dockerfile (Stufe "jsbuild") und render/entry.js.
+RENDER_DIR = os.environ.get("EXCALIDRAW_RENDER_DIR", "/app/render")
+RENDER_PORT = int(os.environ.get("EXCALIDRAW_RENDER_PORT", "8934"))
+# Kein expliziter Pfad zu Chromium nötig: das offizielle Playwright-
+# Basisimage (siehe Dockerfile) hat den Browser schon an der Stelle
+# installiert, an der Playwright selbst ihn erwartet.
 
 HOST = os.environ.get("FASTMCP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("FASTMCP_PORT", "8000"))
@@ -427,6 +450,107 @@ def get_diagram(name: str = "") -> dict:
         for el in scene.get("elements", [])
     ]
     return {"diagram": name, "elements": compact}
+
+
+# ── PNG-Rendern (export_png) ─────────────────────────────────────────────
+
+_render_server_started = False
+_render_lock = threading.Lock()
+
+
+def _ensure_render_server():
+    """Startet den lokalen Datei-Server für render/ genau einmal.
+
+    Playwright/Chromium braucht eine echte HTTP-URL, kein file:// - sonst
+    scheitert das Nachladen der Schriften per fetch() (an einem echten Lauf
+    beobachtet: file:// führte zu "NetworkError", Chromiums Fetch-API
+    erlaubt keine file://-Ziele von einer file://-Seite aus). Der Server
+    läuft nur auf 127.0.0.1, ist also von außerhalb dieses Containers
+    ohnehin nicht erreichbar.
+    """
+    global _render_server_started
+    if _render_server_started:
+        return
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=RENDER_DIR)
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", RENDER_PORT), handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    _render_server_started = True
+
+
+def _render_png_bytes(scene, scale=2):
+    """Rendert eine Szene mit einem headless Chromium zu PNG-Bytes.
+
+    Ein Lock statt mehrerer gleichzeitiger Chromium-Prozesse: export_png
+    ist ein gelegentlich genutztes Werkzeug, kein Dauerbetrieb - lieber
+    Aufrufe kurz hintereinander abarbeiten als den Speicher mit mehreren
+    Browserinstanzen gleichzeitig zu belasten.
+    """
+    _ensure_render_server()
+    with _render_lock:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(args=["--no-sandbox"])
+            try:
+                page = browser.new_page()
+                page.goto(f"http://127.0.0.1:{RENDER_PORT}/harness.html")
+                page.wait_for_function("window.__renderReady === true", timeout=15000)
+                b64 = page.evaluate(
+                    "([sceneJson, optsJson]) => window.renderPNG(sceneJson, optsJson)",
+                    [json.dumps(scene), json.dumps({"scale": scale})],
+                )
+            finally:
+                browser.close()
+    return base64.b64decode(b64)
+
+
+@mcp.tool()
+def export_png(name: str = "") -> dict:
+    """Rendert ein Diagramm als PNG-Bild und legt es nach /exchange - wie
+    export_diagram, nur als fertiges Bild statt als .excalidraw-Rohdatei.
+
+    Nutzt denselben Renderer, den Excalidraw selbst im Browser verwendet
+    (echte Handschrift-Schrift, echte Formen) - läuft aber headless in
+    diesem Dienst, kein externer Dienst oder Netzwerk zur Laufzeit nötig.
+    Der erste Aufruf nach dem Start dauert etwas länger (Chromium startet
+    neu), danach ist jeder Export in wenigen Sekunden fertig.
+
+    :param name: Diagrammname. Leer = aktuelles Diagramm (siehe use_diagram).
+    """
+    if not name:
+        try:
+            name, path, scene = _require_current()
+        except ValueError as exc:
+            return {"error": str(exc)}
+    else:
+        try:
+            path = _diagram_path(name)
+        except ValueError as exc:
+            return {"error": str(exc)}
+        if not os.path.exists(path):
+            return {"error": f"Diagramm '{name}' nicht gefunden. Siehe list_diagrams()."}
+        scene = _load_scene(path)
+
+    if not scene.get("elements"):
+        return {"error": f"'{name}' hat keine Elemente - erst mit add_element etwas hinzufügen."}
+
+    try:
+        png_bytes = _render_png_bytes(scene)
+    except Exception as exc:  # noqa: BLE001 - Playwright kann diverse Fehlerarten werfen
+        return {"error": f"Rendern fehlgeschlagen: {exc}"}
+
+    try:
+        os.makedirs(EXCHANGE_DIR, exist_ok=True)
+        dest = os.path.join(EXCHANGE_DIR, f"{name}.png")
+        with open(dest, "wb") as fh:
+            fh.write(png_bytes)
+    except OSError as exc:
+        return {"error": f"Konnte nicht nach {EXCHANGE_DIR} kopieren: {exc}"}
+
+    return {
+        "diagram": name,
+        "exchange_path": dest,
+        "next_step": f"'{name}.png' liegt jetzt in /exchange - der Nutzer kann es dort direkt als Bild herunterladen.",
+    }
 
 
 @mcp.tool()

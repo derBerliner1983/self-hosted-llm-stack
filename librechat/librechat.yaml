@@ -212,6 +212,7 @@ mcpServers:
       Excalidraw-Diagramme bauen (Formen, Text, Pfeile). Erst use_diagram
       aufrufen, dann add_element wiederholt - add_element nimmt EIN
       JSON-Objekt als Text, keine einzelnen Koordinaten-Parameter. Zum
-      Schluss export_diagram, damit die Datei in /exchange landet und der
-      Nutzer sie in seinem Excalidraw öffnen kann. Live in eine offene
-      Excalidraw-Tab zeichnen geht NICHT - nur Dateien erzeugen.
+      Schluss export_diagram (.excalidraw-Datei) oder export_png
+      (fertiges PNG-Bild), damit die Datei in /exchange landet und der
+      Nutzer sie herunterladen kann. Live in eine offene Excalidraw-Tab
+      zeichnen geht NICHT - nur Dateien erzeugen.
