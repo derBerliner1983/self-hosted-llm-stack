@@ -4,7 +4,7 @@ MCP Gateway, wiring it into Open WebUI, and the per-model checklist.
 
 [← Back to overview](../../README-en.md) &nbsp;|&nbsp; [Deutsche Fassung](../de/werkzeuge.md)
 
-**Documentation:** [Installation & getting started](installation.md) · [Control center (menu)](control-center.md) · [Architecture & services](architecture.md) · **Tools for the LLM (MCP)** · [LibreChat (second UI)](librechat.md) · [Code sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android development](android.md) · [Exchange Bridge](exchange-bridge.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · [Operations & maintenance](operations.md) · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
+**Documentation:** [Installation & getting started](installation.md) · [Control center (menu)](control-center.md) · [Architecture & services](architecture.md) · **Tools for the LLM (MCP)** · [LibreChat (second UI)](librechat.md) · [Code sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android development](android.md) · [Excalidraw](excalidraw.md) · [Exchange Bridge](exchange-bridge.md) · [Knowledge base (vault)](knowledge-base.md) · [Managing models](models.md) · [Operations & maintenance](operations.md) · [Security & remote access](security.md) · [Other stacks](other-stacks.md)
 
 ---
 
@@ -40,7 +40,8 @@ How to connect the tools in Open WebUI:
 2. Add a new tool server, URL: **`http://mcpo:8000/mcp_gateway`** (filesystem, web, time, GitHub, search, DB)
 3. Add a second one, URL: **`http://mcpo:8000/code_sandbox`** (`run_python`, `run_shell`)
 4. Optionally a third, URL: **`http://mcpo:8000/android_build`** (create/build/test Android projects — only needed if you run the `android-mcp` service)
-5. In chat: use the tool icon below the input box to enable the tools you want for that conversation
+5. Optionally a fourth, URL: **`http://mcpo:8000/excalidraw`** ([build diagrams](excalidraw.md) — only needed if you run the `excalidraw-mcp` service)
+6. In chat: use the tool icon below the input box to enable the tools you want for that conversation
 
 ```bash
 docker logs mcpo          # is mcpo running, are both servers loaded?
@@ -98,6 +99,7 @@ mcpo ships a Swagger UI that **authoritatively** shows which tools are available
 ```
 http://<server-ip>:8800/mcp_gateway/docs     # filesystem, web fetch, time, …
 http://<server-ip>:8800/code_sandbox/docs    # run_python, run_shell
+http://<server-ip>:8800/excalidraw/docs      # diagrams (only with excalidraw-mcp)
 ```
 
 (Also available as the "mcpo" dashboard tile.) The same list on the command line:

@@ -4,7 +4,7 @@ MCP Gateway, Anbindung an Open WebUI und die Checkliste pro Modell.
 
 [← Zur Übersicht](../../README.md) &nbsp;|&nbsp; [English version](../en/tools.md)
 
-**Dokumentation:** [Installation & Erste Schritte](installation.md) · [Kontrollzentrum (Menü)](kontrollzentrum.md) · [Architektur & Dienste](architektur.md) · **Werkzeuge fürs LLM (MCP)** · [LibreChat (zweite Oberfläche)](librechat.md) · [Code-Sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android-Entwicklung](android.md) · [Austausch-Ablage](austausch-ablage.md) · [Wissensdatenbank (Vault)](wissensdatenbank.md) · [Modelle verwalten](modelle.md) · [Betrieb & Wartung](betrieb.md) · [Sicherheit & Fernzugriff](sicherheit.md) · [Weitere Stacks](weitere-stacks.md)
+**Dokumentation:** [Installation & Erste Schritte](installation.md) · [Kontrollzentrum (Menü)](kontrollzentrum.md) · [Architektur & Dienste](architektur.md) · **Werkzeuge fürs LLM (MCP)** · [LibreChat (zweite Oberfläche)](librechat.md) · [Code-Sandbox](code-sandbox.md) · [Open Interpreter (CLI)](open-interpreter.md) · [Android-Entwicklung](android.md) · [Excalidraw](excalidraw.md) · [Austausch-Ablage](austausch-ablage.md) · [Wissensdatenbank (Vault)](wissensdatenbank.md) · [Modelle verwalten](modelle.md) · [Betrieb & Wartung](betrieb.md) · [Sicherheit & Fernzugriff](sicherheit.md) · [Weitere Stacks](weitere-stacks.md)
 
 ---
 
@@ -40,7 +40,8 @@ So bindest du die Werkzeuge in Open WebUI ein:
 2. Neuen Werkzeug-Server hinzufügen, URL: **`http://mcpo:8000/mcp_gateway`** (Dateisystem, Web, Zeit, GitHub, Suche, DB)
 3. Einen zweiten hinzufügen, URL: **`http://mcpo:8000/code_sandbox`** (`run_python`, `run_shell`)
 4. Optional einen dritten, URL: **`http://mcpo:8000/android_build`** (Android-Projekte anlegen/bauen/testen — nur nötig, wenn du den `android-mcp`-Dienst nutzt)
-5. Im Chat: Werkzeug-Icon unten im Eingabefeld → die gewünschten Werkzeuge für die Unterhaltung aktivieren
+5. Optional einen vierten, URL: **`http://mcpo:8000/excalidraw`** ([Diagramme bauen](excalidraw.md) — nur nötig, wenn du den `excalidraw-mcp`-Dienst nutzt)
+6. Im Chat: Werkzeug-Icon unten im Eingabefeld → die gewünschten Werkzeuge für die Unterhaltung aktivieren
 
 ```bash
 docker logs mcpo          # Läuft mcpo, sind beide Server geladen?
@@ -100,6 +101,7 @@ mcpo bringt eine Swagger-Oberfläche mit, die **verbindlich** zeigt, welche Werk
 ```
 http://<server-ip>:8800/mcp_gateway/docs     # Dateisystem, Web-Fetch, Zeit, …
 http://<server-ip>:8800/code_sandbox/docs    # run_python, run_shell
+http://<server-ip>:8800/excalidraw/docs      # Diagramme (nur mit excalidraw-mcp)
 ```
 
 (Auch als Dashboard-Kachel „mcpo".) Dieselbe Liste auf der Kommandozeile:

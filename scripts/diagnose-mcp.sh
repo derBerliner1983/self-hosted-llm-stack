@@ -45,15 +45,17 @@ printf '%s' "$c_reset"
 # ── 1) Laufen die Dienste? ──────────────────────────────────────────────────
 step "1/6 · Laufen die MCP-Dienste?"
 RUNNING=" $(docker ps --format '{{.Names}}' 2>/dev/null | tr '\n' ' ')"
-for c in mcp sandbox-mcp android-mcp librechat; do
+for c in mcp sandbox-mcp android-mcp excalidraw-mcp librechat; do
   case "$RUNNING" in
     *" $c "*) ok "$c läuft" ;;
-    *) if [ "$c" = "android-mcp" ]; then
-         warn "$c läuft nicht (nur nötig, wenn du Android-Werkzeuge nutzt)"
-       else
-         fail "$c läuft nicht"
-         hint "Starten: docker compose -f $COMPOSE_FILE up -d $c"
-       fi ;;
+    *) case "$c" in
+         android-mcp) warn "$c läuft nicht (nur nötig, wenn du Android-Werkzeuge nutzt)" ;;
+         excalidraw-mcp) warn "$c läuft nicht (nur nötig, wenn du Excalidraw-Werkzeuge nutzt)" ;;
+         *)
+           fail "$c läuft nicht"
+           hint "Starten: docker compose -f $COMPOSE_FILE up -d $c"
+           ;;
+       esac ;;
   esac
 done
 
@@ -161,7 +163,8 @@ case "$RUNNING" in
   *" librechat "*)
     probe "mcp_gateway"  "http://mcp:3000/mcp"          "${MCP_API_KEY:-}"
     probe "code_sandbox" "http://sandbox-mcp:8000/mcp"  ""
-    case "$RUNNING" in *" android-mcp "*) probe "android_build" "http://android-mcp:8000/mcp" "" ;; esac ;;
+    case "$RUNNING" in *" android-mcp "*) probe "android_build" "http://android-mcp:8000/mcp" "" ;; esac
+    case "$RUNNING" in *" excalidraw-mcp "*) probe "excalidraw" "http://excalidraw-mcp:8000/mcp" "" ;; esac ;;
   *) printf '  %s—%s übersprungen: LibreChat läuft nicht\n' "$c_dim" "$c_reset" ;;
 esac
 
@@ -225,7 +228,7 @@ ALL_LOG="$(docker logs librechat 2>&1)"
 # sehen waere (die Codes setzen nur die Farbe zurueck, ohne sichtbaren Rest).
 ALL_LOG="$(printf '%s' "$ALL_LOG" | sed -E $'s/\x1b\\[[0-9;]*[a-zA-Z]//g')"
 GATEWAY_EMPTY=0
-for srv in mcp_gateway code_sandbox android_build; do
+for srv in mcp_gateway code_sandbox android_build excalidraw; do
   [ "$LC_UP" -eq 1 ] || break
   # Ist der Server ueberhaupt konfiguriert?
   docker exec librechat sh -c "grep -q '^  ${srv}:' /app/librechat.yaml" 2>/dev/null || continue
