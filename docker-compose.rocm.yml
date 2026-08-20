@@ -394,6 +394,15 @@ services:
       - android-workspace:/workspace
       # Gradle-Cache: ohne ihn lädt jeder Build alle Abhängigkeiten neu.
       - android-gradle:/gradle
+      # Für export_apk() (server.py): das Dateisystem-Werkzeug move_file
+      # (mcp-Container) scheitert beim Kopieren von /workspace nach
+      # /exchange mit EXDEV ("Invalid cross-device link") - das sind zwei
+      # VERSCHIEDENE benannte Docker-Volumes, ein rename()-Systemaufruf
+      # funktioniert nur innerhalb desselben Dateisystems. Python-eigenes
+      # Kopieren (shutil.copy2) hat dieses Problem nicht, braucht aber
+      # direkten Zugriff auf beide Pfade - deshalb hier zusätzlich
+      # eingehängt, genauso wie bei exchange-bridge/excalidraw-mcp.
+      - exchange-data:/exchange
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import socket; socket.create_connection(('127.0.0.1',8000),3)\" || exit 1"]
       interval: 30s

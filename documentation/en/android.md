@@ -19,6 +19,7 @@ Included: **JDK 21**, the **Android SDK** (command-line tools, platform-tools, b
 | `list_projects()` | List projects in the workspace |
 | `create_project(name, package_name)` | Create a new, buildable Java/Gradle project (manifest, MainActivity, example test, Gradle wrapper) |
 | `gradle(project, args)` | Run a Gradle task — `assembleDebug`, `test`, `clean`, `tasks`, … |
+| `export_apk(project)` | Copy the built APK to [`/exchange`](exchange-bridge.md) (not possible with the `move_file` filesystem tool — see below) |
 | `sdk_packages()` | Show installed SDK packages |
 | `install_sdk_package(package)` | Install another SDK package, e.g. `platforms;android-35` |
 
@@ -41,5 +42,6 @@ docker compose -f docker-compose.rocm.yml up -d --build android-mcp
 - **No `adb` access to your devices** — those hang off your machine, not the server.
 - **Network access is intentional here** (Gradle needs it) — unlike the code sandbox. Gradle build scripts are executable code, so this service is about as powerful as the sandbox, just with internet. Like the sandbox it is therefore reachable **internally only**, with no published port.
 - **The project template is deliberately minimal** (Java, no Kotlin/Compose) — fewer version dependencies between Gradle, AGP and Kotlin that have to line up. Kotlin/Compose can be added within the project itself.
+- **Don't move a built APK to `/exchange` with the `move_file` filesystem tool** — `/workspace` and `/exchange` are two different Docker volumes, that fails there with "Invalid cross-device link" (a `rename()` syscall only works within the same filesystem). Use `export_apk(project)` instead, which copies directly from within this service.
 
 Configurable via `.env`: `ANDROID_DEFAULT_TIMEOUT` (default `600` s), `ANDROID_MAX_TIMEOUT` (`1800` s), `ANDROID_COMPILE_SDK` (`34`), `ANDROID_MIN_SDK` (`24`). SDK/Gradle/AGP versions are build arguments in `android-mcp/Dockerfile`.
