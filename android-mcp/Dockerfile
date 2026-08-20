@@ -18,6 +18,15 @@ ARG CMDLINE_TOOLS_VERSION=11076708
 # lassen sich zur Laufzeit über das sdkmanager-Werkzeug nachinstallieren.
 ARG ANDROID_PLATFORM=android-34
 ARG BUILD_TOOLS_VERSION=34.0.0
+# Standalone-Gradle NUR zum Erzeugen des Wrappers (server.py: create_project
+# ruft "gradle wrapper --gradle-version ..." auf, um gradlew/gradle-wrapper.jar
+# in ein neues Projekt zu legen). Für die eigentlichen Builds benutzt jedes
+# Projekt danach seinen eigenen Wrapper - der lädt sich beim ersten Aufruf
+# die in ANDROID_GRADLE_VERSION (server.py) gewünschte Version selbst nach.
+# Muss NICHT exakt zur Wrapper-Zielversion passen, "gradle wrapper" kann
+# einen Wrapper für eine andere Version erzeugen als die, mit der es selbst
+# läuft - hier trotzdem gleich gehalten, um genau das zu vermeiden.
+ARG GRADLE_VERSION=8.7
 
 ENV ANDROID_HOME=/opt/android-sdk \
     ANDROID_SDK_ROOT=/opt/android-sdk \
@@ -47,6 +56,23 @@ RUN set -eux; \
     rm -rf /tmp/cmdline-tools.zip /tmp/cmdline-tools
 
 ENV PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+# Standalone Gradle installieren. Ohne dieses Paket gibt es im Image
+# überhaupt kein "gradle"-Kommando - create_project() in server.py, das
+# damit den Wrapper eines neuen Projekts erzeugt, schlägt dann fehl
+# (Python bekommt ein OSError, weil "gradle" nicht im PATH steht). Neue
+# Projekte landeten dadurch bislang OHNE gradlew im Arbeitsbereich, und
+# das anschließende gradle()-Werkzeug meldete "Weder ein Gradle-Wrapper im
+# Projekt noch ein globales gradle gefunden" - kein Bug im Wrapper-Aufruf
+# selbst, sondern schlicht ein fehlendes Gradle im Image.
+RUN set -eux; \
+    curl -fsSL -o /tmp/gradle.zip \
+        "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"; \
+    unzip -q /tmp/gradle.zip -d /opt; \
+    mv "/opt/gradle-${GRADLE_VERSION}" /opt/gradle; \
+    rm -f /tmp/gradle.zip
+
+ENV PATH="/opt/gradle/bin:$PATH"
 
 # Lizenzen annehmen und die Basispakete holen. Ohne angenommene Lizenzen
 # bricht jeder Gradle-Build mit "You have not accepted the license

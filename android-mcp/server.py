@@ -293,11 +293,20 @@ def create_project(name: str, package_name: str = "com.example.app") -> dict:
         ["gradle", "wrapper", "--gradle-version", GRADLE_VERSION],
         cwd=root, timeout_seconds=DEFAULT_TIMEOUT,
     )
-    if wrapper.get("exit_code") not in (0, None) and not os.path.exists(os.path.join(root, "gradlew")):
+    # Am tatsächlich entstandenen gradlew prüfen, nicht am exit_code: _run()
+    # liefert exit_code=None sowohl bei Zeitüberschreitung ALS AUCH bei einem
+    # OSError (z. B. "gradle" gar nicht im PATH) - eine Prüfung auf
+    # "exit_code not in (0, None)" übersieht den OSError-Fall komplett und
+    # meldete bisher fälschlich Erfolg, obwohl gar kein Wrapper entstanden
+    # ist (genau das hat zuvor lange Fehlersuche verursacht: Projektdateien
+    # lagen, gradlew fehlte, und create_project() hat trotzdem nichts
+    # gewarnt).
+    if not os.path.exists(os.path.join(root, "gradlew")):
         return {
             "created": root,
             "warning": "Projektdateien liegen, aber der Gradle-Wrapper konnte nicht erzeugt werden.",
             "wrapper_output": wrapper.get("output", ""),
+            "wrapper_error": wrapper.get("error", ""),
         }
 
     return {
