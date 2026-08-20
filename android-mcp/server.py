@@ -6,6 +6,7 @@ bauen und zu testen:
   - list_projects()                  Projekte im Arbeitsbereich auflisten
   - create_project(name, package)    Neues Gradle-Projekt anlegen
   - gradle(project, args)            Gradle-Aufgabe ausführen (assembleDebug, test, …)
+  - export_apk(project)              Gebaute APK nach /exchange kopieren
   - sdk_packages()                   Installierte SDK-Pakete anzeigen
   - install_sdk_package(package)     Weiteres SDK-Paket nachinstallieren
 
@@ -19,6 +20,7 @@ Dateisystem-Werkzeuge die Dateien bearbeiten können.
 This file is part of Self-Hosted AI Stack. MIT License.
 """
 
+import glob
 import os
 import re
 import shutil
@@ -27,6 +29,14 @@ import subprocess
 from mcp.server.mcpserver import MCPServer
 
 WORKSPACE = os.environ.get("ANDROID_WORKSPACE", "/workspace")
+# Für export_apk(): /workspace und /exchange sind zwei VERSCHIEDENE
+# benannte Docker-Volumes (siehe docker-compose.rocm.yml). Ein Kopieren
+# über das generische Dateisystem-Werkzeug (move_file, mcp-Container)
+# scheitert dort mit "Invalid cross-device link" (EXDEV) - ein
+# rename()-Systemaufruf funktioniert nur innerhalb desselben
+# Dateisystems. shutil.copy2 hat dieses Problem nicht, braucht aber
+# direkten Zugriff auf beide Pfade - deshalb hier zusätzlich eingehängt.
+EXCHANGE_DIR = os.environ.get("ANDROID_EXCHANGE_DIR", "/exchange")
 DEFAULT_TIMEOUT = int(os.environ.get("ANDROID_DEFAULT_TIMEOUT", "600"))
 MAX_TIMEOUT = int(os.environ.get("ANDROID_MAX_TIMEOUT", "1800"))
 ANDROID_HOME = os.environ.get("ANDROID_HOME", "/opt/android-sdk")
@@ -338,9 +348,10 @@ def gradle(project: str, args: str = "assembleDebug", timeout_seconds: int = DEF
 
     Nach 'assembleDebug' liegt die APK unter
     <projekt>/app/build/outputs/apk/debug/app-debug.apk. Damit der Nutzer sie
-    herunterladen kann, verschiebe sie mit dem Dateisystem-Werkzeug
-    move_file nach /exchange (z. B. /exchange/<projekt>.apk) - das ist der
-    Ordner, den er direkt im Browser sieht, nicht /workspace.
+    herunterladen kann, ruf danach export_apk(project) auf - NICHT das
+    Dateisystem-Werkzeug move_file benutzen, das scheitert zwischen
+    /workspace und /exchange (zwei verschiedene Docker-Volumes) mit
+    "Invalid cross-device link".
 
     :param project: Name des Projekts im Arbeitsbereich (siehe list_projects).
     :param args: Gradle-Argumente, z. B. "assembleDebug" oder "test --info".
@@ -365,6 +376,68 @@ def gradle(project: str, args: str = "assembleDebug", timeout_seconds: int = DEF
     # --no-daemon: Der Gradle-Daemon würde zwischen Aufrufen weiterlaufen und
     # in diesem Container nur Speicher binden, ohne dass jemand ihn beendet.
     return _run(cmd + args.split() + ["--no-daemon"], cwd=root, timeout_seconds=timeout_seconds)
+
+
+@mcp.tool()
+def export_apk(project: str, apk_path: str = "") -> dict:
+    """Kopiert eine gebaute APK nach /exchange, damit der Nutzer sie im
+    Browser herunterladen kann.
+
+    NICHT das Dateisystem-Werkzeug move_file dafür benutzen - /workspace
+    und /exchange sind zwei verschiedene Docker-Volumes, ein Verschieben
+    dazwischen scheitert dort mit "Invalid cross-device link" (EXDEV).
+    Dieses Werkzeug kopiert direkt in diesem Dienst, das hat das Problem
+    nicht.
+
+    Ohne apk_path wird automatisch die zuletzt gebaute APK unter
+    <projekt>/app/build/outputs/apk/ gesucht (ein Debug-Build wird einem
+    Release-Build vorgezogen; bei mehreren Treffern die zuletzt geänderte
+    Datei). Die Kopie landet als /exchange/<projekt>.apk.
+
+    :param project: Name des Projekts im Arbeitsbereich (siehe list_projects).
+    :param apk_path: Optional: Pfad relativ zum Projektordner, falls die
+        automatische Suche nicht die gewünschte APK findet.
+    """
+    try:
+        root = _project_dir(project)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    if not os.path.isdir(root):
+        return {"error": f"Projekt '{project}' nicht gefunden. Siehe list_projects()."}
+
+    if apk_path:
+        src = os.path.realpath(os.path.join(root, apk_path))
+        if os.path.commonpath([src, root]) != root:
+            return {"error": "apk_path liegt außerhalb des Projektordners."}
+        if not os.path.isfile(src):
+            return {"error": f"'{apk_path}' nicht gefunden unter {root}."}
+    else:
+        pattern = os.path.join(root, "app", "build", "outputs", "apk", "**", "*.apk")
+        candidates = glob.glob(pattern, recursive=True)
+        if not candidates:
+            return {
+                "error": (
+                    f"Keine APK unter {root}/app/build/outputs/apk/ gefunden. "
+                    "Erst mit gradle(project, args='assembleDebug') bauen."
+                ),
+            }
+        debug_builds = [c for c in candidates if f"{os.sep}debug{os.sep}" in c]
+        pool = debug_builds or candidates
+        src = max(pool, key=os.path.getmtime)
+
+    try:
+        os.makedirs(EXCHANGE_DIR, exist_ok=True)
+        dest = os.path.join(EXCHANGE_DIR, f"{project}.apk")
+        shutil.copy2(src, dest)
+    except OSError as exc:
+        return {"error": f"Konnte nicht nach {EXCHANGE_DIR} kopieren: {exc}"}
+
+    return {
+        "project": project,
+        "source": src,
+        "exchange_path": dest,
+        "next_step": f"'{project}.apk' liegt jetzt in /exchange - der Nutzer kann sie dort herunterladen.",
+    }
 
 
 @mcp.tool()
